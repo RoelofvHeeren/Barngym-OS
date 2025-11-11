@@ -27,13 +27,19 @@ type FeedItem = {
   totalAmount?: { minorUnits?: number; currency?: string };
   direction?: string;
   counterPartyName?: string;
+  counterPartyType?: string;
+  counterPartyUid?: string;
   reference?: string;
+  description?: string;
   spendingCategory?: string;
   transactionTime?: string;
   updatedAt?: string;
   sourceAmount?: { minorUnits?: number; currency?: string };
   status?: string;
   source?: string;
+  merchantUid?: string;
+  categoryUid?: string;
+  feedItemType?: string;
 };
 
 function parseDateParam(value: string | null, fallback: Date) {
@@ -73,14 +79,22 @@ function mapFeedItemToCsvRow(item: FeedItem) {
   return [
     item.feedItemUid,
     occurredAt,
-    item.counterPartyName ?? "",
-    item.reference ?? "",
-    (amount / 100).toFixed(2),
-    currency,
+    item.updatedAt ?? "",
     item.direction ?? "",
-    item.spendingCategory ?? "",
     item.status ?? "",
+    amount,
+    currency,
     item.source ?? "",
+    item.spendingCategory ?? "",
+    item.counterPartyName ?? "",
+    item.counterPartyType ?? "",
+    item.counterPartyUid ?? "",
+    item.merchantUid ?? "",
+    item.reference ?? "",
+    item.description ?? "",
+    item.feedItemType ?? "",
+    item.categoryUid ?? "",
+    JSON.stringify(item),
   ]
     .map(formatCsvValue)
     .join(",");
@@ -193,15 +207,23 @@ export async function GET(request: Request) {
 
     const header = [
       "feedItemUid",
-      "timestamp",
-      "counterParty",
-      "reference",
-      "amount",
-      "currency",
+      "transactionTime",
+      "updatedAt",
       "direction",
-      "spendingCategory",
       "status",
+      "amountMinor",
+      "currency",
       "source",
+      "spendingCategory",
+      "counterPartyName",
+      "counterPartyType",
+      "counterPartyUid",
+      "merchantUid",
+      "reference",
+      "description",
+      "feedItemType",
+      "categoryUid",
+      "raw",
     ].join(",");
     const rows = allItems.map(mapFeedItemToCsvRow);
     const csv = [header, ...rows].join("\n");
