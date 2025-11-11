@@ -76,6 +76,10 @@ type StarlingFeedItem = {
   spendingCategory?: string;
 };
 
+function safeString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim().length > 0 ? value : undefined;
+}
+
 function mapStripeCharge(charge: StripeCharge): TransactionRecord {
   const created = typeof charge?.created === "number" ? charge.created * 1000 : Date.now();
   const amountMinor = typeof charge?.amount === "number" ? charge.amount : 0;
@@ -88,14 +92,17 @@ function mapStripeCharge(charge: StripeCharge): TransactionRecord {
       : "Needs Review";
   const confidence = charge?.paid ? "High" : "Needs Review";
 
+  const metadata = (charge?.metadata ?? {}) as Record<string, unknown>;
+
   return {
     id: `stripe_${charge?.id ?? randomUUID()}`,
     source: "Stripe",
     personName:
-      charge?.billing_details?.name ||
-      charge?.metadata?.member_name ||
-      charge?.customer,
-    productType: charge?.metadata?.product_type ?? "Stripe Charge",
+      safeString(charge?.billing_details?.name) ||
+      safeString(metadata.member_name) ||
+      safeString(charge?.customer) ||
+      undefined,
+    productType: safeString(metadata.product_type) ?? "Stripe Charge",
     status,
     confidence,
     amountMinor,
@@ -104,9 +111,9 @@ function mapStripeCharge(charge: StripeCharge): TransactionRecord {
     description: charge?.description ?? charge?.statement_descriptor,
     reference: charge?.id,
     metadata: {
-      customer: charge?.customer,
-      email: charge?.billing_details?.email,
-      invoice: charge?.invoice,
+      customer: safeString(charge?.customer),
+      email: safeString(charge?.billing_details?.email),
+      invoice: safeString(charge?.invoice),
     },
   };
 }
