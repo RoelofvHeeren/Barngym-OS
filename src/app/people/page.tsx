@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, startTransition, useEffect, useMemo, useState } from "react";
 
 const leadStages = ["All", "New", "Follow Up", "Proposal", "Won", "Lost"] as const;
 type LeadStage = (typeof leadStages)[number];
@@ -324,15 +324,19 @@ export default function PeoplePage() {
       if (storedLeads) {
         const parsed: LeadRow[] = JSON.parse(storedLeads);
         if (Array.isArray(parsed) && parsed.length) {
-          setImportedLeads(parsed);
-          setSelectedLeadId(parsed[0].id);
+          startTransition(() => {
+            setImportedLeads(parsed);
+            setSelectedLeadId(parsed[0].id);
+          });
         }
       }
       if (storedProfiles) {
         const parsedProfiles: Record<string, LeadProfile> =
           JSON.parse(storedProfiles);
         if (parsedProfiles && typeof parsedProfiles === "object") {
-          setProfiles((prev) => ({ ...prev, ...parsedProfiles }));
+          startTransition(() => {
+            setProfiles((prev) => ({ ...prev, ...parsedProfiles }));
+          });
         }
       }
     } catch (error) {

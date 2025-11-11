@@ -11,6 +11,13 @@ type SyncLog = {
   errors?: string | null;
 };
 
+type BackfillLogSummary = {
+  source?: string;
+  status?: string;
+  message?: string;
+  records?: number | string;
+};
+
 const SYNC_LOG_STORAGE_KEY = "barnGymSyncLogs";
 
 export default function ConnectionsPage() {
@@ -62,9 +69,14 @@ export default function ConnectionsPage() {
   }, [syncLogs]);
 
   const appendSyncLog = useCallback((entry: Omit<SyncLog, "id" | "timestamp">) => {
+    const id =
+      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
     setSyncLogs((prev) => [
       {
-        id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}`,
+        id,
         timestamp: new Date().toISOString(),
         ...entry,
       },
@@ -226,7 +238,7 @@ export default function ConnectionsPage() {
       setBackfillStatus("success");
       setBackfillMessage(result.message || "Backfill complete.");
       if (Array.isArray(result.summaries)) {
-        result.summaries.forEach((summary: any) => {
+        result.summaries.forEach((summary: BackfillLogSummary) => {
           appendSyncLog({
             source: summary.source ?? "Backfill",
             detail: summary.message ?? "Backfill result",

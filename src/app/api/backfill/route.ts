@@ -1,4 +1,6 @@
+import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
+import { TransactionRecord, addTransactions } from "@/lib/transactionStore";
 
 export const runtime = "nodejs";
 
@@ -26,7 +28,134 @@ type BackfillSummary = {
   records?: number;
 };
 
-async function runStripeBackfill(config: StripeBackfillRequest): Promise<BackfillSummary> {
+type BackfillRunResult = {
+  summary: BackfillSummary;
+  transactions: TransactionRecord[];
+};
+
+type StripeCharge = {
+  id?: string;
+  created?: number;
+  amount?: number;
+  currency?: string;
+  status?: string;
+  paid?: boolean;
+  billing_details?: {
+    name?: string;
+    email?: string;
+  };
+  metadata?: Record<string, unknown>;
+  customer?: string;
+  description?: string;
+  statement_descriptor?: string;
+  invoice?: string;
+};
+
+type StarlingFeedItem = {
+  feedItemUid?: string;
+  amount?: {
+    minorUnits?: number;
+    currency?: string;
+  };
+  totalAmount?: {
+    minorUnits?: number;
+    currency?: string;
+  };
+  sourceAmount?: {
+    minorUnits?: number;
+    currency?: string;
+  };
+  transactionTime?: string;
+  updatedAt?: string;
+  spendUntil?: string;
+  status?: string;
+  counterPartyName?: string;
+  reference?: string;
+  description?: string;
+  direction?: string;
+  spendingCategory?: string;
+};
+
+function mapStripeCharge(charge: StripeCharge): TransactionRecord {
+  const created = typeof charge?.created === "number" ? charge.created * 1000 : Date.now();
+  const amountMinor = typeof charge?.amount === "number" ? charge.amount : 0;
+  const currency = (charge?.currency ?? "eur").toString().toUpperCase();
+  const status =
+    charge?.status === "succeeded"
+      ? "Completed"
+      : charge?.status === "failed"
+      ? "Failed"
+      : "Needs Review";
+  const confidence = charge?.paid ? "High" : "Needs Review";
+
+  return {
+    id: `stripe_${charge?.id ?? randomUUID()}`,
+    source: "Stripe",
+    personName:
+      charge?.billing_details?.name ||
+      charge?.metadata?.member_name ||
+      charge?.customer,
+    productType: charge?.metadata?.product_type ?? "Stripe Charge",
+    status,
+    confidence,
+    amountMinor,
+    currency,
+    occurredAt: new Date(created).toISOString(),
+    description: charge?.description ?? charge?.statement_descriptor,
+    reference: charge?.id,
+    metadata: {
+      customer: charge?.customer,
+      email: charge?.billing_details?.email,
+      invoice: charge?.invoice,
+    },
+  };
+}
+
+function mapStarlingFeedItem(item: StarlingFeedItem): TransactionRecord {
+  const feedItemUid = item?.feedItemUid ?? randomUUID();
+  const amountMinor =
+    item?.amount?.minorUnits ??
+    item?.totalAmount?.minorUnits ??
+    item?.sourceAmount?.minorUnits ??
+    0;
+  const currency =
+    (item?.amount?.currency ??
+      item?.totalAmount?.currency ??
+      item?.sourceAmount?.currency ??
+      "GBP")?.toString().toUpperCase();
+  const occurredAt =
+    item?.transactionTime ??
+    item?.updatedAt ??
+    item?.spendUntil ??
+    new Date().toISOString();
+  const status =
+    item?.status === "SETTLED"
+      ? "Completed"
+      : item?.status === "DECLINED"
+      ? "Failed"
+      : "Needs Review";
+  const confidence = item?.counterPartyName ? "Medium" : "Needs Review";
+
+  return {
+    id: `starling_${feedItemUid}`,
+    source: "Starling",
+    personName: item?.counterPartyName ?? item?.reference,
+    productType: item?.spendingCategory ?? "Bank Transfer",
+    status,
+    confidence,
+    amountMinor,
+    currency,
+    occurredAt: new Date(occurredAt).toISOString(),
+    description: item?.reference ?? item?.description,
+    reference: item?.reference ?? feedItemUid,
+    metadata: {
+      direction: item?.direction,
+      spendingCategory: item?.spendingCategory,
+    },
+  };
+}
+
+async function runStripeBackfill(config: StripeBackfillRequest): Promise<BackfillRunResult> {
   const days = Number.isFinite(config.days) ? Number(config.days) : 30;
   const since = Math.floor((Date.now() - days * DAY_MS) / 1000);
 
@@ -47,18 +176,22 @@ async function runStripeBackfill(config: StripeBackfillRequest): Promise<Backfil
   }
 
   const payload = await response.json();
-  const count = Array.isArray(payload.data) ? payload.data.length : 0;
+  const charges = Array.isArray(payload.data) ? payload.data : [];
+  const transactions = charges.map(mapStripeCharge);
   return {
-    source: "Stripe",
-    status: "success",
-    message: `Fetched ${count} charge${
-      count === 1 ? "" : "s"
-    } from the last ${days} day${days === 1 ? "" : "s"}.`,
-    records: count,
+    summary: {
+      source: "Stripe",
+      status: "success",
+      message: `Fetched ${charges.length} charge${
+        charges.length === 1 ? "" : "s"
+      } from the last ${days} day${days === 1 ? "" : "s"}.`,
+      records: charges.length,
+    },
+    transactions,
   };
 }
 
-async function runStarlingBackfill(config: StarlingBackfillRequest): Promise<BackfillSummary> {
+async function runStarlingBackfill(config: StarlingBackfillRequest): Promise<BackfillRunResult> {
   const days = Number.isFinite(config.days) ? Number(config.days) : 90;
   const sinceIso = new Date(Date.now() - days * DAY_MS).toISOString();
   const headers = {
@@ -110,19 +243,25 @@ async function runStarlingBackfill(config: StarlingBackfillRequest): Promise<Bac
   }
 
   const feedPayload = await feedResponse.json();
-  const feedItems =
-    feedPayload?.feedItems ??
-    feedPayload?._embedded?.feedItems ??
-    feedPayload?.items ??
+  const feedItems: StarlingFeedItem[] =
+    (Array.isArray(feedPayload?.feedItems) && (feedPayload.feedItems as StarlingFeedItem[])) ||
+    (Array.isArray(feedPayload?._embedded?.feedItems) &&
+      (feedPayload._embedded.feedItems as StarlingFeedItem[])) ||
+    (Array.isArray(feedPayload?.items) && (feedPayload.items as StarlingFeedItem[])) ||
     [];
 
+  const transactions = feedItems.map(mapStarlingFeedItem);
+
   return {
-    source: "Starling",
-    status: "success",
-    message: `Fetched ${feedItems.length} feed item${
-      feedItems.length === 1 ? "" : "s"
-    } from the last ${days} day${days === 1 ? "" : "s"}.`,
-    records: Array.isArray(feedItems) ? feedItems.length : 0,
+    summary: {
+      source: "Starling",
+      status: "success",
+      message: `Fetched ${transactions.length} feed item${
+        transactions.length === 1 ? "" : "s"
+      } from the last ${days} day${days === 1 ? "" : "s"}.`,
+      records: transactions.length,
+    },
+    transactions,
   };
 }
 
@@ -133,7 +272,15 @@ export async function POST(request: Request) {
 
     if (body?.stripe?.secretKey?.trim()) {
       try {
-        summaries.push(await runStripeBackfill(body.stripe));
+        const result = await runStripeBackfill(body.stripe);
+        const stats = await addTransactions(result.transactions);
+        summaries.push({
+          ...result.summary,
+          records: result.transactions.length,
+          message: `${result.summary.message} Stored ${stats.added} new entr${
+            stats.added === 1 ? "y" : "ies"
+          }.`,
+        });
       } catch (error) {
         summaries.push({
           source: "Stripe",
@@ -154,7 +301,15 @@ export async function POST(request: Request) {
 
     if (body?.starling?.accessToken?.trim()) {
       try {
-        summaries.push(await runStarlingBackfill(body.starling));
+        const result = await runStarlingBackfill(body.starling);
+        const stats = await addTransactions(result.transactions);
+        summaries.push({
+          ...result.summary,
+          records: result.transactions.length,
+          message: `${result.summary.message} Stored ${stats.added} new entr${
+            stats.added === 1 ? "y" : "ies"
+          }.`,
+        });
       } catch (error) {
         summaries.push({
           source: "Starling",
