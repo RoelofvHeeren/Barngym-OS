@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 
 const leadStages = ["All", "New", "Follow Up", "Proposal", "Won", "Lost"] as const;
 type LeadStage = (typeof leadStages)[number];
@@ -280,6 +280,9 @@ const membershipOptions = [
   "Online Coaching",
 ] as const;
 
+const IMPORTED_LEADS_STORAGE_KEY = "barnGymImportedLeads";
+const IMPORTED_PROFILES_STORAGE_KEY = "barnGymImportedProfiles";
+
 export default function PeoplePage() {
   const [search, setSearch] = useState("");
   const [leadFilter, setLeadFilter] = useState<LeadStage>("All");
@@ -308,6 +311,58 @@ export default function PeoplePage() {
   });
   const [importMessage, setImportMessage] = useState<string | null>(null);
   const [showImportWorkspace, setShowImportWorkspace] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const storedLeads = window.localStorage.getItem(
+        IMPORTED_LEADS_STORAGE_KEY
+      );
+      const storedProfiles = window.localStorage.getItem(
+        IMPORTED_PROFILES_STORAGE_KEY
+      );
+      if (storedLeads) {
+        const parsed: LeadRow[] = JSON.parse(storedLeads);
+        if (Array.isArray(parsed) && parsed.length) {
+          setImportedLeads(parsed);
+          setSelectedLeadId(parsed[0].id);
+        }
+      }
+      if (storedProfiles) {
+        const parsedProfiles: Record<string, LeadProfile> =
+          JSON.parse(storedProfiles);
+        if (parsedProfiles && typeof parsedProfiles === "object") {
+          setProfiles((prev) => ({ ...prev, ...parsedProfiles }));
+        }
+      }
+    } catch (error) {
+      console.error("Failed to hydrate imported leads", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(
+        IMPORTED_LEADS_STORAGE_KEY,
+        JSON.stringify(importedLeads)
+      );
+      const importedProfilesSubset = importedLeads.reduce(
+        (acc, lead) => {
+          const profile = profiles[lead.id];
+          if (profile) acc[lead.id] = profile;
+          return acc;
+        },
+        {} as Record<string, LeadProfile>
+      );
+      window.localStorage.setItem(
+        IMPORTED_PROFILES_STORAGE_KEY,
+        JSON.stringify(importedProfilesSubset)
+      );
+    } catch (error) {
+      console.error("Failed to persist imported leads", error);
+    }
+  }, [importedLeads, profiles]);
 
   const allLeads = useMemo(
     () => [...leadSheet, ...importedLeads],
