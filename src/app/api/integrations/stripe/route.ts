@@ -34,6 +34,7 @@ export async function POST(request: Request) {
       message: `Connected to Stripe account ${accountData.id}.${
         webhookSecret ? " Webhook secret captured." : ""
       }`,
+      accountId: accountData.id,
     });
   } catch (error) {
     return NextResponse.json(

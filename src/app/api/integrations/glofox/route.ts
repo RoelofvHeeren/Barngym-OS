@@ -45,6 +45,7 @@ export async function POST(request: Request) {
       data: {
         sessionExpiry: loginPayload?.expires_at ?? null,
       },
+      studioId: studioId ?? null,
     });
   } catch (error) {
     return NextResponse.json(

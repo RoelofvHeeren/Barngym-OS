@@ -1,18 +1,24 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
-const syncLogs = [
-  { date: "09 Sep · 07:30", source: "Stripe", records: "142 charges", errors: "0" },
-  { date: "09 Sep · 07:02", source: "Glofox", records: "88 memberships", errors: "0" },
-  { date: "09 Sep · 06:50", source: "Starling", records: "24 feed items", errors: "2 needs review" },
-];
+type SyncLog = {
+  id: string;
+  timestamp: string;
+  source: string;
+  detail: string;
+  records?: string;
+  errors?: string | null;
+};
+
+const SYNC_LOG_STORAGE_KEY = "barnGymSyncLogs";
 
 export default function ConnectionsPage() {
   const [stripeSecret, setStripeSecret] = useState("");
   const [stripeWebhook, setStripeWebhook] = useState("");
   const [stripeStatus, setStripeStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [stripeMessage, setStripeMessage] = useState("");
+  const [stripeAccount, setStripeAccount] = useState<string | null>(null);
 
   const [glofoxKey, setGlofoxKey] = useState("");
   const [glofoxToken, setGlofoxToken] = useState("");
@@ -25,6 +31,58 @@ export default function ConnectionsPage() {
   const [starlingWebhookUrl, setStarlingWebhookUrl] = useState("");
   const [starlingStatus, setStarlingStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [starlingMessage, setStarlingMessage] = useState("");
+  const [starlingAccount, setStarlingAccount] = useState<string | null>(null);
+
+  const [syncLogs, setSyncLogs] = useState<SyncLog[]>([]);
+  const [backfillStatus, setBackfillStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [backfillMessage, setBackfillMessage] = useState("");
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const stored = window.localStorage.getItem(SYNC_LOG_STORAGE_KEY);
+      if (stored) {
+        const parsed: SyncLog[] = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          setSyncLogs(parsed);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to hydrate sync logs", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(SYNC_LOG_STORAGE_KEY, JSON.stringify(syncLogs));
+    } catch (error) {
+      console.error("Failed to persist sync logs", error);
+    }
+  }, [syncLogs]);
+
+  const appendSyncLog = useCallback((entry: Omit<SyncLog, "id" | "timestamp">) => {
+    setSyncLogs((prev) => [
+      {
+        id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}`,
+        timestamp: new Date().toISOString(),
+        ...entry,
+      },
+      ...prev,
+    ]);
+  }, []);
+
+  const formattedLogs = useMemo(
+    () =>
+      syncLogs.map((log) => ({
+        ...log,
+        formattedDate: new Date(log.timestamp).toLocaleString(undefined, {
+          dateStyle: "medium",
+          timeStyle: "short",
+        }),
+      })),
+    [syncLogs]
+  );
 
   const testStripeConnection = async () => {
     if (!stripeSecret.trim()) {
@@ -49,9 +107,20 @@ export default function ConnectionsPage() {
       }
       setStripeStatus("success");
       setStripeMessage(result.message || "Stripe connection verified.");
+      setStripeAccount(result.accountId ?? null);
+      appendSyncLog({
+        source: "Stripe",
+        detail: `Connection verified${result.accountId ? ` for ${result.accountId}` : ""}.`,
+        records: "Credential test",
+      });
     } catch (error) {
       setStripeStatus("error");
       setStripeMessage(error instanceof Error ? error.message : "Connection failed.");
+      appendSyncLog({
+        source: "Stripe",
+        detail: "Connection test failed.",
+        errors: error instanceof Error ? error.message : "Unknown error",
+      });
     }
   };
 
@@ -80,11 +149,21 @@ export default function ConnectionsPage() {
       }
       setGlofoxStatus("success");
       setGlofoxMessage(result.message || "Connection succeeded.");
+      appendSyncLog({
+        source: "Glofox",
+        detail: "Credentials verified.",
+        records: result.studioId ? `Studio ${result.studioId}` : undefined,
+      });
     } catch (error) {
       setGlofoxStatus("error");
       setGlofoxMessage(
         error instanceof Error ? error.message : "Connection failed."
       );
+      appendSyncLog({
+        source: "Glofox",
+        detail: "Connection test failed.",
+        errors: error instanceof Error ? error.message : "Unknown error",
+      });
     }
   };
 
@@ -111,9 +190,63 @@ export default function ConnectionsPage() {
       }
       setStarlingStatus("success");
       setStarlingMessage(result.message || "Starling connection verified.");
+      setStarlingAccount(result.accountUid ?? null);
+      appendSyncLog({
+        source: "Starling",
+        detail: `Connection verified${result.accountUid ? ` for ${result.accountUid}` : ""}.`,
+        records: "Credential test",
+      });
     } catch (error) {
       setStarlingStatus("error");
       setStarlingMessage(error instanceof Error ? error.message : "Connection failed.");
+      appendSyncLog({
+        source: "Starling",
+        detail: "Connection test failed.",
+        errors: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  };
+
+  const handleBackfill = async () => {
+    setBackfillStatus("loading");
+    setBackfillMessage("");
+    try {
+      const response = await fetch("/api/backfill", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          stripe: stripeSecret ? { secretKey: stripeSecret, days: 30 } : undefined,
+          starling: starlingToken ? { accessToken: starlingToken, days: 90 } : undefined,
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.ok) {
+        throw new Error(result.message || "Backfill failed.");
+      }
+      setBackfillStatus("success");
+      setBackfillMessage(result.message || "Backfill complete.");
+      if (Array.isArray(result.summaries)) {
+        result.summaries.forEach((summary: any) => {
+          appendSyncLog({
+            source: summary.source ?? "Backfill",
+            detail: summary.message ?? "Backfill result",
+            records:
+              typeof summary.records === "number"
+                ? `${summary.records} records`
+                : summary.records,
+            errors: summary.status === "error" ? summary.message : null,
+          });
+        });
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to run backfill.";
+      setBackfillStatus("error");
+      setBackfillMessage(message);
+      appendSyncLog({
+        source: "Backfill",
+        detail: "Backfill run failed.",
+        errors: message,
+      });
     }
   };
 
@@ -181,11 +314,16 @@ export default function ConnectionsPage() {
           </div>
           {stripeStatus !== "idle" && stripeMessage && (
             <p
-              className={`text-sm ${
+              className={`flex flex-wrap items-center gap-2 text-sm ${
                 stripeStatus === "success" ? "text-emerald-700" : "text-amber-600"
               }`}
             >
-              {stripeMessage}
+              <span>{stripeMessage}</span>
+              {stripeAccount && (
+                <span className="rounded-full border border-emerald-900/20 px-2 py-0.5 text-xs text-muted">
+                  {stripeAccount}
+                </span>
+              )}
             </p>
           )}
         </div>
@@ -293,17 +431,35 @@ export default function ConnectionsPage() {
             >
               {starlingStatus === "loading" ? "Testing..." : "Validate & Save"}
             </button>
-            <span className="chip text-xs text-amber-200">
-              Status · Token expiring in 6 days
+            <span
+              className={`chip text-xs ${
+                starlingStatus === "success"
+                  ? "text-emerald-200"
+                  : starlingStatus === "error"
+                  ? "text-amber-200"
+                  : "text-muted"
+              }`}
+            >
+              Status ·{" "}
+              {starlingStatus === "success"
+                ? "Connected"
+                : starlingStatus === "error"
+                ? "Error"
+                : "Not tested"}
             </span>
           </div>
           {starlingStatus !== "idle" && starlingMessage && (
             <p
-              className={`text-sm ${
+              className={`flex flex-wrap items-center gap-2 text-sm ${
                 starlingStatus === "success" ? "text-emerald-700" : "text-amber-600"
               }`}
             >
-              {starlingMessage}
+              <span>{starlingMessage}</span>
+              {starlingAccount && (
+                <span className="rounded-full border border-emerald-900/20 px-2 py-0.5 text-xs text-muted">
+                  {starlingAccount}
+                </span>
+              )}
             </p>
           )}
         </div>
@@ -339,42 +495,69 @@ export default function ConnectionsPage() {
               <li>Fuzzy name + amount</li>
             </ol>
           </div>
-          <button className="rounded-full bg-black px-5 py-2 text-sm font-semibold text-white">
-            Backfill now (90 days Starling / 30 days Stripe + Glofox)
-          </button>
+          <div className="flex flex-col gap-2">
+            <button
+              className="rounded-full bg-black px-5 py-2 text-sm font-semibold text-white disabled:opacity-50"
+              onClick={handleBackfill}
+              disabled={backfillStatus === "loading"}
+            >
+              {backfillStatus === "loading"
+                ? "Backfill running..."
+                : "Backfill now (90d Starling / 30d Stripe)"}
+            </button>
+            {backfillStatus !== "idle" && backfillMessage && (
+              <p
+                className={`text-sm ${
+                  backfillStatus === "success" ? "text-emerald-700" : "text-amber-600"
+                }`}
+              >
+                {backfillMessage}
+              </p>
+            )}
+          </div>
         </div>
       </section>
 
-      <section className="glass-panel">
-        <div className="flex flex-col gap-1">
+      <section className="glass-panel flex flex-col gap-4">
+        <div>
+          <p className="text-xs uppercase tracking-[0.35em] text-muted">
+            Sync Logs
+          </p>
           <h3 className="text-2xl font-semibold">Sync Logs</h3>
           <p className="text-sm text-muted">
-            Every job recorded. Filter by source when needed.
+            Every job recorded. Logs persist locally until cleared.
           </p>
         </div>
-        <div className="mt-4 overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="text-muted">
-              <tr>
-                {["Date", "Source", "Records Synced", "Errors"].map((header) => (
-                  <th key={header} className="pb-3 pr-4 font-medium">
-                    {header}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5">
-              {syncLogs.map((log) => (
-                <tr key={log.date}>
-                  <td className="py-4 pr-4 text-muted">{log.date}</td>
-                  <td className="pr-4 font-semibold">{log.source}</td>
-                  <td className="pr-4">{log.records}</td>
-                  <td className="pr-4 text-amber-200">{log.errors}</td>
+        {formattedLogs.length === 0 ? (
+          <div className="rounded-3xl border border-white/10 bg-white/5 p-5 text-sm text-muted">
+            No sync activity yet. Run a connection test or backfill to generate entries.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[560px] text-left text-sm">
+              <thead className="text-muted">
+                <tr>
+                  {["Date", "Source", "Detail", "Records", "Errors"].map((header) => (
+                    <th key={header} className="pb-3 pr-4 font-medium">
+                      {header}
+                    </th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-white/10">
+                {formattedLogs.map((log) => (
+                  <tr key={log.id}>
+                    <td className="py-3 pr-4 text-muted">{log.formattedDate}</td>
+                    <td className="pr-4 font-semibold text-primary">{log.source}</td>
+                    <td className="pr-4 text-muted">{log.detail}</td>
+                    <td className="pr-4">{log.records ?? "—"}</td>
+                    <td className="pr-4 text-amber-600">{log.errors ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
     </div>
   );

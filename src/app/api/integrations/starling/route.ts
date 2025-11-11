@@ -47,6 +47,7 @@ export async function POST(request: Request) {
       }.${
         webhookUrl ? " Webhook endpoint stored." : ""
       }`,
+      accountUid: primaryAccount?.accountUid ?? null,
     });
   } catch (error) {
     return NextResponse.json(
