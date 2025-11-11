@@ -19,6 +19,28 @@ type BackfillLogSummary = {
 };
 
 const SYNC_LOG_STORAGE_KEY = "barnGymSyncLogs";
+const CONNECTION_STORAGE_KEY = "barnGymConnectionForm";
+
+type StoredConnectionForm = {
+  stripeSecret?: string;
+  stripeWebhook?: string;
+  stripeStatus?: "idle" | "loading" | "success" | "error";
+  stripeMessage?: string;
+  stripeAccount?: string | null;
+  glofoxKey?: string;
+  glofoxToken?: string;
+  glofoxStudio?: string;
+  glofoxSalt?: string;
+  glofoxStatus?: "idle" | "loading" | "success" | "error";
+  glofoxMessage?: string;
+  starlingToken?: string;
+  starlingWebhookUrl?: string;
+  starlingStatus?: "idle" | "loading" | "success" | "error";
+  starlingMessage?: string;
+  starlingAccount?: string | null;
+  backfillStatus?: "idle" | "loading" | "success" | "error";
+  backfillMessage?: string;
+};
 
 export default function ConnectionsPage() {
   const [stripeSecret, setStripeSecret] = useState("");
@@ -43,6 +65,7 @@ export default function ConnectionsPage() {
   const [syncLogs, setSyncLogs] = useState<SyncLog[]>([]);
   const [backfillStatus, setBackfillStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [backfillMessage, setBackfillMessage] = useState("");
+  const [formHydrated, setFormHydrated] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -67,6 +90,89 @@ export default function ConnectionsPage() {
       console.error("Failed to persist sync logs", error);
     }
   }, [syncLogs]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const stored = window.localStorage.getItem(CONNECTION_STORAGE_KEY);
+      if (stored) {
+        const parsed: StoredConnectionForm = JSON.parse(stored);
+        if (parsed && typeof parsed === "object") {
+          setStripeSecret(parsed.stripeSecret ?? "");
+          setStripeWebhook(parsed.stripeWebhook ?? "");
+          setStripeStatus(parsed.stripeStatus ?? "idle");
+          setStripeMessage(parsed.stripeMessage ?? "");
+          setStripeAccount(parsed.stripeAccount ?? null);
+          setGlofoxKey(parsed.glofoxKey ?? "");
+          setGlofoxToken(parsed.glofoxToken ?? "");
+          setGlofoxStudio(parsed.glofoxStudio ?? "");
+          setGlofoxSalt(parsed.glofoxSalt ?? "");
+          setGlofoxStatus(parsed.glofoxStatus ?? "idle");
+          setGlofoxMessage(parsed.glofoxMessage ?? "");
+          setStarlingToken(parsed.starlingToken ?? "");
+          setStarlingWebhookUrl(parsed.starlingWebhookUrl ?? "");
+          setStarlingStatus(parsed.starlingStatus ?? "idle");
+          setStarlingMessage(parsed.starlingMessage ?? "");
+          setStarlingAccount(parsed.starlingAccount ?? null);
+          setBackfillStatus(parsed.backfillStatus ?? "idle");
+          setBackfillMessage(parsed.backfillMessage ?? "");
+        }
+      }
+    } catch (error) {
+      console.error("Failed to hydrate connection settings", error);
+    } finally {
+      setFormHydrated(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !formHydrated) return;
+    try {
+      const payload: StoredConnectionForm = {
+        stripeSecret,
+        stripeWebhook,
+        stripeStatus,
+        stripeMessage,
+        stripeAccount,
+        glofoxKey,
+        glofoxToken,
+        glofoxStudio,
+        glofoxSalt,
+        glofoxStatus,
+        glofoxMessage,
+        starlingToken,
+        starlingWebhookUrl,
+        starlingStatus,
+        starlingMessage,
+        starlingAccount,
+        backfillStatus,
+        backfillMessage,
+      };
+      window.localStorage.setItem(CONNECTION_STORAGE_KEY, JSON.stringify(payload));
+    } catch (error) {
+      console.error("Failed to persist connection settings", error);
+    }
+  }, [
+    formHydrated,
+    stripeSecret,
+    stripeWebhook,
+    stripeStatus,
+    stripeMessage,
+    stripeAccount,
+    glofoxKey,
+    glofoxToken,
+    glofoxStudio,
+    glofoxSalt,
+    glofoxStatus,
+    glofoxMessage,
+    starlingToken,
+    starlingWebhookUrl,
+    starlingStatus,
+    starlingMessage,
+    starlingAccount,
+    backfillStatus,
+    backfillMessage,
+  ]);
 
   const appendSyncLog = useCallback((entry: Omit<SyncLog, "id" | "timestamp">) => {
     const id =
