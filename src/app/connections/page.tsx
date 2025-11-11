@@ -11,35 +11,20 @@ type SyncLog = {
   errors?: string | null;
 };
 
-type BackfillLogSummary = {
-  source?: string;
-  status?: string;
-  message?: string;
-  records?: number | string;
+type ConnectionState = {
+  status: string | null;
+  accountId: string | null;
+  lastVerifiedAt: string | null;
+  hasSecret: boolean;
 };
 
-const SYNC_LOG_STORAGE_KEY = "barnGymSyncLogs";
-const CONNECTION_STORAGE_KEY = "barnGymConnectionForm";
-
-type StoredConnectionForm = {
-  stripeSecret?: string;
-  stripeWebhook?: string;
-  stripeStatus?: "idle" | "loading" | "success" | "error";
-  stripeMessage?: string;
-  stripeAccount?: string | null;
-  glofoxKey?: string;
-  glofoxToken?: string;
-  glofoxStudio?: string;
-  glofoxSalt?: string;
-  glofoxStatus?: "idle" | "loading" | "success" | "error";
-  glofoxMessage?: string;
-  starlingToken?: string;
-  starlingWebhookUrl?: string;
-  starlingStatus?: "idle" | "loading" | "success" | "error";
-  starlingMessage?: string;
-  starlingAccount?: string | null;
-  backfillStatus?: "idle" | "loading" | "success" | "error";
-  backfillMessage?: string;
+type SyncLogResponse = {
+  id: string;
+  source: string;
+  detail: string;
+  records: string | null;
+  errors: string | null;
+  createdAt: string;
 };
 
 export default function ConnectionsPage() {
@@ -65,130 +50,90 @@ export default function ConnectionsPage() {
   const [syncLogs, setSyncLogs] = useState<SyncLog[]>([]);
   const [backfillStatus, setBackfillStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [backfillMessage, setBackfillMessage] = useState("");
-  const [formHydrated, setFormHydrated] = useState(false);
+  const [connectionState, setConnectionState] = useState<Record<string, ConnectionState>>({});
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
+  const refreshConnectionState = useCallback(async () => {
     try {
-      const stored = window.localStorage.getItem(SYNC_LOG_STORAGE_KEY);
-      if (stored) {
-        const parsed: SyncLog[] = JSON.parse(stored);
-        if (Array.isArray(parsed)) {
-          setSyncLogs(parsed);
+      const response = await fetch("/api/integrations/state");
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.message || "Unable to load connection state.");
+      }
+      const data = (payload.data ?? {}) as Record<string, ConnectionState>;
+      setConnectionState(data);
+
+      const stripe = data.stripe;
+      if (stripe) {
+        setStripeAccount(stripe.accountId ?? null);
+        if (stripe.status === "connected") {
+          setStripeStatus("success");
+          setStripeMessage(
+            `Stored securely${stripe.accountId ? ` · ${stripe.accountId}` : ""}`
+          );
+        }
+      }
+
+      const glofox = data.glofox;
+      if (glofox) {
+        if (glofox.status === "connected") {
+          setGlofoxStatus("success");
+          setGlofoxMessage(
+            glofox.accountId
+              ? `Studio ${glofox.accountId} linked.`
+              : "Credentials stored securely."
+          );
+        }
+      }
+
+      const starling = data.starling;
+      if (starling) {
+        setStarlingAccount(starling.accountId ?? null);
+        if (starling.status === "connected") {
+          setStarlingStatus("success");
+          setStarlingMessage(
+            starling.accountId
+              ? `Bank feed ready (${starling.accountId}).`
+              : "Bank feed ready."
+          );
         }
       }
     } catch (error) {
-      console.error("Failed to hydrate sync logs", error);
+      console.error("Failed to refresh connection state", error);
     }
   }, []);
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
+  const refreshLogs = useCallback(async () => {
     try {
-      window.localStorage.setItem(SYNC_LOG_STORAGE_KEY, JSON.stringify(syncLogs));
-    } catch (error) {
-      console.error("Failed to persist sync logs", error);
-    }
-  }, [syncLogs]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      const stored = window.localStorage.getItem(CONNECTION_STORAGE_KEY);
-      if (stored) {
-        const parsed: StoredConnectionForm = JSON.parse(stored);
-        if (parsed && typeof parsed === "object") {
-          setStripeSecret(parsed.stripeSecret ?? "");
-          setStripeWebhook(parsed.stripeWebhook ?? "");
-          setStripeStatus(parsed.stripeStatus ?? "idle");
-          setStripeMessage(parsed.stripeMessage ?? "");
-          setStripeAccount(parsed.stripeAccount ?? null);
-          setGlofoxKey(parsed.glofoxKey ?? "");
-          setGlofoxToken(parsed.glofoxToken ?? "");
-          setGlofoxStudio(parsed.glofoxStudio ?? "");
-          setGlofoxSalt(parsed.glofoxSalt ?? "");
-          setGlofoxStatus(parsed.glofoxStatus ?? "idle");
-          setGlofoxMessage(parsed.glofoxMessage ?? "");
-          setStarlingToken(parsed.starlingToken ?? "");
-          setStarlingWebhookUrl(parsed.starlingWebhookUrl ?? "");
-          setStarlingStatus(parsed.starlingStatus ?? "idle");
-          setStarlingMessage(parsed.starlingMessage ?? "");
-          setStarlingAccount(parsed.starlingAccount ?? null);
-          setBackfillStatus(parsed.backfillStatus ?? "idle");
-          setBackfillMessage(parsed.backfillMessage ?? "");
-        }
+      const response = await fetch("/api/sync-logs");
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.message || "Unable to load sync logs.");
       }
+      const logs: SyncLogResponse[] = Array.isArray(payload.data)
+        ? payload.data
+        : [];
+      setSyncLogs(
+        logs.map((log) => ({
+          id: log.id,
+          timestamp: new Date(log.createdAt).toISOString(),
+          source: log.source,
+          detail: log.detail,
+          records: log.records ?? undefined,
+          errors: log.errors ?? undefined,
+        }))
+      );
     } catch (error) {
-      console.error("Failed to hydrate connection settings", error);
-    } finally {
-      setFormHydrated(true);
+      console.error("Failed to load sync logs", error);
     }
   }, []);
 
   useEffect(() => {
-    if (typeof window === "undefined" || !formHydrated) return;
-    try {
-      const payload: StoredConnectionForm = {
-        stripeSecret,
-        stripeWebhook,
-        stripeStatus,
-        stripeMessage,
-        stripeAccount,
-        glofoxKey,
-        glofoxToken,
-        glofoxStudio,
-        glofoxSalt,
-        glofoxStatus,
-        glofoxMessage,
-        starlingToken,
-        starlingWebhookUrl,
-        starlingStatus,
-        starlingMessage,
-        starlingAccount,
-        backfillStatus,
-        backfillMessage,
-      };
-      window.localStorage.setItem(CONNECTION_STORAGE_KEY, JSON.stringify(payload));
-    } catch (error) {
-      console.error("Failed to persist connection settings", error);
-    }
-  }, [
-    formHydrated,
-    stripeSecret,
-    stripeWebhook,
-    stripeStatus,
-    stripeMessage,
-    stripeAccount,
-    glofoxKey,
-    glofoxToken,
-    glofoxStudio,
-    glofoxSalt,
-    glofoxStatus,
-    glofoxMessage,
-    starlingToken,
-    starlingWebhookUrl,
-    starlingStatus,
-    starlingMessage,
-    starlingAccount,
-    backfillStatus,
-    backfillMessage,
-  ]);
+    refreshConnectionState();
+  }, [refreshConnectionState]);
 
-  const appendSyncLog = useCallback((entry: Omit<SyncLog, "id" | "timestamp">) => {
-    const id =
-      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-        ? crypto.randomUUID()
-        : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-
-    setSyncLogs((prev) => [
-      {
-        id,
-        timestamp: new Date().toISOString(),
-        ...entry,
-      },
-      ...prev,
-    ]);
-  }, []);
+  useEffect(() => {
+    refreshLogs();
+  }, [refreshLogs]);
 
   const formattedLogs = useMemo(
     () =>
@@ -203,11 +148,6 @@ export default function ConnectionsPage() {
   );
 
   const testStripeConnection = async () => {
-    if (!stripeSecret.trim()) {
-      setStripeStatus("error");
-      setStripeMessage("Stripe secret key is required.");
-      return;
-    }
     setStripeStatus("loading");
     setStripeMessage("");
     try {
@@ -226,28 +166,18 @@ export default function ConnectionsPage() {
       setStripeStatus("success");
       setStripeMessage(result.message || "Stripe connection verified.");
       setStripeAccount(result.accountId ?? null);
-      appendSyncLog({
-        source: "Stripe",
-        detail: `Connection verified${result.accountId ? ` for ${result.accountId}` : ""}.`,
-        records: "Credential test",
-      });
+      setStripeSecret("");
+      setStripeWebhook("");
+      await refreshConnectionState();
+      await refreshLogs();
     } catch (error) {
       setStripeStatus("error");
       setStripeMessage(error instanceof Error ? error.message : "Connection failed.");
-      appendSyncLog({
-        source: "Stripe",
-        detail: "Connection test failed.",
-        errors: error instanceof Error ? error.message : "Unknown error",
-      });
+      await refreshLogs();
     }
   };
 
   const testGlofoxConnection = async () => {
-    if (!glofoxKey.trim() || !glofoxToken.trim()) {
-      setGlofoxStatus("error");
-      setGlofoxMessage("API key and token are required.");
-      return;
-    }
     setGlofoxStatus("loading");
     setGlofoxMessage("");
     try {
@@ -267,30 +197,24 @@ export default function ConnectionsPage() {
       }
       setGlofoxStatus("success");
       setGlofoxMessage(result.message || "Connection succeeded.");
-      appendSyncLog({
-        source: "Glofox",
-        detail: "Credentials verified.",
-        records: result.studioId ? `Studio ${result.studioId}` : undefined,
-      });
+      setGlofoxKey("");
+      setGlofoxToken("");
+      if (result.studioId) {
+        setGlofoxStudio(result.studioId);
+      }
+      setGlofoxSalt("");
+      await refreshConnectionState();
+      await refreshLogs();
     } catch (error) {
       setGlofoxStatus("error");
       setGlofoxMessage(
         error instanceof Error ? error.message : "Connection failed."
       );
-      appendSyncLog({
-        source: "Glofox",
-        detail: "Connection test failed.",
-        errors: error instanceof Error ? error.message : "Unknown error",
-      });
+      await refreshLogs();
     }
   };
 
   const testStarlingConnection = async () => {
-    if (!starlingToken.trim()) {
-      setStarlingStatus("error");
-      setStarlingMessage("Personal access token is required.");
-      return;
-    }
     setStarlingStatus("loading");
     setStarlingMessage("");
     try {
@@ -309,19 +233,14 @@ export default function ConnectionsPage() {
       setStarlingStatus("success");
       setStarlingMessage(result.message || "Starling connection verified.");
       setStarlingAccount(result.accountUid ?? null);
-      appendSyncLog({
-        source: "Starling",
-        detail: `Connection verified${result.accountUid ? ` for ${result.accountUid}` : ""}.`,
-        records: "Credential test",
-      });
+      setStarlingToken("");
+      setStarlingWebhookUrl("");
+      await refreshConnectionState();
+      await refreshLogs();
     } catch (error) {
       setStarlingStatus("error");
       setStarlingMessage(error instanceof Error ? error.message : "Connection failed.");
-      appendSyncLog({
-        source: "Starling",
-        detail: "Connection test failed.",
-        errors: error instanceof Error ? error.message : "Unknown error",
-      });
+      await refreshLogs();
     }
   };
 
@@ -343,28 +262,12 @@ export default function ConnectionsPage() {
       }
       setBackfillStatus("success");
       setBackfillMessage(result.message || "Backfill complete.");
-      if (Array.isArray(result.summaries)) {
-        result.summaries.forEach((summary: BackfillLogSummary) => {
-          appendSyncLog({
-            source: summary.source ?? "Backfill",
-            detail: summary.message ?? "Backfill result",
-            records:
-              typeof summary.records === "number"
-                ? `${summary.records} records`
-                : summary.records,
-            errors: summary.status === "error" ? summary.message : null,
-          });
-        });
-      }
+      await refreshLogs();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to run backfill.";
       setBackfillStatus("error");
       setBackfillMessage(message);
-      appendSyncLog({
-        source: "Backfill",
-        detail: "Backfill run failed.",
-        errors: message,
-      });
+      await refreshLogs();
     }
   };
 
@@ -444,6 +347,9 @@ export default function ConnectionsPage() {
               )}
             </p>
           )}
+          {connectionState.stripe?.hasSecret && stripeStatus !== "error" && (
+            <p className="text-xs text-muted">Secret stored securely on the server.</p>
+          )}
         </div>
 
         <div className="glass-panel flex flex-col gap-4">
@@ -506,6 +412,9 @@ export default function ConnectionsPage() {
                   ? "Connection succeeded."
                   : "Unable to verify connection.")}
             </p>
+          )}
+          {connectionState.glofox?.hasSecret && glofoxStatus !== "error" && (
+            <p className="text-xs text-muted">Credentials stored securely.</p>
           )}
         </div>
 
@@ -579,6 +488,9 @@ export default function ConnectionsPage() {
                 </span>
               )}
             </p>
+          )}
+          {connectionState.starling?.hasSecret && starlingStatus !== "error" && (
+            <p className="text-xs text-muted">Token stored securely.</p>
           )}
         </div>
 

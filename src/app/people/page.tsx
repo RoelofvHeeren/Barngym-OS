@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, startTransition, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 const leadStages = ["All", "New", "Follow Up", "Proposal", "Won", "Lost"] as const;
 type LeadStage = (typeof leadStages)[number];
@@ -280,8 +280,119 @@ const membershipOptions = [
   "Online Coaching",
 ] as const;
 
-const IMPORTED_LEADS_STORAGE_KEY = "barnGymImportedLeads";
-const IMPORTED_PROFILES_STORAGE_KEY = "barnGymImportedProfiles";
+type ApiLead = {
+  id: string;
+  externalId: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  email: string | null;
+  phone: string | null;
+  channel: string | null;
+  stage: string | null;
+  owner: string | null;
+  nextStep: string | null;
+  valueMinor: number | null;
+  membershipName: string | null;
+  metadata: unknown;
+};
+
+const formatMinorToCurrency = (minor?: number | null, currency = "EUR") => {
+  if (minor === null || minor === undefined) return null;
+  return new Intl.NumberFormat("en-GB", {
+    style: "currency",
+    currency,
+  }).format(minor / 100);
+};
+
+const parseCurrencyToMinor = (value: string) => {
+  if (!value?.trim()) return null;
+  const normalized = value.replace(/[^0-9-.,]/g, "").replace(/,/g, "");
+  const amount = Number(normalized);
+  if (Number.isNaN(amount)) return null;
+  return Math.round(amount * 100);
+};
+
+const isLeadProfile = (value: unknown): value is LeadProfile => {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "name" in value &&
+    "stats" in value &&
+    "payments" in value
+  );
+};
+
+const buildProfileFromLead = (lead: ApiLead, displayName: string): LeadProfile => {
+  const initials = displayName
+    .split(" ")
+    .map((part) => part.charAt(0))
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
+  return {
+    name: displayName,
+    initials: initials || "BG",
+    title: lead.membershipName ?? "Imported Lead",
+    email: lead.email ?? "",
+    phone: lead.phone ?? "",
+    tags: [lead.channel ?? "Imported"],
+    identities: [
+      lead.email ? { label: "Email", value: lead.email } : null,
+      lead.phone ? { label: "Phone", value: lead.phone } : null,
+    ].filter(Boolean) as { label: string; value: string }[],
+    stats: {
+      lifetimeSpend:
+        formatMinorToCurrency(lead.valueMinor) ??
+        (lead.membershipName ?? "Not set"),
+      memberships: lead.membershipName ?? "Unassigned",
+      lastPayment: "—",
+      lastAttendance: "—",
+    },
+    payments: [],
+    manualMatches: [],
+    notes: [],
+  };
+};
+
+type NormalizedLead = {
+  row: LeadRow;
+  profile: LeadProfile;
+};
+
+function normalizeApiLead(lead: ApiLead): NormalizedLead {
+  const leadId = lead.externalId ?? lead.id;
+  const displayName =
+    [lead.firstName ?? "", lead.lastName ?? ""].map((part) => part.trim()).join(" ").trim() ||
+    lead.email ||
+    lead.phone ||
+    "Imported Lead";
+
+  const metadata = (lead.metadata ?? {}) as Record<string, unknown>;
+  const metadataProfile =
+    typeof metadata === "object" && metadata !== null && "profile" in metadata
+      ? (metadata as { profile?: unknown }).profile
+      : null;
+  const storedProfile = isLeadProfile(metadataProfile) ? metadataProfile : null;
+  const profile = storedProfile ?? buildProfileFromLead(lead, displayName);
+
+  const row: LeadRow = {
+    id: leadId,
+    name: displayName,
+    channel: lead.channel ?? "Imported",
+    stage: lead.stage ?? "New",
+    owner: lead.owner ?? "Unassigned",
+    next: lead.nextStep ?? "Review import",
+    value:
+      formatMinorToCurrency(lead.valueMinor) ??
+      lead.membershipName ??
+      profile.stats.lifetimeSpend ??
+      "€0",
+  };
+
+  return { row, profile };
+}
+
 
 export default function PeoplePage() {
   const [search, setSearch] = useState("");
@@ -311,62 +422,49 @@ export default function PeoplePage() {
   });
   const [importMessage, setImportMessage] = useState<string | null>(null);
   const [showImportWorkspace, setShowImportWorkspace] = useState(false);
+  const [loadingLeads, setLoadingLeads] = useState(false);
+  const [leadError, setLeadError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
+  const loadImportedLeads = useCallback(async () => {
+    setLoadingLeads(true);
+    setLeadError(null);
     try {
-      const storedLeads = window.localStorage.getItem(
-        IMPORTED_LEADS_STORAGE_KEY
-      );
-      const storedProfiles = window.localStorage.getItem(
-        IMPORTED_PROFILES_STORAGE_KEY
-      );
-      if (storedLeads) {
-        const parsed: LeadRow[] = JSON.parse(storedLeads);
-        if (Array.isArray(parsed) && parsed.length) {
-          startTransition(() => {
-            setImportedLeads(parsed);
-            setSelectedLeadId(parsed[0].id);
-          });
-        }
+      const response = await fetch("/api/leads");
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.message || "Unable to load leads.");
       }
-      if (storedProfiles) {
-        const parsedProfiles: Record<string, LeadProfile> =
-          JSON.parse(storedProfiles);
-        if (parsedProfiles && typeof parsedProfiles === "object") {
-          startTransition(() => {
-            setProfiles((prev) => ({ ...prev, ...parsedProfiles }));
-          });
+      const leads: ApiLead[] = Array.isArray(payload.data) ? payload.data : [];
+      const rows: LeadRow[] = [];
+      const profileMap: Record<string, LeadProfile> = {};
+      leads.forEach((lead) => {
+        const normalized = normalizeApiLead(lead);
+        rows.push(normalized.row);
+        profileMap[normalized.row.id] = normalized.profile;
+      });
+      setImportedLeads(rows);
+      setProfiles({ ...leadProfiles, ...profileMap });
+      setSelectedLeadId((previous) => {
+        const combined = [...leadSheet, ...rows];
+        if (previous && combined.some((lead) => lead.id === previous)) {
+          return previous;
         }
-      }
+        return rows[0]?.id ?? leadSheet[0].id;
+      });
     } catch (error) {
-      console.error("Failed to hydrate imported leads", error);
+      setLeadError(
+        error instanceof Error
+          ? error.message
+          : "Unable to load leads from the server."
+      );
+    } finally {
+      setLoadingLeads(false);
     }
   }, []);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      window.localStorage.setItem(
-        IMPORTED_LEADS_STORAGE_KEY,
-        JSON.stringify(importedLeads)
-      );
-      const importedProfilesSubset = importedLeads.reduce(
-        (acc, lead) => {
-          const profile = profiles[lead.id];
-          if (profile) acc[lead.id] = profile;
-          return acc;
-        },
-        {} as Record<string, LeadProfile>
-      );
-      window.localStorage.setItem(
-        IMPORTED_PROFILES_STORAGE_KEY,
-        JSON.stringify(importedProfilesSubset)
-      );
-    } catch (error) {
-      console.error("Failed to persist imported leads", error);
-    }
-  }, [importedLeads, profiles]);
+    loadImportedLeads();
+  }, [loadImportedLeads]);
 
   const allLeads = useMemo(
     () => [...leadSheet, ...importedLeads],
@@ -493,7 +591,7 @@ export default function PeoplePage() {
     }
   };
 
-  const handleImportCsv = () => {
+  const handleImportCsv = async () => {
     if (!parsedRows.length) {
       setImportMessage("Upload a CSV and verify mappings before importing.");
       return;
@@ -510,10 +608,7 @@ export default function PeoplePage() {
       return row[index] ?? "";
     };
 
-    const newLeadRows: LeadRow[] = [];
-    const newProfiles: Record<string, LeadProfile> = {};
-
-    parsedRows.forEach((row, index) => {
+    const payloads = parsedRows.map((row, index) => {
       const firstName = getValue(row, "first_name");
       const lastName = getValue(row, "last_name");
       const combinedName = getValue(row, "name");
@@ -528,37 +623,27 @@ export default function PeoplePage() {
       const valueRaw = getValue(row, "value");
       const lastBooking = getValue(row, "last_booking");
       const totalAttendances = getValue(row, "total_attendances");
-
       const leadId = `CSV-${Date.now()}-${index}`;
+      const email = getValue(row, "email");
+      const phone = getValue(row, "phone");
+      const channel = getValue(row, "channel") || "CSV Upload";
 
-      newLeadRows.push({
-        id: leadId,
-        name: displayName,
-        channel: getValue(row, "channel") || "CSV Upload",
-        stage: "New",
-        owner: "Unassigned",
-        next: "Review import",
-        value: valueRaw || membershipName || "€0",
-      });
-
-      const initials =
-        `${((firstName || displayName).charAt(0)) ?? ""}${
-          ((lastName || displayName.split(" ").slice(-1)[0] || "").charAt(0)) ?? ""
-        }`.toUpperCase() || displayName.slice(0, 2).toUpperCase();
-
-      newProfiles[leadId] = {
+      const profile: LeadProfile = {
         ...baseProfile,
         name: displayName,
-        initials,
+        initials:
+          `${((firstName || displayName).charAt(0)) ?? ""}${
+            ((lastName || displayName.split(" ").slice(-1)[0] || "").charAt(0)) ?? ""
+          }`.toUpperCase() || displayName.slice(0, 2).toUpperCase(),
         title: membershipName,
-        email: getValue(row, "email"),
-        phone: getValue(row, "phone"),
+        email,
+        phone,
         tags: [membershipName].filter(Boolean),
         identities: [
-          { label: "Email", value: getValue(row, "email") },
-          { label: "Phone", value: getValue(row, "phone") },
-          { label: "Membership", value: membershipName },
-        ].filter((identity) => identity.value),
+          email ? { label: "Email", value: email } : null,
+          phone ? { label: "Phone", value: phone } : null,
+          membershipName ? { label: "Membership", value: membershipName } : null,
+        ].filter(Boolean) as { label: string; value: string }[],
         stats: {
           lifetimeSpend: valueRaw || baseProfile.stats.lifetimeSpend,
           memberships: membershipName,
@@ -568,7 +653,7 @@ export default function PeoplePage() {
         payments: [
           {
             date: lastBooking || "—",
-            source: getValue(row, "channel") || "CSV",
+            source: channel,
             amount: valueRaw || "€0",
             product: membershipName,
             status: "Imported",
@@ -583,17 +668,44 @@ export default function PeoplePage() {
           },
         ],
       };
+
+      return {
+        externalId: leadId,
+        firstName,
+        lastName,
+        email,
+        phone,
+        channel,
+        stage: "New",
+        owner: "Unassigned",
+        nextStep: "Review import",
+        valueMinor: parseCurrencyToMinor(valueRaw),
+        membershipName,
+        metadata: { profile },
+      };
     });
 
-    setImportedLeads((prev) => [...prev, ...newLeadRows]);
-    setProfiles((prev) => ({ ...prev, ...newProfiles }));
-    setImportMessage(
-      `Imported ${newLeadRows.length} lead${newLeadRows.length === 1 ? "" : "s"} from ${
-        csvFile?.name ?? "CSV"
-      }.`
-    );
-    if (newLeadRows.length) {
-      setSelectedLeadId(newLeadRows[0].id);
+    try {
+      const response = await fetch("/api/leads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ leads: payloads }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.ok) {
+        throw new Error(result.message || "Failed to import leads.");
+      }
+      setImportMessage(result.message ?? `Imported ${payloads.length} leads.`);
+      await loadImportedLeads();
+      if (payloads.length) {
+        setSelectedLeadId(payloads[0].externalId ?? leadSheet[0].id);
+      }
+    } catch (error) {
+      setImportMessage(
+        error instanceof Error
+          ? error.message
+          : "Failed to import leads. Please try again."
+      );
     }
   };
 
@@ -646,6 +758,12 @@ export default function PeoplePage() {
             {showImportWorkspace ? "Hide import workspace" : "Open import workspace"}
           </button>
         </div>
+        {loadingLeads && (
+          <p className="text-xs text-muted">Refreshing server leads…</p>
+        )}
+        {leadError && (
+          <p className="text-xs text-amber-600">{leadError}</p>
+        )}
       </section>
 
       {showImportWorkspace && (

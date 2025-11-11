@@ -1,0 +1,77 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model ConnectionSecret {
+  id             String   @id @default(cuid())
+  provider       String   @unique
+  secret         Json?
+  webhookSecret  String?
+  status         String?
+  accountId      String?
+  lastVerifiedAt DateTime?
+  metadata       Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model Lead {
+  id             String   @id @default(cuid())
+  externalId     String?  @unique
+  firstName      String?
+  lastName       String?
+  email          String?
+  phone          String?
+  channel        String?
+  stage          String?  @default("New")
+  owner          String?
+  nextStep       String?
+  valueMinor     Int?
+  membershipName String?
+  metadata       Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  transactions   Transaction[]
+}
+
+model Transaction {
+  id           String   @id @default(cuid())
+  provider     String
+  externalId   String   @unique
+  amountMinor  Int
+  currency     String
+  occurredAt   DateTime
+  personName   String?
+  productType  String?
+  status       String
+  confidence   String
+  description  String?
+  reference    String?
+  raw          Json?
+  metadata     Json?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  leadId       String?
+  lead         Lead?    @relation(fields: [leadId], references: [id])
+}
+
+model SyncLog {
+  id        String   @id @default(cuid())
+  source    String
+  detail    String
+  records   String?
+  errors    String?
+  createdAt DateTime @default(now())
+}

@@ -1,4 +1,5 @@
-import { readTransactions, TransactionRecord } from "@/lib/transactionStore";
+import type { Transaction } from "@prisma/client";
+import { listTransactions } from "@/lib/transactions";
 
 const DEFAULT_EMPTY_OPTION = "No data yet";
 const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
@@ -57,7 +58,7 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-function buildLedgerRows(transactions: TransactionRecord[]) {
+function buildLedgerRows(transactions: Transaction[]) {
   return transactions.map((transaction) => ({
     id: transaction.id,
     person: transaction.personName ?? "Unassigned",
@@ -75,7 +76,7 @@ function buildLedgerRows(transactions: TransactionRecord[]) {
 }
 
 export default async function TransactionsPage() {
-  const transactions = await readTransactions();
+  const transactions = await listTransactions();
   const hasData = transactions.length > 0;
   const ledgerRows = buildLedgerRows(transactions);
 

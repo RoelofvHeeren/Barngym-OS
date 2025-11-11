@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
-import { TransactionRecord, addTransactions } from "@/lib/transactionStore";
+import { prisma } from "@/lib/prisma";
+import { NormalizedTransaction, upsertTransactions } from "@/lib/transactions";
 
 export const runtime = "nodejs";
 
@@ -30,8 +31,37 @@ type BackfillSummary = {
 
 type BackfillRunResult = {
   summary: BackfillSummary;
-  transactions: TransactionRecord[];
+  transactions: NormalizedTransaction[];
 };
+
+type StripeSecretPayload = {
+  secretKey?: string;
+  webhookSecret?: string;
+};
+
+type StarlingSecretPayload = {
+  accessToken?: string;
+  webhookUrl?: string;
+};
+
+async function getConnectionSecret(provider: string) {
+  return prisma.connectionSecret.findUnique({ where: { provider } });
+}
+
+async function recordSummary(summary: BackfillSummary) {
+  try {
+    await prisma.syncLog.create({
+      data: {
+        source: summary.source,
+        detail: summary.message,
+        records: typeof summary.records === "number" ? summary.records.toString() : undefined,
+        errors: summary.status === "error" ? summary.message : undefined,
+      },
+    });
+  } catch (error) {
+    console.error("Failed to persist sync log", summary, error);
+  }
+}
 
 type StripeCharge = {
   id?: string;
@@ -80,7 +110,7 @@ function safeString(value: unknown): string | undefined {
   return typeof value === "string" && value.trim().length > 0 ? value : undefined;
 }
 
-function mapStripeCharge(charge: StripeCharge): TransactionRecord {
+function mapStripeCharge(charge: StripeCharge): NormalizedTransaction {
   const created = typeof charge?.created === "number" ? charge.created * 1000 : Date.now();
   const amountMinor = typeof charge?.amount === "number" ? charge.amount : 0;
   const currency = (charge?.currency ?? "eur").toString().toUpperCase();
@@ -95,8 +125,8 @@ function mapStripeCharge(charge: StripeCharge): TransactionRecord {
   const metadata = (charge?.metadata ?? {}) as Record<string, unknown>;
 
   return {
-    id: `stripe_${charge?.id ?? randomUUID()}`,
-    source: "Stripe",
+    externalId: `stripe_${charge?.id ?? randomUUID()}`,
+    provider: "Stripe",
     personName:
       safeString(charge?.billing_details?.name) ||
       safeString(metadata.member_name) ||
@@ -115,10 +145,11 @@ function mapStripeCharge(charge: StripeCharge): TransactionRecord {
       email: safeString(charge?.billing_details?.email),
       invoice: safeString(charge?.invoice),
     },
+    raw: charge as Record<string, unknown>,
   };
 }
 
-function mapStarlingFeedItem(item: StarlingFeedItem): TransactionRecord {
+function mapStarlingFeedItem(item: StarlingFeedItem): NormalizedTransaction {
   const feedItemUid = item?.feedItemUid ?? randomUUID();
   const amountMinor =
     item?.amount?.minorUnits ??
@@ -144,8 +175,8 @@ function mapStarlingFeedItem(item: StarlingFeedItem): TransactionRecord {
   const confidence = item?.counterPartyName ? "Medium" : "Needs Review";
 
   return {
-    id: `starling_${feedItemUid}`,
-    source: "Starling",
+    externalId: `starling_${feedItemUid}`,
+    provider: "Starling",
     personName: item?.counterPartyName ?? item?.reference,
     productType: item?.spendingCategory ?? "Bank Transfer",
     status,
@@ -159,6 +190,7 @@ function mapStarlingFeedItem(item: StarlingFeedItem): TransactionRecord {
       direction: item?.direction,
       spendingCategory: item?.spendingCategory,
     },
+    raw: item as Record<string, unknown>,
   };
 }
 
@@ -276,20 +308,36 @@ export async function POST(request: Request) {
   try {
     const body = (await request.json()) as BackfillPayload;
     const summaries: BackfillSummary[] = [];
+    const logWrites: Promise<void>[] = [];
 
-    if (body?.stripe?.secretKey?.trim()) {
+    const pushSummary = (summary: BackfillSummary) => {
+      summaries.push(summary);
+      if (summary.status !== "skipped") {
+        logWrites.push(recordSummary(summary));
+      }
+    };
+
+    const stripeSecretRecord = await getConnectionSecret("stripe");
+    const storedStripeSecret =
+      (stripeSecretRecord?.secret as StripeSecretPayload | null) ?? null;
+    const stripeSecretKey =
+      body?.stripe?.secretKey?.trim() || storedStripeSecret?.secretKey;
+
+    if (stripeSecretKey) {
       try {
-        const result = await runStripeBackfill(body.stripe);
-        const stats = await addTransactions(result.transactions);
-        summaries.push({
+        const result = await runStripeBackfill({
+          secretKey: stripeSecretKey,
+          days: body?.stripe?.days,
+        });
+        const stats = await upsertTransactions(result.transactions);
+        pushSummary({
           ...result.summary,
-          records: result.transactions.length,
           message: `${result.summary.message} Stored ${stats.added} new entr${
             stats.added === 1 ? "y" : "ies"
           }.`,
         });
       } catch (error) {
-        summaries.push({
+        pushSummary({
           source: "Stripe",
           status: "error",
           message:
@@ -299,26 +347,34 @@ export async function POST(request: Request) {
         });
       }
     } else {
-      summaries.push({
+      pushSummary({
         source: "Stripe",
         status: "skipped",
-        message: "No Stripe secret key provided, skipping.",
+        message: "No stored Stripe credentials. Connect Stripe first.",
       });
     }
 
-    if (body?.starling?.accessToken?.trim()) {
+    const starlingSecretRecord = await getConnectionSecret("starling");
+    const storedStarlingSecret =
+      (starlingSecretRecord?.secret as StarlingSecretPayload | null) ?? null;
+    const starlingAccessToken =
+      body?.starling?.accessToken?.trim() || storedStarlingSecret?.accessToken;
+
+    if (starlingAccessToken) {
       try {
-        const result = await runStarlingBackfill(body.starling);
-        const stats = await addTransactions(result.transactions);
-        summaries.push({
+        const result = await runStarlingBackfill({
+          accessToken: starlingAccessToken,
+          days: body?.starling?.days,
+        });
+        const stats = await upsertTransactions(result.transactions);
+        pushSummary({
           ...result.summary,
-          records: result.transactions.length,
           message: `${result.summary.message} Stored ${stats.added} new entr${
             stats.added === 1 ? "y" : "ies"
           }.`,
         });
       } catch (error) {
-        summaries.push({
+        pushSummary({
           source: "Starling",
           status: "error",
           message:
@@ -328,12 +384,14 @@ export async function POST(request: Request) {
         });
       }
     } else {
-      summaries.push({
+      pushSummary({
         source: "Starling",
         status: "skipped",
-        message: "No Starling token provided, skipping.",
+        message: "No stored Starling credentials. Connect Starling first.",
       });
     }
+
+    await Promise.all(logWrites);
 
     const ok = summaries.some((summary) => summary.status === "success");
 

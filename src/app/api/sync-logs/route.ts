@@ -1,12 +1,15 @@
 import { NextResponse } from "next/server";
-import { listTransactions } from "@/lib/transactions";
+import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
 
 export async function GET() {
   try {
-    const data = await listTransactions();
-    return NextResponse.json({ ok: true, data });
+    const logs = await prisma.syncLog.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 200,
+    });
+    return NextResponse.json({ ok: true, data: logs });
   } catch (error) {
     return NextResponse.json(
       {
@@ -14,7 +17,7 @@ export async function GET() {
         message:
           error instanceof Error
             ? error.message
-            : "Unable to load transaction ledger.",
+            : "Unable to load sync logs.",
       },
       { status: 500 }
     );

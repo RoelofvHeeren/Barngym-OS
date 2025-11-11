@@ -1,14 +1,27 @@
 import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   try {
-    const { secretKey, webhookSecret } = await request.json();
+    const { secretKey: incomingSecret, webhookSecret: incomingWebhook } =
+      await request.json();
 
-    if (!secretKey?.trim()) {
+    const record = await prisma.connectionSecret.findUnique({
+      where: { provider: "stripe" },
+    });
+
+    const storedSecret =
+      (record?.secret as { secretKey?: string; webhookSecret?: string } | null) ??
+      null;
+
+    const secretKey = incomingSecret?.trim() || storedSecret?.secretKey;
+    const webhookSecret = incomingWebhook?.trim() || storedSecret?.webhookSecret;
+
+    if (!secretKey) {
       return NextResponse.json(
-        { ok: false, message: "Stripe secret key is required." },
+        { ok: false, message: "Provide a Stripe secret key to connect." },
         { status: 400 }
       );
     }
@@ -29,12 +42,38 @@ export async function POST(request: Request) {
 
     const accountData = await accountResponse.json();
 
+    await prisma.connectionSecret.upsert({
+      where: { provider: "stripe" },
+      update: {
+        secret: { secretKey, webhookSecret },
+        status: "connected",
+        accountId: accountData.id,
+        lastVerifiedAt: new Date(),
+      },
+      create: {
+        provider: "stripe",
+        secret: { secretKey, webhookSecret },
+        status: "connected",
+        accountId: accountData.id,
+        lastVerifiedAt: new Date(),
+      },
+    });
+
+    await prisma.syncLog.create({
+      data: {
+        source: "Stripe",
+        detail: `Credentials verified for ${accountData.id}.`,
+        records: "Credential test",
+      },
+    });
+
     return NextResponse.json({
       ok: true,
       message: `Connected to Stripe account ${accountData.id}.${
         webhookSecret ? " Webhook secret captured." : ""
       }`,
       accountId: accountData.id,
+      stored: true,
     });
   } catch (error) {
     return NextResponse.json(
