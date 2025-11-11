@@ -1,0 +1,112 @@
+@import "tailwindcss";
+
+:root {
+  --bg-base: #d9e7df;
+  --bg-soft: #f4fbf7;
+  --bg-accent: #06523a;
+  --text-primary: #031f15;
+  --text-muted: rgba(3, 31, 21, 0.68);
+  --panel: rgba(252, 255, 254, 0.96);
+  --panel-border: rgba(5, 78, 55, 0.22);
+  --accent: #0bcba1;
+  --accent-strong: #054d36;
+}
+
+@theme inline {
+  --font-sans: var(--font-plus-jakarta);
+}
+
+body {
+  min-height: 100vh;
+  background-image: radial-gradient(
+      circle at 12% 18%,
+      rgba(6, 82, 58, 0.2),
+      transparent 35%
+    ),
+    radial-gradient(
+      circle at 85% 0%,
+      rgba(8, 117, 85, 0.24),
+      transparent 45%
+    ),
+    linear-gradient(135deg, var(--bg-base), var(--bg-soft) 55%, #f7fffb);
+  color: var(--text-primary);
+  font-family: var(--font-plus-jakarta), "Inter", "Segoe UI", system-ui,
+    -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.glass-panel {
+  border-radius: 30px;
+  border: 1px solid var(--panel-border);
+  background: linear-gradient(155deg, rgba(255, 255, 255, 0.98), rgba(230, 245, 239, 0.95));
+  box-shadow:
+    0 30px 60px rgba(3, 33, 24, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.6);
+  padding: 1.85rem;
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+}
+
+.glass-panel:hover {
+  transform: translateY(-3px);
+  border-color: rgba(6, 82, 58, 0.4);
+  box-shadow:
+    0 35px 65px rgba(3, 33, 24, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.85);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 1.1rem;
+  border-radius: 999px;
+  border: 1px solid rgba(6, 82, 58, 0.28);
+  background: linear-gradient(135deg, rgba(6, 82, 58, 0.12), rgba(6, 82, 58, 0.03));
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  transition: border 0.2s ease, background 0.2s ease, color 0.2s ease;
+}
+
+.chip:hover {
+  border-color: rgba(6, 82, 58, 0.5);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(6, 82, 58, 0.12);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(6, 82, 58, 0.45);
+  border-radius: 999px;
+}
+
+.text-primary {
+  color: var(--text-primary);
+}
+
+.text-muted {
+  color: var(--text-muted);
+}
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 999px;
+  background: radial-gradient(circle at 30% 20%, #11f7c8, #04543b);
+  color: white;
+  padding: 0.65rem 1.8rem;
+  font-weight: 600;
+  box-shadow: 0 20px 40px rgba(4, 60, 46, 0.35);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 25px 45px rgba(4, 60, 46, 0.45);
+}

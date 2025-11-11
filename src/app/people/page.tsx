@@ -1,0 +1,1013 @@
+'use client';
+
+import { FormEvent, useMemo, useState } from "react";
+
+const leadStages = ["All", "New", "Follow Up", "Proposal", "Won", "Lost"] as const;
+type LeadStage = (typeof leadStages)[number];
+
+const defaultCsvColumns = [
+  "first_name",
+  "last_name",
+  "full_name",
+  "email",
+  "phone",
+  "channel",
+  "stage",
+  "owner",
+  "next_step",
+  "value",
+  "notes",
+  "membership_name",
+  "membership_plan",
+  "total_bookings",
+  "last_booking",
+  "total_attendances",
+  "credits_remaining",
+  "custom_ref",
+] as const;
+
+const csvColumns = defaultCsvColumns as unknown as string[];
+
+const DONT_IMPORT = "__DONT_IMPORT__";
+
+const searchHints = [
+  "Name",
+  "Email",
+  "Phone",
+  "Stripe customer id",
+  "Glofox member id",
+  "Bank reference name",
+];
+
+type LeadRow = {
+  id: string;
+  name: string;
+  channel: string;
+  stage: string;
+  owner: string;
+  next: string;
+  value: string;
+};
+
+const leadSheet: LeadRow[] = [
+  {
+    id: "LEAD-203",
+    name: "Nora Ikeda",
+    channel: "Corporate Retreat",
+    stage: "New",
+    owner: "Isla",
+    next: "Intro call · Tomorrow",
+    value: "€18,500",
+  },
+  {
+    id: "LEAD-174",
+    name: "Atlas Robotics",
+    channel: "Corporate Wellness",
+    stage: "Follow Up",
+    owner: "Theo",
+    next: "Send proposal · Today",
+    value: "€56,000",
+  },
+  {
+    id: "LEAD-126",
+    name: "Jamie Cal",
+    channel: "PTA Referral",
+    stage: "Proposal",
+    owner: "Mira",
+    next: "Negotiation · Thu",
+    value: "€4,800",
+  },
+  {
+    id: "LEAD-091",
+    name: "Linea Studio",
+    channel: "Corporate Retreat",
+    stage: "Won",
+    owner: "Isla",
+    next: "Kickoff · Fri",
+    value: "€22,000",
+  },
+  {
+    id: "LEAD-067",
+    name: "Sloane Reyes",
+    channel: "Organic",
+    stage: "Follow Up",
+    owner: "Kai",
+    next: "Trial session · Mon",
+    value: "€1,120",
+  },
+] ;
+
+type LeadProfile = {
+  name: string;
+  initials: string;
+  title: string;
+  email: string;
+  phone: string;
+  tags: string[];
+  identities: { label: string; value: string }[];
+  stats: {
+    lifetimeSpend: string;
+    memberships: string;
+    lastPayment: string;
+    lastAttendance: string;
+  };
+  payments: {
+    date: string;
+    source: string;
+    amount: string;
+    product: string;
+    status: string;
+  }[];
+  manualMatches: {
+    reference: string;
+    amount: string;
+    date: string;
+    note: string;
+  }[];
+  notes: { author: string; content: string; timestamp: string }[];
+};
+
+const baseProfile: LeadProfile = {
+  name: "Olivia Northshore",
+  initials: "ON",
+  title: "Corporate Sponsor · PTA Liaison",
+  email: "olivia@northshorelegal.com",
+  phone: "+44 7825 889 441",
+  tags: ["PTA", "Corporate", "High Value", "Trial Alumni"],
+  identities: [
+    { label: "Primary Email", value: "olivia@northshorelegal.com" },
+    { label: "Phone", value: "+44 7825 889 441" },
+    { label: "Stripe", value: "cus_9slf920K" },
+    { label: "Glofox", value: "GF-12201" },
+    { label: "Bank Ref", value: "OLIVIA NORTHSHORE" },
+  ],
+  stats: {
+    lifetimeSpend: "€78,240",
+    memberships: "Corporate Wellness + PT Pack",
+    lastPayment: "€1,840 · 2 days ago",
+    lastAttendance: "Strength Lab · 19:00 yesterday",
+  },
+  payments: [
+    { date: "09 Sep", source: "Stripe", amount: "€1,840", product: "PT Pack", status: "Completed" },
+    { date: "05 Sep", source: "Glofox", amount: "€220", product: "Class Drop-In", status: "Completed" },
+    { date: "01 Sep", source: "Bank", amount: "€9,950", product: "Corporate Renewal", status: "Manual Match" },
+  ],
+  manualMatches: [
+    { reference: "BG-RETREAT-982", amount: "€4,500", date: "08 Sep", note: "Likely to Olivia / Corporate" },
+    { reference: "BG-PTA-1882", amount: "€1,200", date: "07 Sep", note: "Waiting for PTA roster" },
+  ],
+  notes: [
+    {
+      author: "Isla (Success)",
+      content: "Corporate renewal confirmed. Wants mindfulness + cold plunge combo for Q4 retreat.",
+      timestamp: "Today · 09:14",
+    },
+    {
+      author: "Theo (Finance)",
+      content: "Bank transfer matched via reference. Confidence 0.92 after alias update.",
+      timestamp: "Yesterday · 16:02",
+    },
+  ],
+};
+
+const leadProfiles: Record<string, LeadProfile> = {
+  "LEAD-203": {
+    ...baseProfile,
+    name: "Nora Ikeda",
+    initials: "NI",
+    title: "People Ops · Shoreline Bio",
+    email: "nora@shorelinebio.com",
+    phone: "+44 7000 221 821",
+    tags: ["Corporate", "Retreat", "High Value"],
+  },
+  "LEAD-174": {
+    ...baseProfile,
+    name: "Atlas Robotics",
+    initials: "AR",
+    title: "People Ops · Atlas Robotics",
+    email: "ops@atlasrobotics.eu",
+    phone: "+44 7000 983 112",
+    tags: ["Corporate", "Wellness"],
+  },
+  "LEAD-126": {
+    ...baseProfile,
+    name: "Jamie Cal",
+    initials: "JC",
+    title: "PTA Referral",
+    email: "jamie.cal@gmail.com",
+    phone: "+44 7820 111 221",
+    tags: ["PTA", "Trial"],
+  },
+  "LEAD-091": {
+    ...baseProfile,
+    name: "Linea Studio",
+    initials: "LS",
+    title: "Design Agency · Corporate Retreat",
+    email: "hello@lineastudio.co",
+    phone: "+44 7000 199 555",
+    tags: ["Corporate", "Won"],
+  },
+  "LEAD-067": {
+    ...baseProfile,
+    name: "Sloane Reyes",
+    initials: "SR",
+    title: "Organic Lead",
+    email: "sloane.reyes@gmail.com",
+    phone: "+44 7820 116 998",
+    tags: ["Trial", "High Potential"],
+  },
+};
+
+const defaultMapping = {
+  first_name: "first_name",
+  last_name: "last_name",
+  email: "email",
+  phone: "phone",
+  channel: "channel",
+  value: "value",
+  membership_name: "membership_name",
+  total_bookings: "total_bookings",
+  last_booking: "last_booking",
+  credits_remaining: "credits_remaining",
+};
+
+function parseCsv(text: string): string[][] {
+  const rows: string[][] = [];
+  let current = "";
+  let inQuotes = false;
+  const row: string[] = [];
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    const nextChar = text[i + 1];
+    if (char === '"' && inQuotes && nextChar === '"') {
+      current += '"';
+      i++;
+      continue;
+    }
+    if (char === '"') {
+      inQuotes = !inQuotes;
+      continue;
+    }
+    if (char === "," && !inQuotes) {
+      row.push(current);
+      current = "";
+      continue;
+    }
+    if ((char === "\n" || char === "\r") && !inQuotes) {
+      if (char === "\r" && nextChar === "\n") {
+        i++;
+      }
+      row.push(current);
+      rows.push([...row]);
+      row.length = 0;
+      current = "";
+      continue;
+    }
+    current += char;
+  }
+  if (current.length > 0 || row.length > 0) {
+    row.push(current);
+    rows.push([...row]);
+  }
+  return rows.filter((r) => r.some((cell) => cell.trim().length > 0));
+}
+
+const membershipOptions = [
+  "Barn Gym Membership",
+  "6 Week Transformation",
+  "Personal Training",
+  "Pay As You Go Classes",
+  "Online Coaching",
+] as const;
+
+export default function PeoplePage() {
+  const [search, setSearch] = useState("");
+  const [leadFilter, setLeadFilter] = useState<LeadStage>("All");
+  const [selectedLeadId, setSelectedLeadId] = useState<string>(leadSheet[0].id);
+  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [csvHeaders, setCsvHeaders] = useState<string[]>(csvColumns);
+  const [parsedRows, setParsedRows] = useState<string[][]>([]);
+  const [csvPreview, setCsvPreview] = useState<string[][]>([]);
+  const [fieldMapping, setFieldMapping] = useState<Record<string, string>>(defaultMapping);
+  const [customMappings, setCustomMappings] = useState<{ key: string; column: string }[]>([
+    { key: "Membership Id", column: "custom_ref" },
+  ]);
+  const [customFieldName, setCustomFieldName] = useState("");
+  const [drafts, setDrafts] = useState<
+    { id: string; name: string; email: string; membership: string; note: string }[]
+  >([]);
+  const [formState, setFormState] = useState({
+    name: "",
+    email: "",
+    membership: "",
+    note: "",
+  });
+  const [importedLeads, setImportedLeads] = useState<LeadRow[]>([]);
+  const [profiles, setProfiles] = useState<Record<string, LeadProfile>>({
+    ...leadProfiles,
+  });
+  const [importMessage, setImportMessage] = useState<string | null>(null);
+  const [showImportWorkspace, setShowImportWorkspace] = useState(false);
+
+  const allLeads = useMemo(
+    () => [...leadSheet, ...importedLeads],
+    [importedLeads]
+  );
+
+  const pageSizes = [10, 25, 50] as const;
+  const [pageSize, setPageSize] = useState<(typeof pageSizes)[number]>(10);
+  const [page, setPage] = useState(1);
+
+  const filteredLeads = useMemo(() => {
+    return allLeads.filter((lead) => {
+      const matchesStage = leadFilter === "All" || lead.stage === leadFilter;
+      const matchesSearch = search
+        ? lead.name.toLowerCase().includes(search.toLowerCase()) ||
+          lead.channel.toLowerCase().includes(search.toLowerCase())
+        : true;
+      return matchesStage && matchesSearch;
+    });
+  }, [allLeads, leadFilter, search]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredLeads.length / pageSize));
+  const pagedLeads = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return filteredLeads.slice(start, start + pageSize);
+  }, [filteredLeads, page, pageSize]);
+
+  const selectedLeadProfile = profiles[selectedLeadId] ?? baseProfile;
+  const [modalOpen, setModalOpen] = useState(false);
+
+  const matchingIdentities = useMemo(() => {
+    if (!search.trim()) {
+      return selectedLeadProfile.identities.slice(0, 3);
+    }
+    return selectedLeadProfile.identities.filter((identity) =>
+      identity.value.toLowerCase().includes(search.toLowerCase())
+    );
+  }, [search, selectedLeadProfile]);
+
+  const handleCreate = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!formState.name || !formState.email) return;
+    setDrafts((prev) => [
+      ...prev,
+      { id: `DRAFT-${prev.length + 1}`, ...formState },
+    ]);
+    setFormState({ name: "", email: "", membership: "", note: "" });
+  };
+
+  const handleMappingChange = (field: string, column: string) => {
+    setFieldMapping((prev) => ({ ...prev, [field]: column }));
+  };
+
+  const handleCustomMappingChange = (index: number, column: string) => {
+    setCustomMappings((prev) =>
+      prev.map((mapping, idx) =>
+        idx === index ? { ...mapping, column } : mapping
+      )
+    );
+  };
+
+  const addCustomField = () => {
+    if (!customFieldName.trim()) return;
+    setCustomMappings((prev) => [
+      ...prev,
+      {
+        key: customFieldName.trim(),
+        column: csvHeaders[0] ?? csvColumns[0],
+      },
+    ]);
+    setCustomFieldName("");
+  };
+
+  const handleCsvUpload = async (file: File | null) => {
+    setCsvFile(file);
+    if (!file) {
+      setCsvHeaders(csvColumns);
+      setCsvPreview([]);
+      setParsedRows([]);
+      return;
+    }
+    try {
+      const text = await file.text();
+      const rows = parseCsv(text);
+      if (!rows.length) {
+        setCsvHeaders(csvColumns);
+        setCsvPreview([]);
+        setParsedRows([]);
+        return;
+      }
+      const headers = rows[0].map((header) => header.trim());
+      setCsvHeaders(headers);
+      setParsedRows(rows.slice(1));
+      setCsvPreview(rows.slice(1, 6));
+
+      setFieldMapping((prev) => {
+        const next = { ...prev };
+        Object.entries(prev).forEach(([field, currentValue]) => {
+          if (headers.includes(currentValue)) return;
+          const guess = headers.find((header) =>
+            header.toLowerCase().includes(field.replace(/_/g, " ").toLowerCase())
+          );
+          if (guess) next[field] = guess;
+        });
+        return next;
+      });
+
+      setCustomMappings((prev) =>
+        prev.map((mapping) => {
+          if (headers.includes(mapping.column)) return mapping;
+          const guess =
+            headers.find((header) =>
+              header.toLowerCase().includes(mapping.key.toLowerCase())
+            ) ?? mapping.column;
+          return { ...mapping, column: guess };
+        })
+      );
+      setImportMessage(null);
+    } catch {
+      setCsvHeaders(csvColumns);
+      setCsvPreview([]);
+      setParsedRows([]);
+      setImportMessage("Failed to read CSV. Please try again.");
+    }
+  };
+
+  const handleImportCsv = () => {
+    if (!parsedRows.length) {
+      setImportMessage("Upload a CSV and verify mappings before importing.");
+      return;
+    }
+    const headers = csvHeaders;
+    const headerIndex = (column: string | undefined) =>
+      column && column !== DONT_IMPORT
+        ? headers.findIndex((header) => header === column)
+        : -1;
+    const getValue = (row: string[], key: keyof typeof fieldMapping) => {
+      const column = fieldMapping[key];
+      const index = headerIndex(column);
+      if (index === -1) return "";
+      return row[index] ?? "";
+    };
+
+    const newLeadRows: LeadRow[] = [];
+    const newProfiles: Record<string, LeadProfile> = {};
+
+    parsedRows.forEach((row, index) => {
+      const firstName = getValue(row, "first_name");
+      const lastName = getValue(row, "last_name");
+      const combinedName = getValue(row, "name");
+      const displayName =
+        [firstName, lastName].filter(Boolean).join(" ") ||
+        combinedName ||
+        `Lead ${index + 1}`;
+      const membershipName =
+        getValue(row, "membership_name") ||
+        formState.membership ||
+        "Unassigned";
+      const valueRaw = getValue(row, "value");
+      const lastBooking = getValue(row, "last_booking");
+      const totalAttendances = getValue(row, "total_attendances");
+
+      const leadId = `CSV-${Date.now()}-${index}`;
+
+      newLeadRows.push({
+        id: leadId,
+        name: displayName,
+        channel: getValue(row, "channel") || "CSV Upload",
+        stage: "New",
+        owner: "Unassigned",
+        next: "Review import",
+        value: valueRaw || membershipName || "€0",
+      });
+
+      const initials =
+        `${((firstName || displayName).charAt(0)) ?? ""}${
+          ((lastName || displayName.split(" ").slice(-1)[0] || "").charAt(0)) ?? ""
+        }`.toUpperCase() || displayName.slice(0, 2).toUpperCase();
+
+      newProfiles[leadId] = {
+        ...baseProfile,
+        name: displayName,
+        initials,
+        title: membershipName,
+        email: getValue(row, "email"),
+        phone: getValue(row, "phone"),
+        tags: [membershipName].filter(Boolean),
+        identities: [
+          { label: "Email", value: getValue(row, "email") },
+          { label: "Phone", value: getValue(row, "phone") },
+          { label: "Membership", value: membershipName },
+        ].filter((identity) => identity.value),
+        stats: {
+          lifetimeSpend: valueRaw || baseProfile.stats.lifetimeSpend,
+          memberships: membershipName,
+          lastPayment: lastBooking || "—",
+          lastAttendance: `${totalAttendances || 0} attendances`,
+        },
+        payments: [
+          {
+            date: lastBooking || "—",
+            source: getValue(row, "channel") || "CSV",
+            amount: valueRaw || "€0",
+            product: membershipName,
+            status: "Imported",
+          },
+        ],
+        manualMatches: [],
+        notes: [
+          {
+            author: "CSV Importer",
+            content: `Imported from ${csvFile?.name ?? "CSV"} row ${index + 1}`,
+            timestamp: new Date().toLocaleString(),
+          },
+        ],
+      };
+    });
+
+    setImportedLeads((prev) => [...prev, ...newLeadRows]);
+    setProfiles((prev) => ({ ...prev, ...newProfiles }));
+    setImportMessage(
+      `Imported ${newLeadRows.length} lead${newLeadRows.length === 1 ? "" : "s"} from ${
+        csvFile?.name ?? "CSV"
+      }.`
+    );
+    if (newLeadRows.length) {
+      setSelectedLeadId(newLeadRows[0].id);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-8 text-primary">
+      <section className="glass-panel space-y-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p className="text-xs uppercase tracking-[0.35em] text-muted">
+              Leads / CRM
+            </p>
+            <h2 className="mt-2 text-3xl font-semibold">Identity Graph</h2>
+            <p className="text-sm text-muted">
+              Lead sheet first. Search anything, filter stages, and open full profiles.
+            </p>
+          </div>
+          <button
+            className="btn-primary text-sm"
+            type="button"
+            onClick={() => {
+              setShowImportWorkspace((prev) => !prev);
+              setImportMessage(null);
+              setFormState({ name: "", email: "", membership: "", note: "" });
+            }}
+          >
+            {showImportWorkspace ? "Import Workspace Open" : "Open Import Workspace"}
+          </button>
+        </div>
+
+        <div className="rounded-3xl border border-white/20 bg-white/80 px-5 py-3">
+          <input
+            type="text"
+            placeholder="Search people or leads..."
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            className="w-full bg-transparent text-lg font-medium text-primary placeholder:text-muted focus:outline-none"
+          />
+        </div>
+        <div className="flex flex-wrap gap-2 text-xs text-muted">
+          {searchHints.map((hint) => (
+            <span key={hint} className="chip !border-white/15 !bg-white/5">
+              {hint}
+            </span>
+          ))}
+          <button
+            className="chip text-xs"
+            type="button"
+            onClick={() => setShowImportWorkspace((prev) => !prev)}
+          >
+            {showImportWorkspace ? "Hide import workspace" : "Open import workspace"}
+          </button>
+        </div>
+      </section>
+
+      {showImportWorkspace && (
+        <section className="grid gap-6 lg:grid-cols-2">
+          <div className="rounded-3xl border border-emerald-900/15 bg-white/80 p-5">
+            <p className="text-xs uppercase tracking-[0.35em] text-muted">Upload CSV</p>
+            <h3 className="mt-2 text-xl font-semibold">Ingest leads from Glofox or Stripe</h3>
+            <label className="mt-4 flex cursor-pointer flex-col items-center justify-center gap-3 rounded-3xl border border-dashed border-emerald-900/30 bg-emerald-50/50 px-4 py-6 text-sm text-muted">
+              <input
+                type="file"
+                accept=".csv"
+                onChange={(event) => handleCsvUpload(event.target.files?.[0] ?? null)}
+                className="hidden"
+              />
+              {csvFile ? (
+                <>
+                  <span className="text-base font-semibold text-primary">{csvFile.name}</span>
+                  <span>Ready to map columns</span>
+                </>
+              ) : (
+                <>
+                  <span className="text-base font-semibold text-primary">Drop CSV or click to upload</span>
+                  <span>Sample columns: first_name, email, phone, status...</span>
+                </>
+              )}
+            </label>
+            <form className="mt-4 grid gap-3 text-sm" onSubmit={handleCreate}>
+              <p className="text-muted text-xs md:col-span-2">
+                Quick add is optional. CSV imports will use the mapped &lsquo;Membership Name&rsquo; column automatically.
+              </p>
+              <div className="grid gap-3 md:grid-cols-2">
+                <input
+                  className="rounded-2xl border border-emerald-900/15 bg-white px-4 py-3"
+                  placeholder="Quick lead name"
+                  value={formState.name}
+                  onChange={(event) =>
+                    setFormState((prev) => ({ ...prev, name: event.target.value }))
+                  }
+                  required
+                />
+                <input
+                  className="rounded-2xl border border-emerald-900/15 bg-white px-4 py-3"
+                  placeholder="Email"
+                  type="email"
+                  value={formState.email}
+                  onChange={(event) =>
+                    setFormState((prev) => ({ ...prev, email: event.target.value }))
+                  }
+                  required
+                />
+                <select
+                  className="rounded-2xl border border-emerald-900/15 bg-white px-4 py-3"
+                  value={formState.membership}
+                  onChange={(event) =>
+                    setFormState((prev) => ({ ...prev, membership: event.target.value }))
+                  }
+                >
+                  <option value="">Auto detect from CSV (optional)</option>
+                  {membershipOptions.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  className="rounded-2xl border border-emerald-900/15 bg-white px-4 py-3"
+                  placeholder="Internal note"
+                  value={formState.note}
+                  onChange={(event) =>
+                    setFormState((prev) => ({ ...prev, note: event.target.value }))
+                  }
+                />
+              </div>
+              <button type="submit" className="btn-primary text-sm">
+                Save quick lead
+              </button>
+            </form>
+            {drafts.length > 0 && (
+              <div className="mt-4 rounded-2xl border border-dashed border-emerald-900/25 bg-white/80 p-3 text-sm">
+                <p className="text-xs uppercase tracking-[0.35em] text-muted">
+                  Drafts awaiting import
+                </p>
+                <ul className="mt-2 space-y-1">
+                  {drafts.map((draft) => (
+                    <li key={draft.id} className="flex justify-between text-primary">
+                      <span>{draft.name}</span>
+                      <span className="text-muted">{draft.membership}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-3xl border border-emerald-900/15 bg-white/80 p-5 text-sm">
+            <p className="text-xs uppercase tracking-[0.35em] text-muted">Field Mapping</p>
+            <h3 className="mt-2 text-xl font-semibold">Map CSV columns to Barn Gym schema</h3>
+            <div className="mt-4 space-y-3">
+              {Object.entries(fieldMapping).map(([field, column]) => (
+                <div key={field} className="flex flex-col gap-1 md:flex-row md:items-center">
+                  <label className="md:w-32 capitalize text-muted">{field}</label>
+                  <select
+                    className="flex-1 rounded-2xl border border-emerald-900/20 bg-white px-4 py-2"
+                    value={column}
+                    onChange={(event) => handleMappingChange(field, event.target.value)}
+                  >
+                    <option value={DONT_IMPORT}>Don&apos;t import</option>
+                    {csvHeaders.map((col) => (
+                      <option key={`${field}-${col}`} value={col}>
+                        {col || "—"}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 space-y-2">
+              <p className="text-xs uppercase tracking-[0.35em] text-muted">
+                Custom Variables
+              </p>
+              {customMappings.map((mapping, index) => (
+                <div key={`${mapping.key}-${index}`} className="flex flex-col gap-1 md:flex-row md:items-center">
+                  <input
+                    className="rounded-2xl border border-emerald-900/20 bg-white px-4 py-2 text-sm md:w-40"
+                    value={mapping.key}
+                    readOnly
+                  />
+                  <select
+                    className="flex-1 rounded-2xl border border-emerald-900/20 bg-white px-4 py-2"
+                    value={mapping.column}
+                    onChange={(event) => handleCustomMappingChange(index, event.target.value)}
+                  >
+                    {csvHeaders.map((col) => (
+                      <option key={`${mapping.key}-${col}`} value={col}>
+                        {col}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ))}
+              <div className="flex flex-col gap-2 md:flex-row md:items-center">
+                <input
+                  className="rounded-2xl border border-dashed border-emerald-900/30 bg-white px-4 py-2 text-sm"
+                  placeholder="Add custom variable"
+                  value={customFieldName}
+                  onChange={(event) => setCustomFieldName(event.target.value)}
+                />
+                <button type="button" className="chip text-xs" onClick={addCustomField}>
+                  + Add mapping
+                </button>
+              </div>
+            </div>
+
+            {csvPreview.length > 0 && (
+              <div className="mt-5">
+                <p className="text-xs uppercase tracking-[0.35em] text-muted">
+                  Preview (first {Math.min(csvPreview.length, 5)} rows)
+                </p>
+                <div className="mt-2 overflow-auto rounded-2xl border border-emerald-900/15 bg-white/70 text-xs">
+                  <table className="w-full min-w-[640px]">
+                    <thead>
+                      <tr>
+                        {csvHeaders.slice(0, 8).map((header) => (
+                          <th key={header} className="border-b border-emerald-900/10 px-3 py-2 text-left font-medium text-muted">
+                            {header || "—"}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {csvPreview.slice(0, 5).map((row, index) => (
+                        <tr key={`preview-${index}`} className="border-b border-emerald-900/5">
+                          {csvHeaders.slice(0, 8).map((_, colIndex) => (
+                            <td key={`preview-${index}-${colIndex}`} className="px-3 py-2 text-primary">
+                              {row[colIndex] ?? ""}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            <div className="mt-5 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                className="btn-primary text-sm"
+                onClick={handleImportCsv}
+              >
+                Import mapped rows
+              </button>
+              {importMessage && (
+                <p className="text-sm text-emerald-700">{importMessage}</p>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
+
+      <section className="glass-panel">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-xs uppercase tracking-[0.35em] text-muted">
+              Lead Sheet
+            </p>
+            <h3 className="mt-2 text-2xl font-semibold">Spreadsheet Overview</h3>
+            <p className="text-sm text-muted">
+              {filteredLeads.length} leads · click any row to open profile.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {leadStages.map((stage) => (
+              <button
+                key={stage}
+                type="button"
+                onClick={() => setLeadFilter(stage)}
+                className={`chip text-xs ${
+                  stage === leadFilter ? "!bg-emerald-600 !text-white !border-emerald-600" : ""
+                }`}
+              >
+                {stage}
+              </button>
+            ))}
+          </div>
+        </div>
+
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full min-w-[720px] text-left text-sm">
+              <thead className="text-muted">
+                <tr>
+                  {["Lead", "Channel", "Stage", "Owner", "Next Step", "Value"].map((column) => (
+                    <th key={column} className="pb-3 pr-4 font-medium">
+                      {column}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-emerald-900/10">
+                {pagedLeads.map((lead) => (
+                  <tr
+                    key={lead.id}
+                    className={`cursor-pointer rounded-2xl ${
+                      lead.id === selectedLeadId ? "bg-emerald-50/80" : ""
+                    }`}
+                    onClick={() => {
+                      setSelectedLeadId(lead.id);
+                      setModalOpen(true);
+                    }}
+                  >
+                    <td className="py-3 pr-4">
+                      <p className="font-semibold text-primary">{lead.name}</p>
+                      <p className="text-xs text-muted">{lead.id}</p>
+                    </td>
+                    <td className="pr-4 text-muted">{lead.channel}</td>
+                    <td className="pr-4">
+                      <span className="chip text-xs">{lead.stage}</span>
+                    </td>
+                    <td className="pr-4 text-muted">{lead.owner}</td>
+                    <td className="pr-4 text-muted">{lead.next}</td>
+                    <td className="pr-4 font-semibold text-primary">{lead.value}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 text-sm">
+          <div className="flex items-center gap-2">
+            <span className="text-muted">Rows per page</span>
+            <select
+              className="rounded-2xl border border-emerald-900/20 bg-white/60 px-3 py-2 text-sm"
+              value={pageSize}
+              onChange={(event) => {
+                setPageSize(Number(event.target.value) as (typeof pageSizes)[number]);
+                setPage(1);
+              }}
+            >
+              {pageSizes.map((size) => (
+                <option key={size} value={size}>
+                  {size}
+                </option>
+              ))}
+            </select>
+          </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            className="chip text-xs"
+            disabled={page === 1}
+            onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+            >
+              Previous
+            </button>
+            <span className="text-muted">
+              Page {page} / {totalPages}
+            </span>
+            <button
+              type="button"
+              className="chip text-xs"
+              disabled={page === totalPages}
+              onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {modalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-8">
+          <div className="glass-panel max-h-[90vh] w-full max-w-4xl overflow-y-auto">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-[0.35em] text-muted">
+                  Lead Profile
+                </p>
+                <h3 className="mt-2 text-2xl font-semibold">{selectedLeadProfile.name}</h3>
+                <p className="text-sm text-muted">{selectedLeadProfile.title}</p>
+              </div>
+              <button
+                type="button"
+                className="chip text-xs"
+                onClick={() => setModalOpen(false)}
+              >
+                Close
+              </button>
+            </div>
+            <div className="mt-5 space-y-3 text-sm text-muted">
+              <p>Phone · {selectedLeadProfile.phone}</p>
+              <p>Email · {selectedLeadProfile.email}</p>
+              <div className="flex flex-wrap gap-2">
+                {selectedLeadProfile.tags.map((tag) => (
+                  <span key={tag} className="chip text-xs">
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                <p className="text-xs uppercase tracking-[0.35em] text-muted">
+                  Lifetime Value
+                </p>
+                <p className="mt-2 text-lg font-semibold">
+                  {selectedLeadProfile.stats.lifetimeSpend}
+                </p>
+              </div>
+              <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                <p className="text-xs uppercase tracking-[0.35em] text-muted">
+                  Membership
+                </p>
+                <p className="mt-2 text-lg font-semibold">
+                  {selectedLeadProfile.stats.memberships}
+                </p>
+              </div>
+              <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                <p className="text-xs uppercase tracking-[0.35em] text-muted">
+                  Recent Payment
+                </p>
+                <p className="mt-2 text-lg font-semibold">
+                  {selectedLeadProfile.stats.lastPayment}
+                </p>
+              </div>
+              <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                <p className="text-xs uppercase tracking-[0.35em] text-muted">
+                  Attendance
+                </p>
+                <p className="mt-2 text-lg font-semibold">
+                  {selectedLeadProfile.stats.lastAttendance}
+                </p>
+              </div>
+            </div>
+            <div className="mt-6 grid gap-4 md:grid-cols-2">
+              <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                <p className="text-xs uppercase tracking-[0.35em] text-muted">
+                  Contact Info
+                </p>
+                <ul className="mt-3 space-y-2 text-primary">
+                  {matchingIdentities.map((identity) => (
+                    <li key={identity.value} className="flex justify-between gap-4">
+                      <span className="text-muted">{identity.label}</span>
+                      <span className="font-medium text-primary">{identity.value}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                <p className="text-xs uppercase tracking-[0.35em] text-muted">Recent Payments</p>
+                <div className="mt-3 space-y-3">
+                  {selectedLeadProfile.payments.map((entry) => (
+                    <div
+                      key={`${entry.date}-${entry.product}`}
+                      className="rounded-2xl border border-white/10 bg-white/5 p-3"
+                    >
+                      <p className="text-sm font-semibold text-primary">{entry.product}</p>
+                      <p className="text-xs text-muted">
+                        {entry.date} · {entry.source}
+                      </p>
+                      <p className="text-sm text-primary">{entry.amount}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="mt-4 rounded-3xl border border-white/10 bg-white/5 p-4">
+              <p className="text-xs uppercase tracking-[0.35em] text-muted">Notes</p>
+              <div className="mt-3 space-y-3 text-sm">
+                {selectedLeadProfile.notes.map((note) => (
+                  <div key={note.timestamp} className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                    <p className="text-xs text-muted">{note.timestamp}</p>
+                    <p className="text-primary">{note.content}</p>
+                    <p className="text-xs text-muted">— {note.author}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+}
