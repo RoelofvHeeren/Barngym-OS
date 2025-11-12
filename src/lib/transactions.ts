@@ -1,4 +1,5 @@
 import { randomUUID } from "crypto";
+import type Stripe from "stripe";
 import { prisma } from "./prisma";
 import { attachLeadBatch } from "./transactionMatcher";
 
@@ -104,15 +105,11 @@ type StripeChargePayload = {
   currency?: string;
   status?: string;
   paid?: boolean;
-  customer?: string;
+  customer?: string | Stripe.Customer | Stripe.DeletedCustomer | null;
   description?: string;
   statement_descriptor?: string;
   metadata?: Record<string, unknown>;
-  billing_details?: {
-    name?: string;
-    email?: string;
-    phone?: string;
-  };
+  billing_details?: Stripe.Charge.BillingDetails;
   receipt_email?: string;
   invoice?: string;
 };
@@ -121,7 +118,7 @@ type StripePaymentIntentPayload = StripeChargePayload & {
   amount_received?: number;
   amount_capturable?: number;
   amount_details?: Record<string, unknown>;
-  charges?: { data?: StripeChargePayload[] };
+  charges?: { data?: Array<StripeChargePayload | Stripe.Charge> };
 };
 
 type StripeInvoicePayload = {
