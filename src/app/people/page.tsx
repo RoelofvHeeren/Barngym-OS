@@ -49,54 +49,6 @@ type LeadRow = {
   value: string;
 };
 
-const leadSheet: LeadRow[] = [
-  {
-    id: "LEAD-203",
-    name: "Nora Ikeda",
-    channel: "Corporate Retreat",
-    stage: "New",
-    owner: "Isla",
-    next: "Intro call · Tomorrow",
-    value: "€18,500",
-  },
-  {
-    id: "LEAD-174",
-    name: "Atlas Robotics",
-    channel: "Corporate Wellness",
-    stage: "Follow Up",
-    owner: "Theo",
-    next: "Send proposal · Today",
-    value: "€56,000",
-  },
-  {
-    id: "LEAD-126",
-    name: "Jamie Cal",
-    channel: "PTA Referral",
-    stage: "Proposal",
-    owner: "Mira",
-    next: "Negotiation · Thu",
-    value: "€4,800",
-  },
-  {
-    id: "LEAD-091",
-    name: "Linea Studio",
-    channel: "Corporate Retreat",
-    stage: "Won",
-    owner: "Isla",
-    next: "Kickoff · Fri",
-    value: "€22,000",
-  },
-  {
-    id: "LEAD-067",
-    name: "Sloane Reyes",
-    channel: "Organic",
-    stage: "Follow Up",
-    owner: "Kai",
-    next: "Trial session · Mon",
-    value: "€1,120",
-  },
-] ;
-
 type LeadProfile = {
   name: string;
   initials: string;
@@ -127,96 +79,36 @@ type LeadProfile = {
   notes: { author: string; content: string; timestamp: string }[];
 };
 
-const baseProfile: LeadProfile = {
-  name: "Olivia Northshore",
-  initials: "ON",
-  title: "Corporate Sponsor · PTA Liaison",
-  email: "olivia@northshorelegal.com",
-  phone: "+44 7825 889 441",
-  tags: ["PTA", "Corporate", "High Value", "Trial Alumni"],
-  identities: [
-    { label: "Primary Email", value: "olivia@northshorelegal.com" },
-    { label: "Phone", value: "+44 7825 889 441" },
-    { label: "Stripe", value: "cus_9slf920K" },
-    { label: "Glofox", value: "GF-12201" },
-    { label: "Bank Ref", value: "OLIVIA NORTHSHORE" },
-  ],
-  stats: {
-    lifetimeSpend: "€78,240",
-    memberships: "Corporate Wellness + PT Pack",
-    lastPayment: "€1,840 · 2 days ago",
-    lastAttendance: "Strength Lab · 19:00 yesterday",
-  },
-  payments: [
-    { date: "09 Sep", source: "Stripe", amount: "€1,840", product: "PT Pack", status: "Completed" },
-    { date: "05 Sep", source: "Glofox", amount: "€220", product: "Class Drop-In", status: "Completed" },
-    { date: "01 Sep", source: "Bank", amount: "€9,950", product: "Corporate Renewal", status: "Manual Match" },
-  ],
-  manualMatches: [
-    { reference: "BG-RETREAT-982", amount: "€4,500", date: "08 Sep", note: "Likely to Olivia / Corporate" },
-    { reference: "BG-PTA-1882", amount: "€1,200", date: "07 Sep", note: "Waiting for PTA roster" },
-  ],
-  notes: [
-    {
-      author: "Isla (Success)",
-      content: "Corporate renewal confirmed. Wants mindfulness + cold plunge combo for Q4 retreat.",
-      timestamp: "Today · 09:14",
-    },
-    {
-      author: "Theo (Finance)",
-      content: "Bank transfer matched via reference. Confidence 0.92 after alias update.",
-      timestamp: "Yesterday · 16:02",
-    },
-  ],
-};
+function createDefaultStats() {
+  return {
+    lifetimeSpend: "€0",
+    memberships: "Unassigned",
+    lastPayment: "—",
+    lastAttendance: "—",
+  };
+}
 
-const leadProfiles: Record<string, LeadProfile> = {
-  "LEAD-203": {
-    ...baseProfile,
-    name: "Nora Ikeda",
-    initials: "NI",
-    title: "People Ops · Shoreline Bio",
-    email: "nora@shorelinebio.com",
-    phone: "+44 7000 221 821",
-    tags: ["Corporate", "Retreat", "High Value"],
-  },
-  "LEAD-174": {
-    ...baseProfile,
-    name: "Atlas Robotics",
-    initials: "AR",
-    title: "People Ops · Atlas Robotics",
-    email: "ops@atlasrobotics.eu",
-    phone: "+44 7000 983 112",
-    tags: ["Corporate", "Wellness"],
-  },
-  "LEAD-126": {
-    ...baseProfile,
-    name: "Jamie Cal",
-    initials: "JC",
-    title: "PTA Referral",
-    email: "jamie.cal@gmail.com",
-    phone: "+44 7820 111 221",
-    tags: ["PTA", "Trial"],
-  },
-  "LEAD-091": {
-    ...baseProfile,
-    name: "Linea Studio",
-    initials: "LS",
-    title: "Design Agency · Corporate Retreat",
-    email: "hello@lineastudio.co",
-    phone: "+44 7000 199 555",
-    tags: ["Corporate", "Won"],
-  },
-  "LEAD-067": {
-    ...baseProfile,
-    name: "Sloane Reyes",
-    initials: "SR",
-    title: "Organic Lead",
-    email: "sloane.reyes@gmail.com",
-    phone: "+44 7820 116 998",
-    tags: ["Trial", "High Potential"],
-  },
-};
+function createProfileTemplate(name: string): LeadProfile {
+  const trimmedName = name.trim() || "Imported Lead";
+  const parts = trimmedName.split(/\s+/).filter(Boolean);
+  const initials = (
+    (parts[0]?.charAt(0) ?? "") + (parts[1]?.charAt(0) ?? parts[0]?.charAt(1) ?? "")
+  ).toUpperCase();
+
+  return {
+    name: trimmedName,
+    initials: initials || "BG",
+    title: "Lead",
+    email: "",
+    phone: "",
+    tags: [],
+    identities: [],
+    stats: createDefaultStats(),
+    payments: [],
+    manualMatches: [],
+    notes: [],
+  };
+}
 
 const defaultMapping = {
   first_name: "first_name",
@@ -397,7 +289,7 @@ function normalizeApiLead(lead: ApiLead): NormalizedLead {
 export default function PeoplePage() {
   const [search, setSearch] = useState("");
   const [leadFilter, setLeadFilter] = useState<LeadStage>("All");
-  const [selectedLeadId, setSelectedLeadId] = useState<string>(leadSheet[0].id);
+  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [csvHeaders, setCsvHeaders] = useState<string[]>(csvColumns);
   const [parsedRows, setParsedRows] = useState<string[][]>([]);
@@ -417,9 +309,7 @@ export default function PeoplePage() {
     note: "",
   });
   const [importedLeads, setImportedLeads] = useState<LeadRow[]>([]);
-  const [profiles, setProfiles] = useState<Record<string, LeadProfile>>({
-    ...leadProfiles,
-  });
+  const [profiles, setProfiles] = useState<Record<string, LeadProfile>>({});
   const [importMessage, setImportMessage] = useState<string | null>(null);
   const [showImportWorkspace, setShowImportWorkspace] = useState(false);
   const [loadingLeads, setLoadingLeads] = useState(false);
@@ -443,13 +333,12 @@ export default function PeoplePage() {
         profileMap[normalized.row.id] = normalized.profile;
       });
       setImportedLeads(rows);
-      setProfiles({ ...leadProfiles, ...profileMap });
+      setProfiles(profileMap);
       setSelectedLeadId((previous) => {
-        const combined = [...leadSheet, ...rows];
-        if (previous && combined.some((lead) => lead.id === previous)) {
+        if (previous && rows.some((lead) => lead.id === previous)) {
           return previous;
         }
-        return rows[0]?.id ?? leadSheet[0].id;
+        return rows[0]?.id ?? null;
       });
     } catch (error) {
       setLeadError(
@@ -466,10 +355,7 @@ export default function PeoplePage() {
     loadImportedLeads();
   }, [loadImportedLeads]);
 
-  const allLeads = useMemo(
-    () => [...leadSheet, ...importedLeads],
-    [importedLeads]
-  );
+  const allLeads = useMemo(() => importedLeads, [importedLeads]);
 
   const pageSizes = [10, 25, 50] as const;
   const [pageSize, setPageSize] = useState<(typeof pageSizes)[number]>(10);
@@ -492,10 +378,13 @@ export default function PeoplePage() {
     return filteredLeads.slice(start, start + pageSize);
   }, [filteredLeads, page, pageSize]);
 
-  const selectedLeadProfile = profiles[selectedLeadId] ?? baseProfile;
+  const selectedLeadProfile = selectedLeadId ? profiles[selectedLeadId] : null;
   const [modalOpen, setModalOpen] = useState(false);
 
   const matchingIdentities = useMemo(() => {
+    if (!selectedLeadProfile) {
+      return [];
+    }
     if (!search.trim()) {
       return selectedLeadProfile.identities.slice(0, 3);
     }
@@ -628,27 +517,33 @@ export default function PeoplePage() {
       const phone = getValue(row, "phone");
       const channel = getValue(row, "channel") || "CSV Upload";
 
+      const template = createProfileTemplate(displayName);
+      const initials =
+        `${((firstName || displayName).charAt(0)) ?? ""}${
+          ((lastName || displayName.split(" ").slice(-1)[0] || "").charAt(0)) ?? ""
+        }`.toUpperCase() || template.initials;
+
       const profile: LeadProfile = {
-        ...baseProfile,
+        ...template,
         name: displayName,
-        initials:
-          `${((firstName || displayName).charAt(0)) ?? ""}${
-            ((lastName || displayName.split(" ").slice(-1)[0] || "").charAt(0)) ?? ""
-          }`.toUpperCase() || displayName.slice(0, 2).toUpperCase(),
-        title: membershipName,
-        email,
-        phone,
-        tags: [membershipName].filter(Boolean),
+        initials,
+        title: membershipName || channel || template.title,
+        email: email ?? template.email,
+        phone: phone ?? template.phone,
+        tags: [membershipName, channel].filter(Boolean) as string[],
         identities: [
           email ? { label: "Email", value: email } : null,
           phone ? { label: "Phone", value: phone } : null,
           membershipName ? { label: "Membership", value: membershipName } : null,
         ].filter(Boolean) as { label: string; value: string }[],
         stats: {
-          lifetimeSpend: valueRaw || baseProfile.stats.lifetimeSpend,
-          memberships: membershipName,
-          lastPayment: lastBooking || "—",
-          lastAttendance: `${totalAttendances || 0} attendances`,
+          lifetimeSpend: valueRaw || template.stats.lifetimeSpend,
+          memberships: membershipName || template.stats.memberships,
+          lastPayment: lastBooking || template.stats.lastPayment,
+          lastAttendance:
+            totalAttendances && Number(totalAttendances) > 0
+              ? `${totalAttendances} attendances`
+              : template.stats.lastAttendance,
         },
         payments: [
           {
@@ -698,7 +593,7 @@ export default function PeoplePage() {
       setImportMessage(result.message ?? `Imported ${payloads.length} leads.`);
       await loadImportedLeads();
       if (payloads.length) {
-        setSelectedLeadId(payloads[0].externalId ?? leadSheet[0].id);
+        setSelectedLeadId(payloads[0].externalId ?? null);
       }
     } catch (error) {
       setImportMessage(
@@ -1073,7 +968,7 @@ export default function PeoplePage() {
         </div>
       </section>
 
-      {modalOpen && (
+      {modalOpen && selectedLeadProfile && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-8">
           <div className="glass-panel max-h-[90vh] w-full max-w-4xl overflow-y-auto">
             <div className="flex items-center justify-between">

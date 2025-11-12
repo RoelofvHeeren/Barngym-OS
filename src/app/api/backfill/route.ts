@@ -1,7 +1,12 @@
-import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { NormalizedTransaction, upsertTransactions } from "@/lib/transactions";
+import {
+  NormalizedTransaction,
+  StarlingFeedItem,
+  mapStarlingFeedItem,
+  mapStripeCharge,
+  upsertTransactions,
+} from "@/lib/transactions";
 
 export const runtime = "nodejs";
 
@@ -61,137 +66,6 @@ async function recordSummary(summary: BackfillSummary) {
   } catch (error) {
     console.error("Failed to persist sync log", summary, error);
   }
-}
-
-type StripeCharge = {
-  id?: string;
-  created?: number;
-  amount?: number;
-  currency?: string;
-  status?: string;
-  paid?: boolean;
-  billing_details?: {
-    name?: string;
-    email?: string;
-  };
-  metadata?: Record<string, unknown>;
-  customer?: string;
-  description?: string;
-  statement_descriptor?: string;
-  invoice?: string;
-};
-
-type StarlingFeedItem = {
-  feedItemUid?: string;
-  amount?: {
-    minorUnits?: number;
-    currency?: string;
-  };
-  totalAmount?: {
-    minorUnits?: number;
-    currency?: string;
-  };
-  sourceAmount?: {
-    minorUnits?: number;
-    currency?: string;
-  };
-  transactionTime?: string;
-  updatedAt?: string;
-  spendUntil?: string;
-  status?: string;
-  counterPartyName?: string;
-  reference?: string;
-  description?: string;
-  direction?: string;
-  spendingCategory?: string;
-};
-
-function safeString(value: unknown): string | undefined {
-  return typeof value === "string" && value.trim().length > 0 ? value : undefined;
-}
-
-function mapStripeCharge(charge: StripeCharge): NormalizedTransaction {
-  const created = typeof charge?.created === "number" ? charge.created * 1000 : Date.now();
-  const amountMinor = typeof charge?.amount === "number" ? charge.amount : 0;
-  const currency = (charge?.currency ?? "eur").toString().toUpperCase();
-  const status =
-    charge?.status === "succeeded"
-      ? "Completed"
-      : charge?.status === "failed"
-      ? "Failed"
-      : "Needs Review";
-  const confidence = charge?.paid ? "High" : "Needs Review";
-
-  const metadata = (charge?.metadata ?? {}) as Record<string, unknown>;
-
-  return {
-    externalId: `stripe_${charge?.id ?? randomUUID()}`,
-    provider: "Stripe",
-    personName:
-      safeString(charge?.billing_details?.name) ||
-      safeString(metadata.member_name) ||
-      safeString(charge?.customer) ||
-      undefined,
-    productType: safeString(metadata.product_type) ?? "Stripe Charge",
-    status,
-    confidence,
-    amountMinor,
-    currency,
-    occurredAt: new Date(created).toISOString(),
-    description: charge?.description ?? charge?.statement_descriptor,
-    reference: charge?.id,
-    metadata: {
-      customer: safeString(charge?.customer),
-      email: safeString(charge?.billing_details?.email),
-      invoice: safeString(charge?.invoice),
-    },
-    raw: charge as Record<string, unknown>,
-  };
-}
-
-function mapStarlingFeedItem(item: StarlingFeedItem): NormalizedTransaction {
-  const feedItemUid = item?.feedItemUid ?? randomUUID();
-  const amountMinor =
-    item?.amount?.minorUnits ??
-    item?.totalAmount?.minorUnits ??
-    item?.sourceAmount?.minorUnits ??
-    0;
-  const currency =
-    (item?.amount?.currency ??
-      item?.totalAmount?.currency ??
-      item?.sourceAmount?.currency ??
-      "GBP")?.toString().toUpperCase();
-  const occurredAt =
-    item?.transactionTime ??
-    item?.updatedAt ??
-    item?.spendUntil ??
-    new Date().toISOString();
-  const status =
-    item?.status === "SETTLED"
-      ? "Completed"
-      : item?.status === "DECLINED"
-      ? "Failed"
-      : "Needs Review";
-  const confidence = item?.counterPartyName ? "Medium" : "Needs Review";
-
-  return {
-    externalId: `starling_${feedItemUid}`,
-    provider: "Starling",
-    personName: item?.counterPartyName ?? item?.reference,
-    productType: item?.spendingCategory ?? "Bank Transfer",
-    status,
-    confidence,
-    amountMinor,
-    currency,
-    occurredAt: new Date(occurredAt).toISOString(),
-    description: item?.reference ?? item?.description,
-    reference: item?.reference ?? feedItemUid,
-    metadata: {
-      direction: item?.direction,
-      spendingCategory: item?.spendingCategory,
-    },
-    raw: item as Record<string, unknown>,
-  };
 }
 
 async function runStripeBackfill(config: StripeBackfillRequest): Promise<BackfillRunResult> {
