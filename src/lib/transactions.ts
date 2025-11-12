@@ -110,8 +110,8 @@ type StripeChargePayload = {
   statement_descriptor?: string | null;
   metadata?: Record<string, unknown>;
   billing_details?: Stripe.Charge.BillingDetails;
-  receipt_email?: string;
-  invoice?: string;
+  receipt_email?: string | null;
+  invoice?: string | null;
 };
 
 type StripePaymentIntentPayload = StripeChargePayload & {
