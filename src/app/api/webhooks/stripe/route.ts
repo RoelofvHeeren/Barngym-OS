@@ -12,8 +12,6 @@ import {
 
 export const runtime = "nodejs";
 
-const DEFAULT_STRIPE_VERSION: Stripe.LatestApiVersion = "2024-06-20";
-
 type StripeSecret = {
   secretKey?: string;
   webhookSecret?: string;
@@ -71,9 +69,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const stripe = new Stripe(secret.secretKey, {
-      apiVersion: DEFAULT_STRIPE_VERSION,
-    });
+    const stripe = new Stripe(secret.secretKey);
 
     const event = stripe.webhooks.constructEvent(body, signature, secret.webhookSecret) as StripeEvent;
     const normalized = normalizeStripeEvent(event);
