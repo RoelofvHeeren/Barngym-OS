@@ -1,4 +1,3 @@
-import type { Transaction } from "@prisma/client";
 import { listTransactions } from "@/lib/transactions";
 
 const DEFAULT_EMPTY_OPTION = "No data yet";
@@ -58,7 +57,9 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-function buildLedgerRows(transactions: Transaction[]) {
+type TransactionRecord = Awaited<ReturnType<typeof listTransactions>>[number];
+
+function buildLedgerRows(transactions: TransactionRecord[]) {
   return transactions.map((transaction) => ({
     id: transaction.id,
     person: transaction.personName ?? "Unassigned",
