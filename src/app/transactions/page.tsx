@@ -64,7 +64,7 @@ function buildLedgerRows(transactions: TransactionRecord[]) {
     id: transaction.id,
     person: transaction.personName ?? "Unassigned",
     amount: formatCurrency(transaction.amountMinor ?? 0, transaction.currency ?? "EUR"),
-    source: transaction.source ?? "Unknown",
+    source: transaction.provider ?? "Unknown",
     product: transaction.productType ?? "Uncategorized",
     status: transaction.status ?? "Needs Review",
     confidence: transaction.confidence ?? "Needs Review",
@@ -82,7 +82,7 @@ export default async function TransactionsPage() {
   const ledgerRows = buildLedgerRows(transactions);
 
   const uniqueSources = Array.from(
-    new Set(transactions.map((transaction) => transaction.source).filter(Boolean))
+    new Set(transactions.map((transaction) => transaction.provider).filter(Boolean))
   ).sort();
   const uniqueStatuses = Array.from(
     new Set(transactions.map((transaction) => transaction.status).filter(Boolean))
@@ -202,7 +202,7 @@ export default async function TransactionsPage() {
                     <td className="py-4 pr-4 text-muted">{transaction.date}</td>
                     <td className="pr-4 font-semibold text-primary">{transaction.person}</td>
                     <td className="pr-4 font-semibold text-primary">{transaction.amount}</td>
-                    <td className="pr-4 text-muted">{transaction.source}</td>
+                    <td className="pr-4 text-muted">{transaction.provider ?? "Unknown"}</td>
                     <td className="pr-4 text-muted">{transaction.product}</td>
                     <td className="pr-4">
                       <StatusBadge status={transaction.status} />
