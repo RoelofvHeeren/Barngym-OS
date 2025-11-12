@@ -1,4 +1,5 @@
 import { randomUUID } from "crypto";
+import { Prisma } from "@/generated/prisma";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
@@ -197,7 +198,7 @@ export async function POST(request: Request) {
               nextStep: lead.nextStep,
               valueMinor: lead.valueMinor ?? null,
               membershipName: lead.membershipName,
-              metadata: lead.metadata ?? undefined,
+              metadata: (lead.metadata as Prisma.InputJsonValue | undefined) ?? undefined,
             },
             create: {
               externalId: externalIds[index],
@@ -211,7 +212,7 @@ export async function POST(request: Request) {
               nextStep: lead.nextStep,
               valueMinor: lead.valueMinor ?? null,
               membershipName: lead.membershipName,
-              metadata: lead.metadata ?? undefined,
+              metadata: (lead.metadata as Prisma.InputJsonValue | undefined) ?? undefined,
             },
           })
           .then(() => {
