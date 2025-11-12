@@ -13,7 +13,7 @@ export type NormalizedTransaction = {
   productType?: string;
   status: string;
   confidence: string;
-  description?: string;
+  description?: string | null;
   reference?: string;
   metadata?: Record<string, unknown>;
   raw?: Record<string, unknown>;
@@ -106,8 +106,8 @@ type StripeChargePayload = {
   status?: string;
   paid?: boolean;
   customer?: string | Stripe.Customer | Stripe.DeletedCustomer | null;
-  description?: string;
-  statement_descriptor?: string;
+  description?: string | null;
+  statement_descriptor?: string | null;
   metadata?: Record<string, unknown>;
   billing_details?: Stripe.Charge.BillingDetails;
   receipt_email?: string;
@@ -172,7 +172,7 @@ export type StarlingFeedItem = {
   status?: string;
   counterPartyName?: string;
   reference?: string;
-  description?: string;
+  description?: string | null;
   direction?: string;
   spendingCategory?: string;
 };
@@ -186,7 +186,7 @@ type GlofoxPaymentPayload = {
   currency?: string;
   status?: string;
   payment_status?: string;
-  description?: string;
+  description?: string | null;
   category?: string;
   payment_type?: string;
   plan_name?: string;
