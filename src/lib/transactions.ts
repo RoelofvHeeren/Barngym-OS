@@ -117,7 +117,7 @@ type StripeChargePayload = {
 type StripePaymentIntentPayload = StripeChargePayload & {
   amount_received?: number;
   amount_capturable?: number;
-  amount_details?: Record<string, unknown>;
+  amount_details?: Stripe.PaymentIntent.AmountDetails;
   charges?: { data?: Array<StripeChargePayload | Stripe.Charge> };
 };
 
