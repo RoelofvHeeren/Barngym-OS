@@ -98,59 +98,67 @@ export async function listTransactions() {
   });
 }
 
-type StripeChargePayload = {
-  id?: string;
-  created?: number;
-  amount?: number;
-  currency?: string;
-  status?: string | null;
-  paid?: boolean;
-  customer?: string | Stripe.Customer | Stripe.DeletedCustomer | null;
-  description?: string | null;
-  statement_descriptor?: string | null;
-  metadata?: Record<string, unknown>;
-  billing_details?: Stripe.Charge.BillingDetails;
-  receipt_email?: string | null;
-  invoice?: string | null;
-};
+type StripeChargePayload =
+  | Stripe.Charge
+  | {
+      id?: string;
+      created?: number;
+      amount?: number;
+      currency?: string;
+      status?: string | null;
+      paid?: boolean;
+      customer?: string | Stripe.Customer | Stripe.DeletedCustomer | null;
+      description?: string | null;
+      statement_descriptor?: string | null;
+      metadata?: Record<string, unknown>;
+      billing_details?: Stripe.Charge.BillingDetails;
+      receipt_email?: string | null;
+      invoice?: string | null;
+    };
 
-type StripePaymentIntentPayload = StripeChargePayload & {
-  amount_received?: number;
-  amount_capturable?: number;
-  amount_details?: Stripe.PaymentIntent.AmountDetails;
-  charges?: { data?: Array<StripeChargePayload | Stripe.Charge> };
-};
+type StripePaymentIntentPayload =
+  | Stripe.PaymentIntent
+  | (StripeChargePayload & {
+      amount_received?: number;
+      amount_capturable?: number;
+      amount_details?: Stripe.PaymentIntent.AmountDetails;
+      charges?: { data?: Array<StripeChargePayload | Stripe.Charge> };
+    });
 
-type StripeInvoicePayload = {
-  id?: string;
-  created?: number;
-  amount_paid?: number;
-  currency?: string;
-  status?: string;
-  number?: string | null;
-  customer_email?: string | null;
-  customer_name?: string | null;
-  metadata?: Record<string, unknown>;
-  customer?: string;
-  hosted_invoice_url?: string | null;
-};
+type StripeInvoicePayload =
+  | Stripe.Invoice
+  | {
+      id?: string;
+      created?: number;
+      amount_paid?: number;
+      currency?: string;
+      status?: string | null;
+      number?: string | null;
+      customer_email?: string | null;
+      customer_name?: string | null;
+      metadata?: Record<string, unknown>;
+      customer?: string;
+      hosted_invoice_url?: string | null;
+    };
 
-type StripeCheckoutSessionPayload = {
-  id?: string;
-  created?: number;
-  amount_total?: number;
-  currency?: string;
-  status?: string;
-  customer_details?: {
-    name?: string;
-    email?: string;
-  };
-  metadata?: Record<string, unknown>;
-  payment_intent?: string | StripePaymentIntentPayload;
-  customer?: string;
-  payment_status?: string;
-  mode?: string;
-};
+type StripeCheckoutSessionPayload =
+  | Stripe.Checkout.Session
+  | {
+      id?: string;
+      created?: number;
+      amount_total?: number;
+      currency?: string;
+      status?: string;
+      customer_details?: {
+        name?: string;
+        email?: string;
+      };
+      metadata?: Record<string, unknown>;
+      payment_intent?: string | StripePaymentIntentPayload;
+      customer?: string;
+      payment_status?: string;
+      mode?: string;
+    };
 
 export type StarlingFeedItem = {
   feedItemUid?: string;
