@@ -65,6 +65,7 @@ function buildLedgerRows(transactions: TransactionRecord[]) {
     person: transaction.personName ?? "Unassigned",
     amount: formatCurrency(transaction.amountMinor ?? 0, transaction.currency ?? "EUR"),
     source: transaction.provider ?? "Unknown",
+    provider: transaction.provider ?? "Unknown",
     product: transaction.productType ?? "Uncategorized",
     status: transaction.status ?? "Needs Review",
     confidence: transaction.confidence ?? "Needs Review",
