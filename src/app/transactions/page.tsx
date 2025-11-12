@@ -68,7 +68,11 @@ function buildLedgerRows(transactions: TransactionRecord[]) {
     product: transaction.productType ?? "Uncategorized",
     status: transaction.status ?? "Needs Review",
     confidence: transaction.confidence ?? "Needs Review",
-    date: formatDateTime(transaction.occurredAt),
+    date: formatDateTime(
+      typeof transaction.occurredAt === "string"
+        ? transaction.occurredAt
+        : transaction.occurredAt?.toISOString() ?? new Date().toISOString()
+    ),
     needsReview:
       (transaction.confidence ?? "").toLowerCase().includes("review") ||
       transaction.status === "Needs Review",
