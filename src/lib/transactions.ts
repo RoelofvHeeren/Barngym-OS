@@ -103,7 +103,7 @@ type StripeChargePayload = {
   created?: number;
   amount?: number;
   currency?: string;
-  status?: string;
+  status?: string | null;
   paid?: boolean;
   customer?: string | Stripe.Customer | Stripe.DeletedCustomer | null;
   description?: string | null;
@@ -127,12 +127,12 @@ type StripeInvoicePayload = {
   amount_paid?: number;
   currency?: string;
   status?: string;
-  number?: string;
-  customer_email?: string;
-  customer_name?: string;
+  number?: string | null;
+  customer_email?: string | null;
+  customer_name?: string | null;
   metadata?: Record<string, unknown>;
   customer?: string;
-  hosted_invoice_url?: string;
+  hosted_invoice_url?: string | null;
 };
 
 type StripeCheckoutSessionPayload = {
