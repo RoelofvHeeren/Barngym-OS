@@ -1,4 +1,5 @@
 import { randomUUID } from "crypto";
+import { Prisma } from "@/generated/prisma";
 import type Stripe from "stripe";
 import { prisma } from "./prisma";
 import { attachLeadBatch } from "./transactionMatcher";
@@ -43,6 +44,9 @@ export async function upsertTransactions(records: NormalizedTransaction[]) {
   let added = 0;
 
   for (const record of enrichedRecords) {
+    const rawPayload = record.raw ?? undefined;
+    const metadataPayload = record.metadata ?? undefined;
+
     await prisma.transaction
       .upsert({
         where: { externalId: record.externalId },
@@ -57,8 +61,8 @@ export async function upsertTransactions(records: NormalizedTransaction[]) {
           confidence: record.confidence,
           description: record.description,
           reference: record.reference,
-          raw: record.raw ?? undefined,
-          metadata: record.metadata ?? undefined,
+          raw: rawPayload as Prisma.TransactionUncheckedUpdateInput["raw"],
+          metadata: metadataPayload as Prisma.TransactionUncheckedUpdateInput["metadata"],
           leadId: record.leadId ?? undefined,
         },
         create: {
@@ -73,8 +77,8 @@ export async function upsertTransactions(records: NormalizedTransaction[]) {
           confidence: record.confidence,
           description: record.description,
           reference: record.reference,
-          raw: record.raw ?? undefined,
-          metadata: record.metadata ?? undefined,
+          raw: rawPayload as Prisma.TransactionUncheckedCreateInput["raw"],
+          metadata: metadataPayload as Prisma.TransactionUncheckedCreateInput["metadata"],
           leadId: record.leadId ?? undefined,
         },
       })
@@ -113,7 +117,7 @@ type StripeChargePayload =
       metadata?: Record<string, unknown>;
       billing_details?: Stripe.Charge.BillingDetails;
       receipt_email?: string | null;
-      invoice?: string | null;
+      invoice?: string | Stripe.Invoice | null;
     };
 
 type StripePaymentIntentPayload =
@@ -229,7 +233,14 @@ export function mapStripeCharge(charge: StripeChargePayload): NormalizedTransact
   const created = typeof charge?.created === "number" ? charge.created * 1000 : Date.now();
   const amountMinor = typeof charge?.amount === "number" ? charge.amount : 0;
   const metadata = charge?.metadata ?? {};
-  const status = resolveStripeStatus({ status: charge?.status, paid: charge?.paid });
+  const invoiceReference =
+    charge && typeof charge === "object" && "invoice" in charge
+      ? (charge as { invoice?: string | Stripe.Invoice | null }).invoice
+      : undefined;
+  const status = resolveStripeStatus({
+    status: charge?.status ?? undefined,
+    paid: charge?.paid,
+  });
 
   return {
     externalId: `stripe_${charge?.id ?? randomUUID()}`,
@@ -251,7 +262,7 @@ export function mapStripeCharge(charge: StripeChargePayload): NormalizedTransact
       customer: charge?.customer,
       email: charge?.billing_details?.email ?? charge?.receipt_email,
       phone: charge?.billing_details?.phone,
-      invoice: charge?.invoice,
+      invoice: invoiceReference,
       rawMetadata: metadata,
     },
     raw: charge as Record<string, unknown>,
@@ -259,7 +270,11 @@ export function mapStripeCharge(charge: StripeChargePayload): NormalizedTransact
 }
 
 export function mapStripePaymentIntent(intent: StripePaymentIntentPayload): NormalizedTransaction {
-  const charge = intent?.charges?.data?.[0];
+  const intentCharges =
+    intent && typeof intent === "object" && "charges" in intent
+      ? (intent as { charges?: { data?: Array<StripeChargePayload | Stripe.Charge> } }).charges
+      : undefined;
+  const charge = intentCharges?.data?.[0];
   if (charge) {
     return mapStripeCharge({
       ...charge,
@@ -290,7 +305,10 @@ export function mapStripePaymentIntent(intent: StripePaymentIntentPayload): Norm
       safeString(metadata.member_name as string | undefined) ??
       safeString(intent?.customer),
     productType: safeString(intent?.metadata?.product_type as string | undefined) ?? "Stripe Payment Intent",
-    status: resolveStripeStatus({ status: intent?.status, paid: amountMinor > 0 }),
+    status: resolveStripeStatus({
+      status: intent?.status ?? undefined,
+      paid: amountMinor > 0,
+    }),
     confidence: amountMinor > 0 ? "High" : "Needs Review",
     description: intent?.description,
     reference: intent?.id,
@@ -317,7 +335,10 @@ export function mapStripeInvoice(invoice: StripeInvoicePayload): NormalizedTrans
     occurredAt: new Date(created).toISOString(),
     personName: safeString(invoice?.customer_name) ?? safeString(invoice?.customer),
     productType: safeString(invoice?.metadata?.product_type as string | undefined) ?? "Stripe Invoice",
-    status: resolveStripeStatus({ status: invoice?.status, paid: amountMinor > 0 }),
+    status: resolveStripeStatus({
+      status: invoice?.status ?? undefined,
+      paid: amountMinor > 0,
+    }),
     confidence: amountMinor > 0 ? "High" : "Needs Review",
     description: invoice?.number ?? invoice?.hosted_invoice_url,
     reference: invoice?.id,
@@ -333,7 +354,7 @@ export function mapStripeCheckoutSession(session: StripeCheckoutSessionPayload):
   const created = typeof session?.created === "number" ? session.created * 1000 : Date.now();
   const amountMinor = typeof session?.amount_total === "number" ? session.amount_total : 0;
   const status = resolveStripeStatus({
-    status: session?.payment_status ?? session?.status,
+    status: (session?.payment_status ?? session?.status) ?? undefined,
     paid: amountMinor > 0,
   });
 
