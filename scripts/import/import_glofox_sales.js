@@ -6,11 +6,7 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 const { parse } = require("csv-parse/sync");
-const { PrismaClient } = require("../../src/generated/prisma");
-const { matchTransactionToMember } = require("../../src/lib/matching/members");
-const { normalizeEmail, normalizePhone } = require("../../src/lib/normalize");
-
-const prisma = new PrismaClient();
+const { prisma, matchTransactionToMember, normalizeEmail, normalizePhone } = require("./matching");
 
 function loadEnv() {
   const envPath = path.resolve(__dirname, "../../.env.local");

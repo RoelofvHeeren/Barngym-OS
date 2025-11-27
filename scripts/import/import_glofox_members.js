@@ -6,7 +6,33 @@ const fs = require("fs");
 const path = require("path");
 const { parse } = require("csv-parse/sync");
 const { PrismaClient } = require("../../src/generated/prisma");
-const { normalizeEmail, normalizePhone, normalizeName } = require("../../src/lib/normalize");
+
+function normalizeEmail(value) {
+  if (!value) return null;
+  const cleaned = String(value).trim().toLowerCase();
+  return cleaned.length ? cleaned : null;
+}
+
+function normalizePhone(value) {
+  if (!value) return null;
+  const digits = String(value).replace(/\D/g, "");
+  return digits.length ? digits : null;
+}
+
+function normalizeName(value) {
+  if (!value) return null;
+  const txt = String(value)
+    .replace(/[.,]/g, " ")
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(
+      (part) =>
+        part &&
+        !["ltd", "limited", "inc", "llc", "co", "company", "plc", "gmbh"].includes(part)
+    );
+  if (!txt.length) return null;
+  return txt.join(" ");
+}
 
 const prisma = new PrismaClient();
 
@@ -74,25 +100,23 @@ async function main() {
       },
     };
 
-    const where =
-      externalId != null
-        ? { externalId }
-        : email
-        ? { email }
-        : phone
-        ? { phone }
-        : { externalId: `import_${row.rowid ?? Math.random()}` };
-
-    const result = await prisma.lead.upsert({
-      where,
-      update: data,
-      create: data,
+    const existing = await prisma.lead.findFirst({
+      where: {
+        OR: [
+          externalId ? { externalId } : undefined,
+          memberId ? { glofoxMemberId: memberId } : undefined,
+          email ? { email } : undefined,
+        ].filter(Boolean),
+      },
+      select: { id: true },
     });
 
-    if (result.createdAt.getTime() === result.updatedAt.getTime()) {
-      created++;
-    } else {
+    if (existing) {
+      await prisma.lead.update({ where: { id: existing.id }, data });
       updated++;
+    } else {
+      await prisma.lead.create({ data });
+      created++;
     }
   }
 

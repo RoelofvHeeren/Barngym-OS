@@ -6,10 +6,7 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 const { parse } = require("csv-parse/sync");
-const { PrismaClient } = require("../../src/generated/prisma");
-const { matchTransactionToMember } = require("../../src/lib/matching/members");
-
-const prisma = new PrismaClient();
+const { prisma, matchTransactionToMember } = require("./matching");
 
 function loadEnv() {
   const envPath = path.resolve(__dirname, "../../.env.local");
@@ -25,7 +22,13 @@ function loadEnv() {
 
 function toAmount(value) {
   if (!value) return 0;
-  const cleaned = `${value}`.replace(/,/g, "");
+  let cleaned = `${value}`.trim();
+  cleaned = cleaned.replace(/[£$€\s]/g, "");
+  if (cleaned.includes(",") && cleaned.includes(".")) {
+    cleaned = cleaned.replace(/\./g, "").replace(/,/g, ".");
+  } else if (cleaned.includes(",")) {
+    cleaned = cleaned.replace(/,/g, ".");
+  }
   const num = Number.parseFloat(cleaned);
   return Number.isNaN(num) ? 0 : num;
 }

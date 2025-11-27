@@ -5,11 +5,7 @@
 const fs = require("fs");
 const path = require("path");
 const { parse } = require("csv-parse/sync");
-const { PrismaClient } = require("../../src/generated/prisma");
-const { matchTransactionToMember } = require("../../src/lib/matching/members");
-const { normalizeEmail } = require("../../src/lib/normalize");
-
-const prisma = new PrismaClient();
+const { prisma, matchTransactionToMember, normalizeEmail } = require("./matching");
 
 function loadEnv() {
   const envPath = path.resolve(__dirname, "../../.env.local");
@@ -55,7 +51,11 @@ async function main() {
     const fee = toNumber(row["Fee"]);
     const net = gross - fee;
     const statusRaw = (row["Status"] || "").toLowerCase();
-    const captured = row["Captured"] === "true" || row["Captured"] === true;
+    const captured =
+      row["Captured"] === "true" ||
+      row["Captured"] === true ||
+      row["Captured"] === "TRUE" ||
+      row["Captured"] === "True";
     const status =
       statusRaw === "succeeded" || captured
         ? "Completed"
@@ -63,12 +63,12 @@ async function main() {
         ? "Failed"
         : "Needs Review";
 
-    const email = normalizeEmail(row["Customer Email"]);
-    const customerId = row["Customer ID"];
+    const email = normalizeEmail(row["Customer Email"] || row["customer_email"]);
+    const customerId = row["Customer ID"] || row["customer_id"];
     const match = await matchTransactionToMember({
       email,
       stripeCustomerId: customerId,
-      fullName: row["Customer Name"],
+      fullName: row["Customer Name"] || row["Customer Description"],
     });
 
     const data = {
@@ -78,13 +78,13 @@ async function main() {
       transactionType: "payment",
       amountMinor: Math.round(net * 100),
       currency: (row["Currency"] || "GBP").toUpperCase(),
-      occurredAt: toDate(row["Created (UTC)"] || row["Created"]),
-      personName: row["Customer Name"],
+      occurredAt: toDate(row["Created (UTC)"] || row["Created date (UTC)"] || row["Created"]),
+      personName: row["Customer Name"] || row["Customer Description"],
       productType: row["Product name"] || "Stripe Payment",
       status,
       confidence: match.kind === "single_confident" ? "Matched" : "Needs Review",
       description: row["Description"],
-      reference: row["Invoice Number"] || row["Invoice ID"],
+      reference: row["Invoice Number"] || row["Invoice ID"] || row["Invoice ID"] || chargeId,
       metadata: {
         customerEmail: email,
         customerId,
