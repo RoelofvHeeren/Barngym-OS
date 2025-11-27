@@ -30,10 +30,21 @@ model ConnectionSecret {
 model Lead {
   id             String   @id @default(cuid())
   externalId     String?  @unique
+  glofoxMemberId String?  @unique
+  stripeCustomerId String?
   firstName      String?
   lastName       String?
   email          String?
   phone          String?
+  gender         String?
+  dateOfBirth    DateTime?
+  street         String?
+  city           String?
+  state          String?
+  country        String?
+  zipCode        String?
+  primaryMembershipPlan String?
+  tags           Json?
   channel        String?
   stage          String?  @default("New")
   owner          String?
@@ -44,12 +55,16 @@ model Lead {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   transactions   Transaction[]
+
+  @@index([email])
+  @@index([phone])
 }
 
 model Transaction {
   id           String   @id @default(cuid())
   provider     String
   externalId   String   @unique
+  transactionUid String? @unique
   amountMinor  Int
   currency     String
   occurredAt   DateTime
@@ -65,6 +80,23 @@ model Transaction {
   updatedAt    DateTime @updatedAt
   leadId       String?
   lead         Lead?    @relation(fields: [leadId], references: [id])
+
+  transactionType String?
+  grossAmount     Float?
+  feeAmount       Float?  @default(0)
+  netAmount       Float?
+  paymentMethod   String?
+  membershipPlan  String?
+  glofoxSaleId    String?
+  stripeChargeId  String?
+  starlingFeedItemId String?
+  memberUid       String?
+  externalAliases Json?
+  notes           String?
+  sourceFile      String?
+  manualMatches   ManualMatchQueue[]
+
+  @@index([occurredAt])
 }
 
 model SyncLog {
@@ -74,4 +106,26 @@ model SyncLog {
   records   String?
   errors    String?
   createdAt DateTime @default(now())
+}
+
+model ManualMatchQueue {
+  id                 String   @id @default(cuid())
+  transactionId      String
+  reason             String
+  suggestedMemberIds Json?
+  createdAt          DateTime @default(now())
+  resolvedAt         DateTime?
+  resolvedBy         String?
+
+  transaction Transaction @relation(fields: [transactionId], references: [id])
+}
+
+model Goal {
+  id          String   @id @default(cuid())
+  name        String
+  metric      String
+  targetValue Float
+  periodStart DateTime
+  periodEnd   DateTime
+  createdAt   DateTime @default(now())
 }
