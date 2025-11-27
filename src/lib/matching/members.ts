@@ -141,4 +141,4 @@ export async function matchTransactionToMember(input: {
   return { kind: "no_match" };
 }
 
-export { MatchResult };
+export type { MatchResult };
