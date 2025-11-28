@@ -38,6 +38,14 @@ function toNumber(value) {
 
 function toIso(value) {
   if (!value) return new Date().toISOString();
+  const str = String(value).trim();
+  const ddmmyyyy = /^(\d{2})\/(\d{2})\/(\d{4})$/;
+  const m = str.match(ddmmyyyy);
+  if (m) {
+    const [, dd, mm, yyyy] = m;
+    const date = new Date(Number(yyyy), Number(mm) - 1, Number(dd));
+    return date.toISOString();
+  }
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? new Date().toISOString() : date.toISOString();
 }
@@ -83,7 +91,7 @@ async function main() {
       const memberId = getField(row, ["Member ID", "member_id"]);
       const email = normalizeEmail(getField(row, ["Email", "Customer Email"]));
       const phone = normalizePhone(getField(row, ["Phone", "Customer Phone"]));
-      const fullName = getField(row, ["Customer Name", "customer_name", "Full Name"]);
+      const fullName = getField(row, ["Customer Name", "customer_name", "Full name", "Full Name"]);
 
       const match = await matchTransactionToMember({
         email,
@@ -99,13 +107,25 @@ async function main() {
         transactionType: "payment",
         amountMinor,
         currency: (row["Currency"] || "GBP").toUpperCase(),
-        occurredAt: new Date(toIso(row["Completed at"] || row["Created at"] || row["created_at"])),
-        personName: fullName,
+        occurredAt: new Date(
+          toIso(
+            row["Transaction time"] ||
+              row["transaction_time"] ||
+              row["Completed at"] ||
+              row["Created at"] ||
+              row["created_at"]
+          )
+        ),
+        personName: fullName || email || phone || null,
         productType: inferProductType(row),
         status: (row["Order status"] || row["Status"] || "completed").toString(),
         confidence: match.kind === "single_confident" ? "Matched" : "Needs Review",
-        description: row["Product description"] || row["Product Name"],
-        reference: getField(row, ["Order note", "Reference"]),
+        description:
+          row["Product description"] ||
+          row["Product Name"] ||
+          row["Description"] ||
+          row["Service name"],
+        reference: getField(row, ["Order note", "Reference", "Transaction Id", "Invoice Id"]),
         metadata: {
           paymentMethod: row["Payment method"],
           serviceType: row["Service type"],

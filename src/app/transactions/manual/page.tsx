@@ -20,6 +20,8 @@ type QueueItem = {
     reference: string | null;
     status: string | null;
     confidence: string | null;
+    metadata?: unknown;
+    raw?: unknown;
   } | null;
 };
 
@@ -51,6 +53,7 @@ export default function ManualMatchPage() {
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [leadIdInput, setLeadIdInput] = useState<Record<string, string>>({});
+  const [creating, setCreating] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const load = async () => {
@@ -82,6 +85,22 @@ export default function ManualMatchPage() {
     const payload = await response.json();
     if (!payload.ok) {
       alert(payload.message || "Failed to attach");
+      return;
+    }
+    setQueue((prev) => prev.filter((item) => item.id !== queueId));
+  };
+
+  const handleCreate = async (queueId: string) => {
+    setCreating((prev) => ({ ...prev, [queueId]: true }));
+    const response = await fetch("/api/manual-match", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "create", queueId }),
+    });
+    const payload = await response.json();
+    setCreating((prev) => ({ ...prev, [queueId]: false }));
+    if (!payload.ok) {
+      alert(payload.message || "Failed to create and attach");
       return;
     }
     setQueue((prev) => prev.filter((item) => item.id !== queueId));
@@ -141,15 +160,29 @@ export default function ManualMatchPage() {
                       {item.transaction?.provider ?? "Unknown"}
                       {item.transaction?.productType ? ` · ${item.transaction.productType}` : ""}
                     </td>
-                    <td className="pr-4 text-muted">
-                      {item.transaction?.personName ?? "Unassigned"}
-                      <div className="text-xs text-muted">
-                        Ref: {item.transaction?.reference ?? "—"} · Reason: {item.reason}
-                      </div>
-                    </td>
-                    <td className="pr-4 text-xs text-muted">
-                      {item.suggestedMemberIds?.length
-                        ? item.suggestedMemberIds.join(", ")
+                  <td className="pr-4 text-muted">
+                    {item.transaction?.personName ?? "Unassigned"}
+                    <div className="text-xs text-muted">
+                      Ref: {item.transaction?.reference ?? "—"} · Reason: {item.reason}
+                      {item.transaction?.metadata &&
+                        typeof item.transaction.metadata === "object" &&
+                        (item.transaction.metadata as Record<string, unknown>).raw &&
+                        (() => {
+                          const raw = (item.transaction?.metadata as Record<string, unknown>)
+                            .raw as Record<string, unknown>;
+                          const email = raw?.["Email"] as string | undefined;
+                          const phone = raw?.["Phone"] as string | undefined;
+                          return (
+                            <div className="text-xs text-muted">
+                              {email ? ` · Email: ${email}` : ""} {phone ? ` · Phone: ${phone}` : ""}
+                            </div>
+                          );
+                        })()}
+                    </div>
+                  </td>
+                  <td className="pr-4 text-xs text-muted">
+                    {item.suggestedMemberIds?.length
+                      ? item.suggestedMemberIds.join(", ")
                         : "None"}
                     </td>
                     <td className="pr-4">
@@ -171,6 +204,13 @@ export default function ManualMatchPage() {
                           onClick={() => handleAttach(item.id, leadIdInput[item.id])}
                         >
                           Attach
+                        </button>
+                        <button
+                          className="rounded-full bg-white/10 px-4 py-2 text-xs font-semibold text-primary"
+                          onClick={() => handleCreate(item.id)}
+                          disabled={creating[item.id]}
+                        >
+                          {creating[item.id] ? "Creating…" : "Create lead & attach"}
                         </button>
                         <div className="text-[11px] text-muted">
                           Tip: paste a Lead ID or pick from suggestions. After attach, this disappears.

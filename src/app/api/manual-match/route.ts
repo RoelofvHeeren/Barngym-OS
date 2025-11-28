@@ -30,6 +30,8 @@ export async function GET() {
             reference: item.transaction.reference,
             status: item.transaction.status,
             confidence: item.transaction.confidence,
+            metadata: item.transaction.metadata,
+            raw: item.transaction.raw,
           }
         : null,
     }));
@@ -78,6 +80,39 @@ export async function POST(request: Request) {
         where: { id: queueItem.transactionId },
         data: {
           leadId,
+          status: queueItem.transaction.status === "Needs Review" ? "Completed" : queueItem.transaction.status,
+          confidence: "Matched",
+        },
+      });
+    }
+
+    if (action === "create") {
+      const raw = (queueItem.transaction.metadata as Record<string, unknown>)?.raw as
+        | Record<string, unknown>
+        | undefined;
+      const personName = queueItem.transaction.personName ?? (raw?.["Full name"] as string | undefined);
+      const email = (raw?.["Email"] as string | undefined) ?? undefined;
+      const phone = (raw?.["Phone"] as string | undefined) ?? undefined;
+      const [firstName, ...rest] = (personName ?? "").split(" ").filter(Boolean);
+      const lastName = rest.join(" ");
+
+      const newLead = await prisma.lead.create({
+        data: {
+          firstName: firstName || null,
+          lastName: lastName || null,
+          email: email?.toLowerCase() ?? null,
+          phone: phone ?? null,
+          channel: queueItem.transaction.provider ?? "Imported",
+          stage: "Won",
+          membershipName: queueItem.transaction.productType ?? null,
+          metadata: { source: "manual-create", raw },
+        },
+      });
+
+      await prisma.transaction.update({
+        where: { id: queueItem.transactionId },
+        data: {
+          leadId: newLead.id,
           status: queueItem.transaction.status === "Needs Review" ? "Completed" : queueItem.transaction.status,
           confidence: "Matched",
         },

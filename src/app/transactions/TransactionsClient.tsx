@@ -261,6 +261,9 @@ export default function TransactionsClient({ transactions }: Props) {
                       }`}
                     >
                       {transaction.person}
+                      {transaction.reference ? (
+                        <div className="text-xs text-muted">Ref: {transaction.reference}</div>
+                      ) : null}
                     </td>
                     <td className="pr-4 font-semibold text-primary">
                       {formatCurrency(transaction.amountMinor ?? 0, transaction.currency ?? "GBP")}
