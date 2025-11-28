@@ -5,7 +5,7 @@
 const fs = require("fs");
 const path = require("path");
 const { parse } = require("csv-parse/sync");
-const { PrismaClient } = require("../../src/generated/prisma");
+const { getPrisma, resetPrisma } = require("./matching");
 
 function normalizeEmail(value) {
   if (!value) return null;
@@ -33,8 +33,6 @@ function normalizeName(value) {
   if (!txt.length) return null;
   return txt.join(" ");
 }
-
-const prisma = new PrismaClient();
 
 function loadEnv() {
   const envPath = path.resolve(__dirname, "../../.env.local");
@@ -101,7 +99,7 @@ async function main() {
         },
       };
 
-      const existing = await prisma.lead.findFirst({
+      const existing = await getPrisma().lead.findFirst({
         where: {
           OR: [
             externalId ? { externalId } : undefined,
@@ -113,10 +111,10 @@ async function main() {
       });
 
       if (existing) {
-        await prisma.lead.update({ where: { id: existing.id }, data });
+        await getPrisma().lead.update({ where: { id: existing.id }, data });
         updated++;
       } else {
-        await prisma.lead.create({ data });
+        await getPrisma().lead.create({ data });
         created++;
       }
 

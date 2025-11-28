@@ -166,7 +166,8 @@ async function matchTransactionToMember(input) {
 }
 
 module.exports = {
-  prisma,
+  getPrisma,
+  resetPrisma,
   matchTransactionToMember,
   normalizeEmail,
   normalizePhone,

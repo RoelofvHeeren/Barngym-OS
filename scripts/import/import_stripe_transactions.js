@@ -5,7 +5,7 @@
 const fs = require("fs");
 const path = require("path");
 const { parse } = require("csv-parse/sync");
-const { prisma, matchTransactionToMember, normalizeEmail } = require("./matching");
+const { getPrisma, resetPrisma, matchTransactionToMember, normalizeEmail } = require("./matching");
 
 function loadEnv() {
   const envPath = path.resolve(__dirname, "../../.env.local");
@@ -104,7 +104,7 @@ async function main() {
         matched++;
       }
 
-      const tx = await prisma.transaction.upsert({
+      const tx = await getPrisma().transaction.upsert({
         where: { externalId: transactionUid },
         update: data,
         create: data,
@@ -112,7 +112,7 @@ async function main() {
 
       if (match.kind === "multiple_candidates") {
         manual++;
-        await prisma.manualMatchQueue.create({
+        await getPrisma().manualMatchQueue.create({
           data: {
             transactionId: tx.id,
             reason: "ambiguous_match",
@@ -121,7 +121,7 @@ async function main() {
         });
       } else if (match.kind === "no_match") {
         manual++;
-        await prisma.manualMatchQueue.create({
+        await getPrisma().manualMatchQueue.create({
           data: {
             transactionId: tx.id,
             reason: "no_match",
@@ -139,7 +139,6 @@ async function main() {
     } catch (error) {
       if (error.code === "P1017") {
         console.log("[Stripe CSV] Connection dropped. Resetting Prisma and continuing...");
-        const { resetPrisma } = require("./matching");
         resetPrisma();
         continue;
       }
