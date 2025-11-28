@@ -6,6 +6,15 @@ export const runtime = "nodejs";
 
 type SourceOption = "all" | "stripe" | "glofox" | "starling";
 
+function extractEmail(candidate?: unknown) {
+  if (typeof candidate === "string" && candidate.includes("@")) return candidate;
+  if (typeof candidate === "string") {
+    const match = candidate.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+    return match ? match[0] : undefined;
+  }
+  return undefined;
+}
+
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as { source?: SourceOption };
@@ -61,9 +70,14 @@ export async function POST(request: Request) {
 
       if (tx.provider === "Stripe" || tx.provider === "Glofox") {
         const raw = (tx.metadata as Record<string, unknown>)?.raw as Record<string, unknown> | undefined;
-        const emailCandidate = raw?.["Email"] ?? (tx.metadata as Record<string, unknown>)?.email;
+        const emailCandidate =
+          raw?.["Email"] ??
+          (tx.metadata as Record<string, unknown>)?.customerEmail ??
+          (tx.metadata as Record<string, unknown>)?.email ??
+          tx.description ??
+          tx.reference;
         const phoneCandidate = raw?.["Phone"] ?? (tx.metadata as Record<string, unknown>)?.phone;
-        const email = typeof emailCandidate === "string" ? emailCandidate : undefined;
+        const email = extractEmail(emailCandidate);
         const phone = typeof phoneCandidate === "string" ? phoneCandidate : undefined;
         const fullName =
           tx.personName ??

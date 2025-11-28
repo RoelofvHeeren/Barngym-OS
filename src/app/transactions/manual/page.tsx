@@ -73,6 +73,7 @@ export default function ManualMatchPage() {
   const [leadIdInput, setLeadIdInput] = useState<Record<string, string>>({});
   const [creating, setCreating] = useState<Record<string, boolean>>({});
   const [leads, setLeads] = useState<LeadOption[]>([]);
+  const [sourceFilter, setSourceFilter] = useState<string>("All");
 
   useEffect(() => {
     const load = async () => {
@@ -147,7 +148,14 @@ export default function ManualMatchPage() {
     setQueue((prev) => prev.filter((item) => item.id !== queueId));
   };
 
-  const filteredQueue = useMemo(() => queue, [queue]);
+  const filteredQueue = useMemo(
+    () =>
+      queue.filter((item) => {
+        if (sourceFilter === "All") return true;
+        return (item.transaction?.provider || "").toLowerCase().includes(sourceFilter.toLowerCase());
+      }),
+    [queue, sourceFilter]
+  );
 
   return (
     <div className="flex flex-col gap-6 text-primary">
@@ -165,6 +173,20 @@ export default function ManualMatchPage() {
           </Link>
         </div>
         <div className="flex flex-wrap gap-3 text-sm">
+          <div className="flex items-center gap-2">
+            <span className="text-muted text-xs uppercase tracking-[0.2em]">Filter by source</span>
+            <select
+              className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-primary"
+              value={sourceFilter}
+              onChange={(e) => setSourceFilter(e.target.value)}
+            >
+              <option value="All">All</option>
+              <option value="Stripe">Stripe</option>
+              <option value="Glofox">Glofox</option>
+              <option value="Starling">Starling</option>
+            </select>
+            <span className="text-muted text-sm">Remaining: {filteredQueue.length}</span>
+          </div>
           <button
             className="rounded-full bg-black px-4 py-2 text-xs font-semibold text-white"
             onClick={async () => {
@@ -199,7 +221,7 @@ export default function ManualMatchPage() {
           <div className="text-muted">No manual matches pending.</div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
+            <table className="w-full text-left text-base">
               <thead className="text-muted">
                 <tr>
                   <th className="pb-3 pr-4 font-medium">Occurred</th>
