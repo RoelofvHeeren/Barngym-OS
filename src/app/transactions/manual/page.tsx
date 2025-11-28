@@ -166,18 +166,20 @@ export default function ManualMatchPage() {
                       Ref: {item.transaction?.reference ?? "—"} · Reason: {item.reason}
                       {item.transaction?.metadata &&
                         typeof item.transaction.metadata === "object" &&
-                        (item.transaction.metadata as Record<string, unknown>).raw &&
-                        (() => {
-                          const raw = (item.transaction?.metadata as Record<string, unknown>)
-                            .raw as Record<string, unknown>;
-                          const email = raw?.["Email"] as string | undefined;
-                          const phone = raw?.["Phone"] as string | undefined;
-                          return (
-                            <div className="text-xs text-muted">
-                              {email ? ` · Email: ${email}` : ""} {phone ? ` · Phone: ${phone}` : ""}
-                            </div>
-                          );
-                        })()}
+                        (item.transaction.metadata as Record<string, unknown>).raw ? (
+                          (() => {
+                            const raw = (item.transaction?.metadata as Record<string, unknown>)
+                              .raw as Record<string, unknown>;
+                            const email = raw?.["Email"] as string | undefined;
+                            const phone = raw?.["Phone"] as string | undefined;
+                            if (!email && !phone) return null;
+                            return (
+                              <div className="text-xs text-muted">
+                                {email ? ` · Email: ${email}` : ""} {phone ? ` · Phone: ${phone}` : ""}
+                              </div>
+                            );
+                          })()
+                        ) : null}
                     </div>
                   </td>
                   <td className="pr-4 text-xs text-muted">
