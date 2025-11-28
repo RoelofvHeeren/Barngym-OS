@@ -103,48 +103,48 @@ export async function POST(request: Request) {
           });
 
           if (mapRelated) {
-            const related = await prisma.transaction.findMany({
-              where: {
-                provider: "Starling",
-                OR: [
-                  {
-                    reference: {
-                      equals: queueItem.transaction.reference ?? "",
-                      mode: "insensitive",
-                    },
+          const related = await prisma.transaction.findMany({
+            where: {
+              provider: "Starling",
+              OR: [
+                {
+                  reference: {
+                    equals: queueItem.transaction.reference ?? "",
+                    mode: "insensitive",
                   },
-                  {
-                    personName: {
-                      equals: queueItem.transaction.personName ?? "",
-                      mode: "insensitive",
-                    },
-                  },
-                ],
-              },
-              select: { id: true },
-            });
-            const relatedIds = related.map((t) => t.id);
-            if (relatedIds.length) {
-              await prisma.transaction.updateMany({
-                where: { id: { in: relatedIds } },
-                data: {
-                  leadId,
-                  confidence: "Matched",
-                  status: queueItem.transaction.status === "Needs Review" ? "Completed" : queueItem.transaction.status,
                 },
-              });
-              await prisma.manualMatchQueue.updateMany({
-                where: { transactionId: { in: relatedIds } },
-                data: { resolvedAt: new Date(), resolvedBy: "auto-mapping" },
-              });
-              return NextResponse.json({
-                ok: true,
-                message: `Attached and auto-mapped ${relatedIds.length} Starling transactions with this reference/person name.`,
-                relatedIds,
-              });
-            }
+                {
+                  personName: {
+                    equals: queueItem.transaction.personName ?? "",
+                    mode: "insensitive",
+                  },
+                },
+              ],
+            },
+            select: { id: true },
+          });
+          const relatedIds = related.map((t) => t.id);
+          if (relatedIds.length) {
+            await prisma.transaction.updateMany({
+              where: { id: { in: relatedIds } },
+              data: {
+                leadId,
+                confidence: "Matched",
+                status: queueItem.transaction.status === "Needs Review" ? "Completed" : queueItem.transaction.status,
+              },
+            });
+            await prisma.manualMatchQueue.updateMany({
+              where: { transactionId: { in: relatedIds } },
+              data: { resolvedAt: new Date(), resolvedBy: "auto-mapping" },
+            });
+            return NextResponse.json({
+              ok: true,
+              message: `Attached and auto-mapped ${relatedIds.length} Starling transactions with this reference/person name.`,
+              relatedIds,
+            });
           }
         }
+      }
       }
     }
 
