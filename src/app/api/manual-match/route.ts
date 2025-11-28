@@ -101,42 +101,45 @@ export async function POST(request: Request) {
             create: { provider: "Starling", key, leadId },
           });
 
-          const updatedTx = await prisma.transaction.updateMany({
+          const related = await prisma.transaction.findMany({
             where: {
               provider: "Starling",
-              leadId: null,
               OR: [
-                { personName: { equals: queueItem.transaction.personName ?? "", mode: "insensitive" } },
-                { reference: { equals: queueItem.transaction.reference ?? "", mode: "insensitive" } },
+                {
+                  personName: {
+                    equals: queueItem.transaction.personName ?? "",
+                    mode: "insensitive",
+                  },
+                },
+                {
+                  reference: {
+                    equals: queueItem.transaction.reference ?? "",
+                    mode: "insensitive",
+                  },
+                },
               ],
-            },
-            data: {
-              leadId,
-              confidence: "Matched",
-              status: queueItem.transaction.status === "Needs Review" ? "Completed" : queueItem.transaction.status,
-            },
-          });
-
-          const txIds = await prisma.transaction.findMany({
-            where: {
-              provider: "Starling",
-              OR: [{ personName: queueItem.transaction.personName }, { reference: queueItem.transaction.reference }],
-              leadId: leadId,
             },
             select: { id: true },
           });
-          const txIdList = txIds.map((t) => t.id);
-          if (txIdList.length) {
+          const relatedIds = related.map((t) => t.id);
+          if (relatedIds.length) {
+            await prisma.transaction.updateMany({
+              where: { id: { in: relatedIds } },
+              data: {
+                leadId,
+                confidence: "Matched",
+                status: queueItem.transaction.status === "Needs Review" ? "Completed" : queueItem.transaction.status,
+              },
+            });
             await prisma.manualMatchQueue.updateMany({
-              where: { transactionId: { in: txIdList } },
+              where: { transactionId: { in: relatedIds } },
               data: { resolvedAt: new Date(), resolvedBy: "auto-mapping" },
             });
+            return NextResponse.json({
+              ok: true,
+              message: `Attached and auto-mapped ${relatedIds.length} Starling transactions with this counterparty.`,
+            });
           }
-
-          return NextResponse.json({
-            ok: true,
-            message: `Attached and auto-mapped ${updatedTx.count} Starling transactions with this counterparty.`,
-          });
         }
       }
     }
