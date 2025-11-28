@@ -52,75 +52,90 @@ async function main() {
   let manual = 0;
 
   for (const row of rows) {
-    const transactionUid = buildUid(row);
-    const amount = toAmount(row.amount_gbp ?? row.amount);
-    const occurredAt = new Date(row.timestamp || row.transaction_timestamp || Date.now());
-    const counterparty = row.counterparty || row.reference || "";
+    try {
+      const transactionUid = buildUid(row);
+      const amount = toAmount(row.amount_gbp ?? row.amount);
+      const occurredAt = new Date(row.timestamp || row.transaction_timestamp || Date.now());
+      const counterparty = row.counterparty || row.reference || "";
 
-    const match = await matchTransactionToMember({
-      fullName: counterparty,
-      email: row.email,
-      phone: row.phone,
-    });
-
-    const data = {
-      provider: "Starling",
-      externalId: transactionUid,
-      transactionUid,
-      transactionType: "payment",
-      amountMinor: Math.round(amount * 100),
-      currency: "GBP",
-      occurredAt,
-      personName: counterparty,
-      productType: "bank_transfer",
-      status: row.status || "Completed",
-      confidence: match.kind === "single_confident" ? "Matched" : "Needs Review",
-      description: row.description || row.category,
-      reference: counterparty,
-      metadata: {
-        category: row.category,
-        source: row.source,
-      },
-      grossAmount: amount,
-      netAmount: amount,
-      feeAmount: 0,
-      starlingFeedItemId: row.feed_item_uid || null,
-      leadId: null,
-      sourceFile: path.basename(filePath),
-    };
-
-    if (match.kind === "single_confident") {
-      data.leadId = match.memberId;
-      matched++;
-    }
-
-    const tx = await prisma.transaction.upsert({
-      where: { externalId: transactionUid },
-      update: data,
-      create: data,
-    });
-
-    if (match.kind === "multiple_candidates") {
-      manual++;
-      await prisma.manualMatchQueue.create({
-        data: {
-          transactionId: tx.id,
-          reason: "ambiguous_match",
-          suggestedMemberIds: match.candidateMemberIds,
-        },
+      const match = await matchTransactionToMember({
+        fullName: counterparty,
+        email: row.email,
+        phone: row.phone,
       });
-    } else if (match.kind === "no_match") {
-      manual++;
-      await prisma.manualMatchQueue.create({
-        data: {
-          transactionId: tx.id,
-          reason: "no_match",
-          suggestedMemberIds: [],
-        },
-      });
-    }
 
-    imported++;
+      const data = {
+        provider: "Starling",
+        externalId: transactionUid,
+        transactionUid,
+        transactionType: "payment",
+        amountMinor: Math.round(amount * 100),
+        currency: "GBP",
+        occurredAt,
+        personName: counterparty,
+        productType: "bank_transfer",
+        status: row.status || "Completed",
+        confidence: match.kind === "single_confident" ? "Matched" : "Needs Review",
+        description: row.description || row.category,
+        reference: counterparty,
+        metadata: {
+          category: row.category,
+          source: row.source,
+        },
+        grossAmount: amount,
+        netAmount: amount,
+        feeAmount: 0,
+        starlingFeedItemId: row.feed_item_uid || null,
+        leadId: null,
+        sourceFile: path.basename(filePath),
+      };
+
+      if (match.kind === "single_confident") {
+        data.leadId = match.memberId;
+        matched++;
+      }
+
+      const tx = await prisma.transaction.upsert({
+        where: { externalId: transactionUid },
+        update: data,
+        create: data,
+      });
+
+      if (match.kind === "multiple_candidates") {
+        manual++;
+        await prisma.manualMatchQueue.create({
+          data: {
+            transactionId: tx.id,
+            reason: "ambiguous_match",
+            suggestedMemberIds: match.candidateMemberIds,
+          },
+        });
+      } else if (match.kind === "no_match") {
+        manual++;
+        await prisma.manualMatchQueue.create({
+          data: {
+            transactionId: tx.id,
+            reason: "no_match",
+            suggestedMemberIds: [],
+          },
+        });
+      }
+
+      imported++;
+      if (imported % 50 === 0) {
+        console.log(
+          `[Starling] progress: ${imported}/${rows.length} (matched ${matched}, manual ${manual})`
+        );
+      }
+    } catch (error) {
+      if (error.code === "P1017") {
+        console.log("[Starling] Connection dropped. Resetting Prisma and continuing...");
+        const { resetPrisma } = require("./matching");
+        resetPrisma();
+        continue;
+      }
+      console.error("[Starling] Failed on row", row, error);
+    }
   }
 
   console.log(`[Starling] imported ${imported}, matched ${matched}, manual queue ${manual}`);

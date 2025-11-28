@@ -71,6 +71,7 @@ async function main() {
   for (const file of files) {
     const rows = parse(fs.readFileSync(file, "utf8"), { columns: true, skip_empty_lines: true, trim: true });
     for (const row of rows) {
+      try {
       const transactionId = getField(row, ["Transaction Id", "Transaction ID", "transaction_id"]) ??
         crypto.createHash("sha1").update(JSON.stringify(row)).digest("hex").slice(0, 10);
       const transactionUid = `glofox_sale:${transactionId}`;
@@ -152,6 +153,20 @@ async function main() {
       }
 
       imported++;
+      if (imported % 100 === 0) {
+        console.log(
+          `[Glofox Sales] progress: ${imported} rows processed (matched ${matched}, manual ${manual})`
+        );
+      }
+      } catch (error) {
+        if (error.code === "P1017") {
+          console.log("[Glofox Sales] Connection dropped. Resetting Prisma and continuing...");
+          const { resetPrisma } = require("./matching");
+          resetPrisma();
+          continue;
+        }
+        console.error("[Glofox Sales] Failed on row", row, error);
+      }
     }
   }
 

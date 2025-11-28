@@ -70,53 +70,69 @@ async function main() {
   let updated = 0;
 
   for (const row of rows) {
-    const memberId = getField(row, ["member_id", "Member ID"]);
-    const email = normalizeEmail(getField(row, ["Email", "email"]));
-    const phone = normalizePhone(getField(row, ["Phone", "phone"]));
-    const firstName = getField(row, ["First Name", "first_name"]);
-    const lastName = getField(row, ["Last Name", "last_name"]);
-    const membership = getField(row, ["Membership Name", "Membership Plan"]);
+    try {
+      const memberId = getField(row, ["member_id", "Member ID"]);
+      const email = normalizeEmail(getField(row, ["Email", "email"]));
+      const phone = normalizePhone(getField(row, ["Phone", "phone"]));
+      const firstName = getField(row, ["First Name", "first_name"]);
+      const lastName = getField(row, ["Last Name", "last_name"]);
+      const membership = getField(row, ["Membership Name", "Membership Plan"]);
 
-    const externalId = memberId ? `glofox_member:${memberId}` : null;
+      const externalId = memberId ? `glofox_member:${memberId}` : null;
 
-    const data = {
-      externalId,
-      glofoxMemberId: memberId ?? undefined,
-      firstName,
-      lastName,
-      email,
-      phone,
-      channel: row["Source"] || "Glofox",
-      membershipName: membership,
-      primaryMembershipPlan: getField(row, ["Membership Plan"]),
-      tags: {
-        membershipPlan: membership,
-        totalBookings: row["Total Bookings"],
-        totalAttendances: row["Total Attendances"],
-      },
-      metadata: {
-        raw: row,
-        normalizedName: normalizeName(`${firstName ?? ""} ${lastName ?? ""}`),
-      },
-    };
+      const data = {
+        externalId,
+        glofoxMemberId: memberId ?? undefined,
+        firstName,
+        lastName,
+        email,
+        phone,
+        channel: row["Source"] || "Glofox",
+        membershipName: membership,
+        primaryMembershipPlan: getField(row, ["Membership Plan"]),
+        tags: {
+          membershipPlan: membership,
+          totalBookings: row["Total Bookings"],
+          totalAttendances: row["Total Attendances"],
+        },
+        metadata: {
+          raw: row,
+          normalizedName: normalizeName(`${firstName ?? ""} ${lastName ?? ""}`),
+        },
+      };
 
-    const existing = await prisma.lead.findFirst({
-      where: {
-        OR: [
-          externalId ? { externalId } : undefined,
-          memberId ? { glofoxMemberId: memberId } : undefined,
-          email ? { email } : undefined,
-        ].filter(Boolean),
-      },
-      select: { id: true },
-    });
+      const existing = await prisma.lead.findFirst({
+        where: {
+          OR: [
+            externalId ? { externalId } : undefined,
+            memberId ? { glofoxMemberId: memberId } : undefined,
+            email ? { email } : undefined,
+          ].filter(Boolean),
+        },
+        select: { id: true },
+      });
 
-    if (existing) {
-      await prisma.lead.update({ where: { id: existing.id }, data });
-      updated++;
-    } else {
-      await prisma.lead.create({ data });
-      created++;
+      if (existing) {
+        await prisma.lead.update({ where: { id: existing.id }, data });
+        updated++;
+      } else {
+        await prisma.lead.create({ data });
+        created++;
+      }
+
+      if ((created + updated) % 100 === 0) {
+        console.log(
+          `[Glofox Members] progress: ${created + updated}/${rows.length} (created ${created}, updated ${updated})`
+        );
+      }
+    } catch (error) {
+      if (error.code === "P1017") {
+        console.log("[Glofox Members] Connection dropped. Resetting Prisma and continuing...");
+        const { resetPrisma } = require("./matching");
+        resetPrisma();
+        continue;
+      }
+      console.error("[Glofox Members] Failed on row", row, error);
     }
   }
 

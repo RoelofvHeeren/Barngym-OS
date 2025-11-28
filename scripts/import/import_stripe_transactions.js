@@ -44,92 +44,107 @@ async function main() {
   let manual = 0;
 
   for (const row of rows) {
-    const chargeId = row["Charge ID"] || row["charge_id"] || row["ID"] || row["id"];
-    if (!chargeId) continue;
-    const transactionUid = `stripe:${chargeId}`;
-    const gross = toNumber(row["Amount"]);
-    const fee = toNumber(row["Fee"]);
-    const net = gross - fee;
-    const statusRaw = (row["Status"] || "").toLowerCase();
-    const captured =
-      row["Captured"] === "true" ||
-      row["Captured"] === true ||
-      row["Captured"] === "TRUE" ||
-      row["Captured"] === "True";
-    const status =
-      statusRaw === "succeeded" || captured
-        ? "Completed"
-        : statusRaw === "failed"
-        ? "Failed"
-        : "Needs Review";
+    try {
+      const chargeId = row["Charge ID"] || row["charge_id"] || row["ID"] || row["id"];
+      if (!chargeId) continue;
+      const transactionUid = `stripe:${chargeId}`;
+      const gross = toNumber(row["Amount"]);
+      const fee = toNumber(row["Fee"]);
+      const net = gross - fee;
+      const statusRaw = (row["Status"] || "").toLowerCase();
+      const captured =
+        row["Captured"] === "true" ||
+        row["Captured"] === true ||
+        row["Captured"] === "TRUE" ||
+        row["Captured"] === "True";
+      const status =
+        statusRaw === "succeeded" || captured
+          ? "Completed"
+          : statusRaw === "failed"
+          ? "Failed"
+          : "Needs Review";
 
-    const email = normalizeEmail(row["Customer Email"] || row["customer_email"]);
-    const customerId = row["Customer ID"] || row["customer_id"];
-    const match = await matchTransactionToMember({
-      email,
-      stripeCustomerId: customerId,
-      fullName: row["Customer Name"] || row["Customer Description"],
-    });
-
-    const data = {
-      provider: "Stripe",
-      externalId: transactionUid,
-      transactionUid,
-      transactionType: "payment",
-      amountMinor: Math.round(net * 100),
-      currency: (row["Currency"] || "GBP").toUpperCase(),
-      occurredAt: toDate(row["Created (UTC)"] || row["Created date (UTC)"] || row["Created"]),
-      personName: row["Customer Name"] || row["Customer Description"],
-      productType: row["Product name"] || "Stripe Payment",
-      status,
-      confidence: match.kind === "single_confident" ? "Matched" : "Needs Review",
-      description: row["Description"],
-      reference: row["Invoice Number"] || row["Invoice ID"] || row["Invoice ID"] || chargeId,
-      metadata: {
-        customerEmail: email,
-        customerId,
-        paymentMethod: row["Payment Method"],
-      },
-      grossAmount: gross,
-      feeAmount: fee,
-      netAmount: net,
-      stripeChargeId: chargeId,
-      leadId: null,
-      sourceFile: path.basename(filePath),
-    };
-
-    if (match.kind === "single_confident") {
-      data.leadId = match.memberId;
-      matched++;
-    }
-
-    const tx = await prisma.transaction.upsert({
-      where: { externalId: transactionUid },
-      update: data,
-      create: data,
-    });
-
-    if (match.kind === "multiple_candidates") {
-      manual++;
-      await prisma.manualMatchQueue.create({
-        data: {
-          transactionId: tx.id,
-          reason: "ambiguous_match",
-          suggestedMemberIds: match.candidateMemberIds,
-        },
+      const email = normalizeEmail(row["Customer Email"] || row["customer_email"]);
+      const customerId = row["Customer ID"] || row["customer_id"];
+      const match = await matchTransactionToMember({
+        email,
+        stripeCustomerId: customerId,
+        fullName: row["Customer Name"] || row["Customer Description"],
       });
-    } else if (match.kind === "no_match") {
-      manual++;
-      await prisma.manualMatchQueue.create({
-        data: {
-          transactionId: tx.id,
-          reason: "no_match",
-          suggestedMemberIds: [],
-        },
-      });
-    }
 
-    imported++;
+      const data = {
+        provider: "Stripe",
+        externalId: transactionUid,
+        transactionUid,
+        transactionType: "payment",
+        amountMinor: Math.round(net * 100),
+        currency: (row["Currency"] || "GBP").toUpperCase(),
+        occurredAt: toDate(row["Created (UTC)"] || row["Created date (UTC)"] || row["Created"]),
+        personName: row["Customer Name"] || row["Customer Description"],
+        productType: row["Product name"] || "Stripe Payment",
+        status,
+        confidence: match.kind === "single_confident" ? "Matched" : "Needs Review",
+        description: row["Description"],
+        reference: row["Invoice Number"] || row["Invoice ID"] || row["Invoice ID"] || chargeId,
+        metadata: {
+          customerEmail: email,
+          customerId,
+          paymentMethod: row["Payment Method"],
+        },
+        grossAmount: gross,
+        feeAmount: fee,
+        netAmount: net,
+        stripeChargeId: chargeId,
+        leadId: null,
+        sourceFile: path.basename(filePath),
+      };
+
+      if (match.kind === "single_confident") {
+        data.leadId = match.memberId;
+        matched++;
+      }
+
+      const tx = await prisma.transaction.upsert({
+        where: { externalId: transactionUid },
+        update: data,
+        create: data,
+      });
+
+      if (match.kind === "multiple_candidates") {
+        manual++;
+        await prisma.manualMatchQueue.create({
+          data: {
+            transactionId: tx.id,
+            reason: "ambiguous_match",
+            suggestedMemberIds: match.candidateMemberIds,
+          },
+        });
+      } else if (match.kind === "no_match") {
+        manual++;
+        await prisma.manualMatchQueue.create({
+          data: {
+            transactionId: tx.id,
+            reason: "no_match",
+            suggestedMemberIds: [],
+          },
+        });
+      }
+
+      imported++;
+      if (imported % 50 === 0) {
+        console.log(
+          `[Stripe CSV] progress: ${imported}/${rows.length} (matched ${matched}, manual ${manual})`
+        );
+      }
+    } catch (error) {
+      if (error.code === "P1017") {
+        console.log("[Stripe CSV] Connection dropped. Resetting Prisma and continuing...");
+        const { resetPrisma } = require("./matching");
+        resetPrisma();
+        continue;
+      }
+      console.error("[Stripe CSV] Failed on row", error);
+    }
   }
 
   console.log(`[Stripe CSV] imported ${imported}, matched ${matched}, manual queue ${manual}`);

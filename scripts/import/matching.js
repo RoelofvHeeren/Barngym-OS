@@ -1,5 +1,17 @@
 const { PrismaClient } = require("../../src/generated/prisma");
-const prisma = new PrismaClient();
+
+let prisma = new PrismaClient();
+
+function resetPrisma() {
+  if (prisma) {
+    prisma.$disconnect().catch(() => {});
+  }
+  prisma = new PrismaClient();
+}
+
+function getPrisma() {
+  return prisma;
+}
 
 const STRONG_THRESHOLD = 0.9;
 const WEAK_THRESHOLD = 0.75;
@@ -76,7 +88,7 @@ async function matchTransactionToMember(input) {
   const fullName = normalizeName(input.fullName ?? null);
 
   if (input.glofoxMemberId) {
-    const lead = await prisma.lead.findFirst({
+    const lead = await getPrisma().lead.findFirst({
       where: { glofoxMemberId: input.glofoxMemberId },
       select: { id: true },
     });
@@ -84,7 +96,7 @@ async function matchTransactionToMember(input) {
   }
 
   if (input.stripeCustomerId) {
-    const lead = await prisma.lead.findFirst({
+    const lead = await getPrisma().lead.findFirst({
       where: { stripeCustomerId: input.stripeCustomerId },
       select: { id: true },
     });
@@ -92,7 +104,7 @@ async function matchTransactionToMember(input) {
   }
 
   if (email) {
-    const lead = await prisma.lead.findFirst({
+    const lead = await getPrisma().lead.findFirst({
       where: { email },
       select: { id: true },
     });
@@ -100,7 +112,7 @@ async function matchTransactionToMember(input) {
   }
 
   if (phone) {
-    const lead = await prisma.lead.findFirst({
+    const lead = await getPrisma().lead.findFirst({
       where: { phone: { contains: phone.slice(-4), mode: "insensitive" } },
       select: { id: true },
     });
@@ -108,7 +120,7 @@ async function matchTransactionToMember(input) {
   }
 
   if (fullName) {
-    const leads = await prisma.lead.findMany({
+    const leads = await getPrisma().lead.findMany({
       where: {
         OR: [
           { firstName: { not: null } },
