@@ -69,7 +69,7 @@ async function main() {
       const match = await matchTransactionToMember({
         email,
         stripeCustomerId: customerId,
-        fullName: row["Customer Name"] || row["Customer Description"],
+        fullName: row["Customer Name"] || row["Customer Description"] || email,
       });
 
       const data = {
@@ -86,11 +86,12 @@ async function main() {
         confidence: match.kind === "single_confident" ? "Matched" : "Needs Review",
         description: row["Description"],
         reference: row["Invoice Number"] || row["Invoice ID"] || row["Invoice ID"] || chargeId,
-        metadata: {
-          customerEmail: email,
-          customerId,
-          paymentMethod: row["Payment Method"],
-        },
+      metadata: {
+        customerEmail: email,
+        email,
+        customerId,
+        paymentMethod: row["Payment Method"],
+      },
         grossAmount: gross,
         feeAmount: fee,
         netAmount: net,

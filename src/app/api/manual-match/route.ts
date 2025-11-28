@@ -97,6 +97,40 @@ export async function POST(request: Request) {
             update: { leadId },
             create: { provider: "Starling", key, leadId },
           });
+
+          const updatedTx = await prisma.transaction.updateMany({
+            where: {
+              provider: "Starling",
+              leadId: null,
+              OR: [{ personName: queueItem.transaction.personName }, { reference: queueItem.transaction.reference }],
+            },
+            data: {
+              leadId,
+              confidence: "Matched",
+              status: queueItem.transaction.status === "Needs Review" ? "Completed" : queueItem.transaction.status,
+            },
+          });
+
+          const txIds = await prisma.transaction.findMany({
+            where: {
+              provider: "Starling",
+              OR: [{ personName: queueItem.transaction.personName }, { reference: queueItem.transaction.reference }],
+              leadId: leadId,
+            },
+            select: { id: true },
+          });
+          const txIdList = txIds.map((t) => t.id);
+          if (txIdList.length) {
+            await prisma.manualMatchQueue.updateMany({
+              where: { transactionId: { in: txIdList } },
+              data: { resolvedAt: new Date(), resolvedBy: "auto-mapping" },
+            });
+          }
+
+          return NextResponse.json({
+            ok: true,
+            message: `Attached and auto-mapped ${updatedTx.count} Starling transactions with this counterparty.`,
+          });
         }
       }
     }
