@@ -265,7 +265,7 @@ export default function ManualMatchPage() {
             <button
               className="rounded-full bg-white/10 px-4 py-2 text-xs font-semibold text-primary disabled:opacity-50"
               onClick={() => handleBulkAttach(leadIdInput.__bulk)}
-              disabled={!selectedIds.size}
+              disabled={!selectedIds.size || !leadIdInput.__bulk}
             >
               Attach selected ({selectedIds.size})
             </button>
@@ -285,6 +285,7 @@ export default function ManualMatchPage() {
             <table className="w-full text-left text-base border-separate border-spacing-y-3">
               <thead className="text-muted">
                 <tr>
+                  <th className="pb-3 pr-4 font-medium w-10"></th>
                   <th className="pb-3 pr-4 font-medium">Occurred</th>
                   <th className="pb-3 pr-4 font-medium">Amount</th>
                   <th className="pb-3 pr-4 font-medium">Source</th>
