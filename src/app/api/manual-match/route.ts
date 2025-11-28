@@ -93,7 +93,7 @@ export async function POST(request: Request) {
         queueItem.transaction.provider === "Starling" &&
         (queueItem.transaction.personName || queueItem.transaction.reference)
       ) {
-        const key = (queueItem.transaction.personName || queueItem.transaction.reference || "").toLowerCase();
+        const key = (queueItem.transaction.reference || queueItem.transaction.personName || "").toLowerCase();
         if (key.trim().length) {
           await prisma.counterpartyMapping.upsert({
             where: { provider_key: { provider: "Starling", key } },
@@ -105,8 +105,18 @@ export async function POST(request: Request) {
             where: {
               provider: "Starling",
               OR: [
-                { personName: { contains: queueItem.transaction.personName ?? "", mode: "insensitive" } },
-                { reference: { contains: queueItem.transaction.reference ?? "", mode: "insensitive" } },
+                {
+                  reference: {
+                    equals: queueItem.transaction.reference ?? "",
+                    mode: "insensitive",
+                  },
+                },
+                {
+                  personName: {
+                    equals: queueItem.transaction.personName ?? "",
+                    mode: "insensitive",
+                  },
+                },
               ],
             },
             select: { id: true },
