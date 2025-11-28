@@ -153,11 +153,12 @@ export async function POST(request: Request) {
         leadPayload?.firstName || leadPayload?.lastName
           ? `${leadPayload?.firstName ?? ""} ${leadPayload?.lastName ?? ""}`.trim()
           : queueItem.transaction.personName ?? (raw?.["Full name"] as string | undefined);
-      const email =
+      const emailCandidate =
         leadPayload?.email ??
         (raw?.["Email"] as string | undefined) ??
         (queueItem.transaction.metadata as Record<string, unknown>)?.customerEmail ??
         undefined;
+      const email = typeof emailCandidate === "string" ? emailCandidate : undefined;
       const phone = leadPayload?.phone ?? (raw?.["Phone"] as string | undefined) ?? undefined;
       const [firstName, ...rest] = (personName ?? "").split(" ").filter(Boolean);
       const lastName = rest.join(" ");
@@ -166,7 +167,7 @@ export async function POST(request: Request) {
         data: {
           firstName: firstName || null,
           lastName: lastName || null,
-          email: email?.toLowerCase() ?? null,
+          email: typeof email === "string" ? email.toLowerCase() : null,
           phone: phone ?? null,
           channel: queueItem.transaction.provider ?? "Imported",
           stage: "Won",
