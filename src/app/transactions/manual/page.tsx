@@ -250,7 +250,7 @@ export default function ManualMatchPage() {
               </thead>
               <tbody className="divide-y divide-white/5">
                 {filteredQueue.map((item) => (
-                  <tr key={item.id} className="border border-white/10">
+                  <tr key={item.id} className="rounded-2xl border border-white/10 bg-white/5">
                     <td className="py-3 pr-4 text-muted">
                       {item.transaction ? formatDateTime(item.transaction.occurredAt) : "—"}
                     </td>
