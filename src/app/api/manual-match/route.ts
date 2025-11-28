@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@/generated/prisma";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
@@ -90,6 +91,10 @@ export async function POST(request: Request) {
       const raw = (queueItem.transaction.metadata as Record<string, unknown>)?.raw as
         | Record<string, unknown>
         | undefined;
+      const metadataPayload: Prisma.InputJsonValue = {
+        source: "manual-create",
+        raw: raw ?? null,
+      };
       const personName = queueItem.transaction.personName ?? (raw?.["Full name"] as string | undefined);
       const email = (raw?.["Email"] as string | undefined) ?? undefined;
       const phone = (raw?.["Phone"] as string | undefined) ?? undefined;
@@ -105,7 +110,7 @@ export async function POST(request: Request) {
           channel: queueItem.transaction.provider ?? "Imported",
           stage: "Won",
           membershipName: queueItem.transaction.productType ?? null,
-          metadata: { source: "manual-create", raw },
+          metadata: metadataPayload,
         },
       });
 
