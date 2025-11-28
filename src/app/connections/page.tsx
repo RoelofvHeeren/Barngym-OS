@@ -52,12 +52,6 @@ export default function ConnectionsPage() {
   const [backfillMessage, setBackfillMessage] = useState("");
   const [connectionState, setConnectionState] = useState<Record<string, ConnectionState>>({});
 
-  const [sheetUrl, setSheetUrl] = useState("");
-  const [sheetId, setSheetId] = useState("");
-  const [sheetRange, setSheetRange] = useState("A1");
-  const [sheetStatus, setSheetStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
-  const [sheetMessage, setSheetMessage] = useState("");
-  const [sheetResult, setSheetResult] = useState<unknown>(null);
 
   const refreshConnectionState = useCallback(async () => {
     try {
@@ -248,48 +242,6 @@ export default function ConnectionsPage() {
       setStarlingStatus("error");
       setStarlingMessage(error instanceof Error ? error.message : "Connection failed.");
       await refreshLogs();
-    }
-  };
-
-  const testSheetConnection = async () => {
-    setSheetStatus("loading");
-    setSheetMessage("");
-    setSheetResult(null);
-    try {
-      const targetUrl = `${sheetUrl}/read?sheetId=${encodeURIComponent(sheetId)}&range=${encodeURIComponent(
-        sheetRange || "A1"
-      )}`;
-      const response = await fetch(targetUrl, {
-        headers: { Accept: "text/event-stream" },
-      });
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-      const text = await response.text();
-      const dataLine = text
-        .split("\n")
-        .map((line) => line.trim())
-        .find((line) => line.startsWith("data:"));
-      if (!dataLine) {
-        throw new Error("Invalid SSE payload");
-      }
-      const payloadString = dataLine.replace(/^data:\s*/, "");
-      const parsed = JSON.parse(payloadString);
-      setSheetStatus("success");
-      setSheetMessage("SSE read succeeded.");
-      setSheetResult(parsed);
-    } catch (error) {
-      try {
-        const pingUrl = `${sheetUrl}/ping`;
-        const resp = await fetch(pingUrl);
-        const body = await resp.text();
-        setSheetStatus(resp.ok ? "success" : "error");
-        setSheetMessage(resp.ok ? "Ping succeeded (SSE failed)" : `Ping failed: ${body || resp.status}`);
-        setSheetResult(body);
-      } catch {
-        setSheetStatus("error");
-        setSheetMessage(error instanceof Error ? error.message : "SSE failed and ping failed.");
-      }
     }
   };
 
@@ -540,80 +492,6 @@ export default function ConnectionsPage() {
           )}
           {connectionState.starling?.hasSecret && starlingStatus !== "error" && (
             <p className="text-xs text-muted">Token stored securely.</p>
-          )}
-        </div>
-
-        <div className="glass-panel flex flex-col gap-4">
-          <div>
-            <p className="text-xs uppercase tracking-[0.35em] text-muted">Sheet MCP</p>
-            <h3 className="mt-2 text-2xl font-semibold">CSV / Sheet Bridge</h3>
-            <p className="text-sm text-muted">
-              Test a live read via SSE. Falls back to /ping for diagnostics.
-            </p>
-          </div>
-          <input
-            type="text"
-            placeholder="Sheet MCP URL (e.g. https://... )"
-            className="rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-sm"
-            value={sheetUrl}
-            onChange={(e) => setSheetUrl(e.target.value)}
-          />
-          <div className="grid gap-3 md:grid-cols-2">
-            <input
-              type="text"
-              placeholder="Sheet ID"
-              className="rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-sm"
-              value={sheetId}
-              onChange={(e) => setSheetId(e.target.value)}
-            />
-            <input
-              type="text"
-              placeholder="Range (e.g. A1)"
-              className="rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-sm"
-              value={sheetRange}
-              onChange={(e) => setSheetRange(e.target.value)}
-            />
-          </div>
-          <div className="flex items-center justify-between">
-            <button
-              className="rounded-full bg-black px-5 py-2 text-sm font-semibold text-white disabled:opacity-50"
-              onClick={testSheetConnection}
-              disabled={sheetStatus === "loading"}
-            >
-              {sheetStatus === "loading" ? "Testing..." : "Test Connection"}
-            </button>
-            <span
-              className={`chip text-xs ${
-                sheetStatus === "success"
-                  ? "text-emerald-200"
-                  : sheetStatus === "error"
-                  ? "text-amber-200"
-                  : "text-muted"
-              }`}
-            >
-              Status ·{" "}
-              {sheetStatus === "success"
-                ? "Connected"
-                : sheetStatus === "error"
-                ? "Error"
-                : "Not tested"}
-            </span>
-          </div>
-          {sheetStatus !== "idle" && sheetMessage && (
-            <p
-              className={`text-sm ${
-                sheetStatus === "success" ? "text-emerald-700" : "text-amber-600"
-              }`}
-            >
-              {sheetMessage}
-            </p>
-          )}
-          {sheetResult && (
-            <pre className="rounded-2xl bg-black/30 p-3 text-xs text-emerald-100">
-              {typeof sheetResult === "string"
-                ? sheetResult
-                : JSON.stringify(sheetResult, null, 2)}
-            </pre>
           )}
         </div>
 
