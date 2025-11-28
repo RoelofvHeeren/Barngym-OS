@@ -94,7 +94,9 @@ export async function POST(request: Request) {
         queueItem.transaction.provider === "Starling" &&
         (queueItem.transaction.personName || queueItem.transaction.reference)
       ) {
-          const key = (queueItem.transaction.reference || queueItem.transaction.personName || "").toLowerCase();
+        const refKey = (queueItem.transaction.reference || "").trim().toLowerCase();
+        const nameKey = (queueItem.transaction.personName || "").trim().toLowerCase();
+        const key = refKey || nameKey;
         if (key.trim().length) {
           await prisma.counterpartyMapping.upsert({
             where: { provider_key: { provider: "Starling", key } },
@@ -102,7 +104,6 @@ export async function POST(request: Request) {
             create: { provider: "Starling", key, leadId },
           });
 
-          if (mapRelated) {
           const related = await prisma.transaction.findMany({
             where: {
               provider: "Starling",
@@ -121,12 +122,14 @@ export async function POST(request: Request) {
                 },
               ],
             },
-            select: { id: true },
+            select: { id: true, leadId: true },
           });
-          const relatedIds = related.map((t) => t.id);
-          if (relatedIds.length) {
+
+          const unmappedIds = related.filter((t) => !t.leadId).map((t) => t.id);
+
+          if (unmappedIds.length) {
             await prisma.transaction.updateMany({
-              where: { id: { in: relatedIds } },
+              where: { id: { in: unmappedIds } },
               data: {
                 leadId,
                 confidence: "Matched",
@@ -134,15 +137,16 @@ export async function POST(request: Request) {
               },
             });
             await prisma.manualMatchQueue.updateMany({
-              where: { transactionId: { in: relatedIds } },
+              where: { transactionId: { in: unmappedIds } },
               data: { resolvedAt: new Date(), resolvedBy: "auto-mapping" },
             });
-            return NextResponse.json({
-              ok: true,
-              message: `Attached and auto-mapped ${relatedIds.length} Starling transactions with this reference/person name.`,
-              relatedIds,
-            });
           }
+
+          return NextResponse.json({
+            ok: true,
+            message: `Attached and auto-mapped ${unmappedIds.length} Starling transactions with this reference/person name.`,
+            relatedIds: unmappedIds,
+          });
         }
       }
       }
