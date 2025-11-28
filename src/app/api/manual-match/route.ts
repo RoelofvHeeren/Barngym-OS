@@ -182,7 +182,10 @@ export async function POST(request: Request) {
           channel: queueItem.transaction.provider ?? "Imported",
           stage: "Won",
           membershipName: queueItem.transaction.productType ?? null,
-          metadata: metadataPayload,
+          metadata: {
+            ...((metadataPayload as Record<string, unknown>) ?? {}),
+            reference: queueItem.transaction.reference ?? null,
+          } as Prisma.InputJsonValue,
         },
       });
 

@@ -11,6 +11,7 @@ type LeadPayload = {
   lastName?: string;
   email?: string;
   phone?: string;
+  reference?: string;
   channel?: string;
   stage?: string;
   owner?: string;
@@ -76,12 +77,13 @@ export async function GET() {
         timeStyle: "short",
       }).format(date);
 
-    const enriched = leads.map((lead) => {
-      const stats = statsMap.get(lead.id) ?? {
-        lifetimeMinor: 0,
-        payments: [],
-      };
-      const recentPayments = stats.payments.slice(0, 5);
+  const enriched = leads.map((lead) => {
+    const stats = statsMap.get(lead.id) ?? {
+      lifetimeMinor: 0,
+      payments: [],
+    };
+    const recentPayments = stats.payments.slice(0, 5);
+    const historyPayments = stats.payments.slice(0, 50);
       const lastPayment = recentPayments[0];
 
       const profile = {
@@ -97,14 +99,20 @@ export async function GET() {
         title: lead.membershipName ?? lead.channel ?? "Lead",
         email: lead.email ?? "",
         phone: lead.phone ?? "",
-        tags: [lead.channel, lead.stage, lead.membershipName].filter(
-          (tag): tag is string => Boolean(tag && tag.trim())
-        ),
-        identities: [
-          lead.email ? { label: "Email", value: lead.email } : null,
-          lead.phone ? { label: "Phone", value: lead.phone } : null,
-          lead.membershipName ? { label: "Membership", value: lead.membershipName } : null,
-        ].filter(Boolean),
+          tags: [lead.channel, lead.stage, lead.membershipName].filter(
+            (tag): tag is string => Boolean(tag && tag.trim())
+          ),
+          identities: [
+            lead.email ? { label: "Email", value: lead.email } : null,
+            lead.phone ? { label: "Phone", value: lead.phone } : null,
+            lead.metadata && typeof lead.metadata === "object" && (lead.metadata as Record<string, unknown>).reference
+              ? {
+                  label: "Reference",
+                  value: (lead.metadata as Record<string, unknown>).reference as string,
+                }
+              : null,
+            lead.membershipName ? { label: "Membership", value: lead.membershipName } : null,
+          ].filter(Boolean),
         stats: {
           lifetimeSpend: formatCurrency(stats.lifetimeMinor || 0),
           memberships: lead.membershipName ?? "Unassigned",
@@ -121,6 +129,15 @@ export async function GET() {
           amount: formatCurrency(payment.amountMinor, payment.currency),
           product: payment.productType ?? "Uncategorized",
           status: payment.status,
+        })),
+        history: historyPayments.map((payment) => ({
+          date: formatDate(payment.occurredAt),
+          timestamp: formatTimestamp(payment.occurredAt),
+          source: payment.provider,
+          amount: formatCurrency(payment.amountMinor, payment.currency),
+          product: payment.productType ?? "Uncategorized",
+          status: payment.status,
+          reference: payment.reference,
         })),
         manualMatches: [],
         notes: [
