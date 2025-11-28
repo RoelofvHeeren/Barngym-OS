@@ -3,6 +3,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/Dialog";
 
 type QueueItem = {
   id: string;
@@ -74,6 +81,14 @@ export default function ManualMatchPage() {
   const [creating, setCreating] = useState<Record<string, boolean>>({});
   const [leads, setLeads] = useState<LeadOption[]>([]);
   const [sourceFilter, setSourceFilter] = useState<string>("All");
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [createPayload, setCreatePayload] = useState<{ queueId: string | null; email: string; phone: string; firstName: string; lastName: string }>({
+    queueId: null,
+    email: "",
+    phone: "",
+    firstName: "",
+    lastName: "",
+  });
 
   useEffect(() => {
     const load = async () => {
@@ -133,11 +148,20 @@ export default function ManualMatchPage() {
   };
 
   const handleCreate = async (queueId: string) => {
+    const payload =
+      createPayload.queueId === queueId
+        ? {
+            email: createPayload.email,
+            phone: createPayload.phone,
+            firstName: createPayload.firstName,
+            lastName: createPayload.lastName,
+          }
+        : undefined;
     setCreating((prev) => ({ ...prev, [queueId]: true }));
     const response = await fetch("/api/manual-match", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "create", queueId }),
+      body: JSON.stringify({ action: "create", queueId, lead: payload }),
     });
     const payload = await response.json();
     setCreating((prev) => ({ ...prev, [queueId]: false }));
@@ -234,7 +258,7 @@ export default function ManualMatchPage() {
               </thead>
               <tbody className="divide-y divide-white/5">
                 {filteredQueue.map((item) => (
-                  <tr key={item.id}>
+                  <tr key={item.id} className="border border-white/10">
                     <td className="py-3 pr-4 text-muted">
                       {item.transaction ? formatDateTime(item.transaction.occurredAt) : "—"}
                     </td>
@@ -247,25 +271,23 @@ export default function ManualMatchPage() {
                       {item.transaction?.provider ?? "Unknown"}
                       {item.transaction?.productType ? ` · ${item.transaction.productType}` : ""}
                     </td>
-                  <td className="pr-4 text-muted">
-                    {item.transaction?.personName ?? "Unassigned"}
-                    <div className="text-xs text-muted">
-                      Ref: {item.transaction?.reference ?? "—"} · Reason: {item.reason}
-                      {(() => {
-                        const { email, phone } = extractContactHint(item.transaction?.metadata);
-                        if (!email && !phone) return null;
-                        return (
-                          <div className="text-xs text-muted">
-                            {email ? ` · Email: ${email}` : ""} {phone ? ` · Phone: ${phone}` : ""}
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  </td>
-                  <td className="pr-4 text-xs text-muted">
-                    {item.suggestedMemberIds?.length
-                      ? item.suggestedMemberIds.join(", ")
-                        : "None"}
+                    <td className="pr-4 text-muted">
+                      {item.transaction?.personName ?? "Unassigned"}
+                      <div className="text-xs text-muted">
+                        Ref: {item.transaction?.reference ?? "—"} · Reason: {item.reason}
+                        {(() => {
+                          const { email, phone } = extractContactHint(item.transaction?.metadata);
+                          if (!email && !phone) return null;
+                          return (
+                            <div className="text-xs text-muted">
+                              {email ? ` · Email: ${email}` : ""} {phone ? ` · Phone: ${phone}` : ""}
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    </td>
+                    <td className="pr-4 text-xs text-muted">
+                      {item.suggestedMemberIds?.length ? item.suggestedMemberIds.join(", ") : "None"}
                     </td>
                     <td className="pr-4">
                       <div className="flex flex-col gap-2">
@@ -295,13 +317,100 @@ export default function ManualMatchPage() {
                         >
                           Attach
                         </button>
-                        <button
-                          className="rounded-full bg-white/10 px-4 py-2 text-xs font-semibold text-primary"
-                          onClick={() => handleCreate(item.id)}
-                          disabled={creating[item.id]}
+                        <Dialog
+                          open={createModalOpen && createPayload.queueId === item.id}
+                          onOpenChange={(open) => {
+                            setCreateModalOpen(open);
+                            if (!open) {
+                              setCreatePayload({
+                                queueId: null,
+                                email: "",
+                                phone: "",
+                                firstName: "",
+                                lastName: "",
+                              });
+                            }
+                          }}
                         >
-                          {creating[item.id] ? "Creating…" : "Create lead & attach"}
-                        </button>
+                          <DialogTrigger asChild>
+                            <button
+                              className="rounded-full bg-white/10 px-4 py-2 text-xs font-semibold text-primary"
+                              onClick={() => {
+                                const { email, phone } = extractContactHint(item.transaction?.metadata);
+                                setCreatePayload({
+                                  queueId: item.id,
+                                  email: email ?? "",
+                                  phone: phone ?? "",
+                                  firstName: "",
+                                  lastName: "",
+                                });
+                                setCreateModalOpen(true);
+                              }}
+                            >
+                              {creating[item.id] ? "Creating…" : "Create lead & attach"}
+                            </button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>Create lead & attach</DialogTitle>
+                            </DialogHeader>
+                            <div className="flex flex-col gap-3 text-sm text-primary">
+                              <input
+                                className="rounded-xl border border-white/10 bg-white/5 px-3 py-2"
+                                placeholder="First name"
+                                value={createPayload.firstName}
+                                onChange={(e) =>
+                                  setCreatePayload((prev) => ({
+                                    ...prev,
+                                    firstName: e.target.value,
+                                  }))
+                                }
+                              />
+                              <input
+                                className="rounded-xl border border-white/10 bg-white/5 px-3 py-2"
+                                placeholder="Last name"
+                                value={createPayload.lastName}
+                                onChange={(e) =>
+                                  setCreatePayload((prev) => ({
+                                    ...prev,
+                                    lastName: e.target.value,
+                                  }))
+                                }
+                              />
+                              <input
+                                className="rounded-xl border border-white/10 bg-white/5 px-3 py-2"
+                                placeholder="Email"
+                                value={createPayload.email}
+                                onChange={(e) =>
+                                  setCreatePayload((prev) => ({
+                                    ...prev,
+                                    email: e.target.value,
+                                  }))
+                                }
+                              />
+                              <input
+                                className="rounded-xl border border-white/10 bg-white/5 px-3 py-2"
+                                placeholder="Phone"
+                                value={createPayload.phone}
+                                onChange={(e) =>
+                                  setCreatePayload((prev) => ({
+                                    ...prev,
+                                    phone: e.target.value,
+                                  }))
+                                }
+                              />
+                              <button
+                                className="rounded-full bg-black px-4 py-2 text-xs font-semibold text-white"
+                                onClick={() => {
+                                  handleCreate(item.id);
+                                  setCreateModalOpen(false);
+                                }}
+                              >
+                                Save & attach
+                              </button>
+                            </div>
+                          </DialogContent>
+                        </Dialog>
                         <div className="text-[11px] text-muted">
                           Tip: search by name/email or paste a Lead ID. After attach, this disappears.
                         </div>

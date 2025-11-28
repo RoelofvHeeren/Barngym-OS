@@ -52,6 +52,9 @@ export async function POST(request: Request) {
     const action = body?.action as string | undefined;
     const queueId = body?.queueId as string | undefined;
     const leadId = body?.leadId as string | undefined;
+    const leadPayload = body?.lead as
+      | { firstName?: string | null; lastName?: string | null; email?: string | null; phone?: string | null }
+      | undefined;
 
     if (!action || !queueId) {
       return NextResponse.json(
@@ -102,7 +105,10 @@ export async function POST(request: Request) {
             where: {
               provider: "Starling",
               leadId: null,
-              OR: [{ personName: queueItem.transaction.personName }, { reference: queueItem.transaction.reference }],
+              OR: [
+                { personName: { equals: queueItem.transaction.personName ?? "", mode: "insensitive" } },
+                { reference: { equals: queueItem.transaction.reference ?? "", mode: "insensitive" } },
+              ],
             },
             data: {
               leadId,
@@ -143,9 +149,16 @@ export async function POST(request: Request) {
         source: "manual-create",
         raw: raw ?? null,
       } as Prisma.InputJsonValue;
-      const personName = queueItem.transaction.personName ?? (raw?.["Full name"] as string | undefined);
-      const email = (raw?.["Email"] as string | undefined) ?? undefined;
-      const phone = (raw?.["Phone"] as string | undefined) ?? undefined;
+      const personName =
+        leadPayload?.firstName || leadPayload?.lastName
+          ? `${leadPayload?.firstName ?? ""} ${leadPayload?.lastName ?? ""}`.trim()
+          : queueItem.transaction.personName ?? (raw?.["Full name"] as string | undefined);
+      const email =
+        leadPayload?.email ??
+        (raw?.["Email"] as string | undefined) ??
+        (queueItem.transaction.metadata as Record<string, unknown>)?.customerEmail ??
+        undefined;
+      const phone = leadPayload?.phone ?? (raw?.["Phone"] as string | undefined) ?? undefined;
       const [firstName, ...rest] = (personName ?? "").split(" ").filter(Boolean);
       const lastName = rest.join(" ");
 
@@ -170,6 +183,52 @@ export async function POST(request: Request) {
           confidence: "Matched",
         },
       });
+
+      const emailLower = email?.toLowerCase();
+      if (emailLower) {
+        const updatedTx = await prisma.transaction.updateMany({
+          where: {
+            leadId: null,
+            OR: [
+              { reference: { equals: emailLower, mode: "insensitive" } },
+              { personName: { equals: emailLower, mode: "insensitive" } },
+              {
+                metadata: {
+                  path: ["customerEmail"],
+                  string_contains: emailLower,
+                  mode: "insensitive",
+                },
+              },
+              {
+                metadata: {
+                  path: ["email"],
+                  string_contains: emailLower,
+                  mode: "insensitive",
+                },
+              },
+            ],
+          },
+          data: {
+            leadId: newLead.id,
+            confidence: "Matched",
+            status: queueItem.transaction.status === "Needs Review" ? "Completed" : queueItem.transaction.status,
+          },
+        });
+
+        if (updatedTx.count) {
+          const txIds = await prisma.transaction.findMany({
+            where: { leadId: newLead.id },
+            select: { id: true },
+          });
+          const txIdList = txIds.map((t) => t.id);
+          if (txIdList.length) {
+            await prisma.manualMatchQueue.updateMany({
+              where: { transactionId: { in: txIdList } },
+              data: { resolvedAt: new Date(), resolvedBy: "auto-mapping" },
+            });
+          }
+        }
+      }
     }
 
     await prisma.manualMatchQueue.update({
