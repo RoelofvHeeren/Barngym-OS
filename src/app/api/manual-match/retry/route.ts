@@ -61,14 +61,10 @@ export async function POST(request: Request) {
 
       if (tx.provider === "Stripe" || tx.provider === "Glofox") {
         const raw = (tx.metadata as Record<string, unknown>)?.raw as Record<string, unknown> | undefined;
-        const email =
-          (raw?.["Email"] as string | undefined) ??
-          (tx.metadata as Record<string, unknown>)?.email ??
-          undefined;
-        const phone =
-          (raw?.["Phone"] as string | undefined) ??
-          (tx.metadata as Record<string, unknown>)?.phone ??
-          undefined;
+        const emailCandidate = raw?.["Email"] ?? (tx.metadata as Record<string, unknown>)?.email;
+        const phoneCandidate = raw?.["Phone"] ?? (tx.metadata as Record<string, unknown>)?.phone;
+        const email = typeof emailCandidate === "string" ? emailCandidate : undefined;
+        const phone = typeof phoneCandidate === "string" ? phoneCandidate : undefined;
         const fullName =
           tx.personName ??
           (raw?.["Full name"] as string | undefined) ??
