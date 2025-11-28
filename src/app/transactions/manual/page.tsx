@@ -150,14 +150,14 @@ export default function ManualMatchPage() {
     const response = await fetch("/api/manual-match/bulk", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ leadId, transactionIds: Array.from(selectedIds) }),
+      body: JSON.stringify({ leadId, queueIds: Array.from(selectedIds) }),
     });
     const payload = await response.json();
     if (!payload.ok) {
       alert(payload.message || "Failed to bulk attach");
       return;
     }
-    setQueue((prev) => prev.filter((item) => !selectedIds.has(item.transaction?.id || "")));
+    setQueue((prev) => prev.filter((item) => !selectedIds.has(item.id)));
     setSelectedIds(new Set());
   };
 

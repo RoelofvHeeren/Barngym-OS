@@ -5,16 +5,22 @@ export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as { transactionIds?: string[]; leadId?: string };
-    const transactionIds = Array.isArray(body.transactionIds) ? body.transactionIds : [];
+    const body = (await request.json()) as { queueIds?: string[]; leadId?: string };
+    const queueIds = Array.isArray(body.queueIds) ? body.queueIds : [];
     const leadId = body.leadId;
 
-    if (!transactionIds.length || !leadId) {
+    if (!queueIds.length || !leadId) {
       return NextResponse.json(
-        { ok: false, message: "Provide transactionIds and leadId." },
+        { ok: false, message: "Provide queueIds and leadId." },
         { status: 400 }
       );
     }
+
+    const queueItems = await prisma.manualMatchQueue.findMany({
+      where: { id: { in: queueIds } },
+      select: { transactionId: true },
+    });
+    const transactionIds = queueItems.map((item) => item.transactionId);
 
     const updated = await prisma.transaction.updateMany({
       where: { id: { in: transactionIds } },
@@ -26,7 +32,7 @@ export async function POST(request: Request) {
     });
 
     await prisma.manualMatchQueue.updateMany({
-      where: { transactionId: { in: transactionIds } },
+      where: { id: { in: queueIds } },
       data: { resolvedAt: new Date(), resolvedBy: "bulk-attach" },
     });
 
