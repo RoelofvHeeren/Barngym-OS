@@ -3,13 +3,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/Dialog";
 
 type QueueItem = {
   id: string;
@@ -81,7 +74,6 @@ export default function ManualMatchPage() {
   const [creating, setCreating] = useState<Record<string, boolean>>({});
   const [leads, setLeads] = useState<LeadOption[]>([]);
   const [sourceFilter, setSourceFilter] = useState<string>("All");
-  const [createModalOpen, setCreateModalOpen] = useState(false);
   const [createPayload, setCreatePayload] = useState<{ queueId: string | null; email: string; phone: string; firstName: string; lastName: string }>({
     queueId: null,
     email: "",
@@ -163,10 +155,10 @@ export default function ManualMatchPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "create", queueId, lead: payload }),
     });
-    const payload = await response.json();
+    const respPayload = await response.json();
     setCreating((prev) => ({ ...prev, [queueId]: false }));
-    if (!payload.ok) {
-      alert(payload.message || "Failed to create and attach");
+    if (!respPayload.ok) {
+      alert(respPayload.message || "Failed to create and attach");
       return;
     }
     setQueue((prev) => prev.filter((item) => item.id !== queueId));
@@ -317,100 +309,89 @@ export default function ManualMatchPage() {
                         >
                           Attach
                         </button>
-                        <Dialog
-                          open={createModalOpen && createPayload.queueId === item.id}
-                          onOpenChange={(open) => {
-                            setCreateModalOpen(open);
-                            if (!open) {
-                              setCreatePayload({
-                                queueId: null,
-                                email: "",
-                                phone: "",
-                                firstName: "",
-                                lastName: "",
-                              });
-                            }
+                        <button
+                          className="rounded-full bg-white/10 px-4 py-2 text-xs font-semibold text-primary"
+                          onClick={() => {
+                            const { email, phone } = extractContactHint(item.transaction?.metadata);
+                            setCreatePayload({
+                              queueId: item.id,
+                              email: email ?? "",
+                              phone: phone ?? "",
+                              firstName: "",
+                              lastName: "",
+                            });
                           }}
                         >
-                          <DialogTrigger asChild>
-                            <button
-                              className="rounded-full bg-white/10 px-4 py-2 text-xs font-semibold text-primary"
-                              onClick={() => {
-                                const { email, phone } = extractContactHint(item.transaction?.metadata);
-                                setCreatePayload({
-                                  queueId: item.id,
-                                  email: email ?? "",
-                                  phone: phone ?? "",
-                                  firstName: "",
-                                  lastName: "",
-                                });
-                                setCreateModalOpen(true);
-                              }}
-                            >
-                              {creating[item.id] ? "Creating…" : "Create lead & attach"}
-                            </button>
-                          </DialogTrigger>
-                          <DialogContent>
-                            <DialogHeader>
-                              <DialogTitle>Create lead & attach</DialogTitle>
-                            </DialogHeader>
-                            <div className="flex flex-col gap-3 text-sm text-primary">
-                              <input
-                                className="rounded-xl border border-white/10 bg-white/5 px-3 py-2"
-                                placeholder="First name"
-                                value={createPayload.firstName}
-                                onChange={(e) =>
-                                  setCreatePayload((prev) => ({
-                                    ...prev,
-                                    firstName: e.target.value,
-                                  }))
-                                }
-                              />
-                              <input
-                                className="rounded-xl border border-white/10 bg-white/5 px-3 py-2"
-                                placeholder="Last name"
-                                value={createPayload.lastName}
-                                onChange={(e) =>
-                                  setCreatePayload((prev) => ({
-                                    ...prev,
-                                    lastName: e.target.value,
-                                  }))
-                                }
-                              />
-                              <input
-                                className="rounded-xl border border-white/10 bg-white/5 px-3 py-2"
-                                placeholder="Email"
-                                value={createPayload.email}
-                                onChange={(e) =>
-                                  setCreatePayload((prev) => ({
-                                    ...prev,
-                                    email: e.target.value,
-                                  }))
-                                }
-                              />
-                              <input
-                                className="rounded-xl border border-white/10 bg-white/5 px-3 py-2"
-                                placeholder="Phone"
-                                value={createPayload.phone}
-                                onChange={(e) =>
-                                  setCreatePayload((prev) => ({
-                                    ...prev,
-                                    phone: e.target.value,
-                                  }))
-                                }
-                              />
+                          {creating[item.id] ? "Creating…" : "Create lead & attach"}
+                        </button>
+                        {createPayload.queueId === item.id ? (
+                          <div className="rounded-2xl border border-white/10 bg-white/5 p-3 text-xs text-primary flex flex-col gap-2">
+                            <div className="font-semibold">New lead details</div>
+                            <input
+                              className="rounded-xl border border-white/10 bg-white/5 px-3 py-2"
+                              placeholder="First name"
+                              value={createPayload.firstName}
+                              onChange={(e) =>
+                                setCreatePayload((prev) => ({
+                                  ...prev,
+                                  firstName: e.target.value,
+                                }))
+                              }
+                            />
+                            <input
+                              className="rounded-xl border border-white/10 bg-white/5 px-3 py-2"
+                              placeholder="Last name"
+                              value={createPayload.lastName}
+                              onChange={(e) =>
+                                setCreatePayload((prev) => ({
+                                  ...prev,
+                                  lastName: e.target.value,
+                                }))
+                              }
+                            />
+                            <input
+                              className="rounded-xl border border-white/10 bg-white/5 px-3 py-2"
+                              placeholder="Email"
+                              value={createPayload.email}
+                              onChange={(e) =>
+                                setCreatePayload((prev) => ({
+                                  ...prev,
+                                  email: e.target.value,
+                                }))
+                              }
+                            />
+                            <input
+                              className="rounded-xl border border-white/10 bg-white/5 px-3 py-2"
+                              placeholder="Phone"
+                              value={createPayload.phone}
+                              onChange={(e) =>
+                                setCreatePayload((prev) => ({
+                                  ...prev,
+                                  phone: e.target.value,
+                                }))
+                              }
+                            />
+                            <div className="flex gap-2">
                               <button
                                 className="rounded-full bg-black px-4 py-2 text-xs font-semibold text-white"
                                 onClick={() => {
                                   handleCreate(item.id);
-                                  setCreateModalOpen(false);
+                                  setCreatePayload({ queueId: null, email: "", phone: "", firstName: "", lastName: "" });
                                 }}
                               >
                                 Save & attach
                               </button>
+                              <button
+                                className="rounded-full bg-white/10 px-4 py-2 text-xs font-semibold text-primary"
+                                onClick={() =>
+                                  setCreatePayload({ queueId: null, email: "", phone: "", firstName: "", lastName: "" })
+                                }
+                              >
+                                Cancel
+                              </button>
                             </div>
-                          </DialogContent>
-                        </Dialog>
+                          </div>
+                        ) : null}
                         <div className="text-[11px] text-muted">
                           Tip: search by name/email or paste a Lead ID. After attach, this disappears.
                         </div>
