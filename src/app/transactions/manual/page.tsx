@@ -25,6 +25,11 @@ type QueueItem = {
   } | null;
 };
 
+type LeadOption = {
+  id: string;
+  label: string;
+};
+
 function formatCurrency(minorUnits: number, currency: string) {
   const amount = minorUnits / 100;
   try {
@@ -54,6 +59,7 @@ export default function ManualMatchPage() {
   const [error, setError] = useState<string | null>(null);
   const [leadIdInput, setLeadIdInput] = useState<Record<string, string>>({});
   const [creating, setCreating] = useState<Record<string, boolean>>({});
+  const [leads, setLeads] = useState<LeadOption[]>([]);
 
   useEffect(() => {
     const load = async () => {
@@ -73,6 +79,28 @@ export default function ManualMatchPage() {
       }
     };
     load();
+  }, []);
+
+  useEffect(() => {
+    const loadLeads = async () => {
+      try {
+        const response = await fetch("/api/leads");
+        const payload = await response.json();
+        if (!payload.ok) return;
+        const options: LeadOption[] = (payload.data || []).map((lead: any) => {
+          const name = [lead.firstName, lead.lastName].filter(Boolean).join(" ").trim() || "Unnamed";
+          const contact = lead.email || lead.phone || lead.externalId || lead.id;
+          return {
+            id: lead.id,
+            label: `${name} · ${contact}`,
+          };
+        });
+        setLeads(options);
+      } catch {
+        // ignore
+      }
+    };
+    loadLeads();
   }, []);
 
   const handleAttach = async (queueId: string, leadId: string | undefined) => {
@@ -191,9 +219,10 @@ export default function ManualMatchPage() {
                       <div className="flex flex-col gap-2">
                         <input
                           type="text"
-                          placeholder="Lead ID"
+                          placeholder="Search name/email or paste Lead ID"
                           className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-primary"
                           value={leadIdInput[item.id] ?? ""}
+                          list={`lead-options-${item.id}`}
                           onChange={(e) =>
                             setLeadIdInput((prev) => ({
                               ...prev,
@@ -201,6 +230,13 @@ export default function ManualMatchPage() {
                             }))
                           }
                         />
+                        <datalist id={`lead-options-${item.id}`}>
+                          {leads.map((lead) => (
+                            <option key={lead.id} value={lead.id}>
+                              {lead.label}
+                            </option>
+                          ))}
+                        </datalist>
                         <button
                           className="rounded-full bg-black px-4 py-2 text-xs font-semibold text-white"
                           onClick={() => handleAttach(item.id, leadIdInput[item.id])}
@@ -215,7 +251,7 @@ export default function ManualMatchPage() {
                           {creating[item.id] ? "Creating…" : "Create lead & attach"}
                         </button>
                         <div className="text-[11px] text-muted">
-                          Tip: paste a Lead ID or pick from suggestions. After attach, this disappears.
+                          Tip: search by name/email or paste a Lead ID. After attach, this disappears.
                         </div>
                       </div>
                     </td>
