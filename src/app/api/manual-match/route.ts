@@ -91,10 +91,10 @@ export async function POST(request: Request) {
       const raw = (queueItem.transaction.metadata as Record<string, unknown>)?.raw as
         | Record<string, unknown>
         | undefined;
-      const metadataPayload: Prisma.InputJsonValue = {
+      const metadataPayload = {
         source: "manual-create",
         raw: raw ?? null,
-      };
+      } as Prisma.InputJsonValue;
       const personName = queueItem.transaction.personName ?? (raw?.["Full name"] as string | undefined);
       const email = (raw?.["Email"] as string | undefined) ?? undefined;
       const phone = (raw?.["Phone"] as string | undefined) ?? undefined;
