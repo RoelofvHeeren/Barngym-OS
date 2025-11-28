@@ -149,7 +149,6 @@ export async function POST(request: Request) {
           });
         }
       }
-      }
     }
 
     if (action === "create") {
