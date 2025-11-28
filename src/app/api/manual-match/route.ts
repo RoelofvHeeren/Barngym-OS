@@ -105,18 +105,8 @@ export async function POST(request: Request) {
             where: {
               provider: "Starling",
               OR: [
-                {
-                  personName: {
-                    equals: queueItem.transaction.personName ?? "",
-                    mode: "insensitive",
-                  },
-                },
-                {
-                  reference: {
-                    equals: queueItem.transaction.reference ?? "",
-                    mode: "insensitive",
-                  },
-                },
+                { personName: { contains: queueItem.transaction.personName ?? "", mode: "insensitive" } },
+                { reference: { contains: queueItem.transaction.reference ?? "", mode: "insensitive" } },
               ],
             },
             select: { id: true },
@@ -134,10 +124,6 @@ export async function POST(request: Request) {
             await prisma.manualMatchQueue.updateMany({
               where: { transactionId: { in: relatedIds } },
               data: { resolvedAt: new Date(), resolvedBy: "auto-mapping" },
-            });
-            return NextResponse.json({
-              ok: true,
-              message: `Attached and auto-mapped ${relatedIds.length} Starling transactions with this counterparty.`,
             });
           }
         }
