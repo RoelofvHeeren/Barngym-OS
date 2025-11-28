@@ -70,6 +70,15 @@ type LeadProfile = {
     product: string;
     status: string;
   }[];
+  history: {
+    date: string;
+    timestamp: string;
+    source: string;
+    amount: string;
+    product: string;
+    status: string;
+    reference?: string | null;
+  }[];
   manualMatches: {
     reference: string;
     amount: string;
@@ -105,6 +114,7 @@ function createProfileTemplate(name: string): LeadProfile {
     identities: [],
     stats: createDefaultStats(),
     payments: [],
+    history: [],
     manualMatches: [],
     notes: [],
   };
@@ -242,6 +252,7 @@ const buildProfileFromLead = (lead: ApiLead, displayName: string): LeadProfile =
       lastAttendance: "—",
     },
     payments: [],
+    history: [],
     manualMatches: [],
     notes: [],
   };
@@ -266,7 +277,11 @@ function normalizeApiLead(lead: ApiLead): NormalizedLead {
       ? (metadata as { profile?: unknown }).profile
       : null;
   const storedProfile = isLeadProfile(metadataProfile) ? metadataProfile : null;
-  const profile = storedProfile ?? buildProfileFromLead(lead, displayName);
+  const profileBase = storedProfile ?? buildProfileFromLead(lead, displayName);
+  const profile = {
+    ...profileBase,
+    history: Array.isArray(profileBase.history) ? profileBase.history : [],
+  };
 
   const row: LeadRow = {
     id: leadId,
@@ -1062,6 +1077,36 @@ export default function PeoplePage() {
                     </div>
                   ))}
                 </div>
+              </div>
+            </div>
+            <div className="mt-4 rounded-3xl border border-white/10 bg-white/5 p-4">
+              <div className="flex items-center justify-between">
+                <p className="text-xs uppercase tracking-[0.35em] text-muted">Transaction History</p>
+                <span className="text-xs text-muted">
+                  Showing up to {selectedLeadProfile.history.length} records
+                </span>
+              </div>
+              <div className="mt-3 space-y-2 max-h-72 overflow-y-auto pr-2">
+                {selectedLeadProfile.history.length === 0 ? (
+                  <p className="text-sm text-muted">No transactions yet.</p>
+                ) : (
+                  selectedLeadProfile.history.map((entry, idx) => (
+                    <div
+                      key={`${entry.timestamp}-${idx}`}
+                      className="rounded-2xl border border-white/10 bg-white/5 p-3"
+                    >
+                      <div className="flex items-center justify-between text-sm text-primary">
+                        <span className="font-semibold">{entry.amount}</span>
+                        <span className="text-muted">{entry.source}</span>
+                      </div>
+                      <div className="text-xs text-muted">
+                        {entry.timestamp} · {entry.product}
+                        {entry.reference ? ` · Ref: ${entry.reference}` : ""}
+                        {entry.status ? ` · ${entry.status}` : ""}
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
             <div className="mt-4 rounded-3xl border border-white/10 bg-white/5 p-4">

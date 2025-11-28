@@ -74,12 +74,20 @@ export default function ManualMatchPage() {
   const [creating, setCreating] = useState<Record<string, boolean>>({});
   const [leads, setLeads] = useState<LeadOption[]>([]);
   const [sourceFilter, setSourceFilter] = useState<string>("All");
-  const [createPayload, setCreatePayload] = useState<{ queueId: string | null; email: string; phone: string; firstName: string; lastName: string }>({
+  const [createPayload, setCreatePayload] = useState<{
+    queueId: string | null;
+    email: string;
+    phone: string;
+    firstName: string;
+    lastName: string;
+    reference: string;
+  }>({
     queueId: null,
     email: "",
     phone: "",
     firstName: "",
     lastName: "",
+    reference: "",
   });
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
@@ -169,6 +177,7 @@ export default function ManualMatchPage() {
             phone: createPayload.phone,
             firstName: createPayload.firstName,
             lastName: createPayload.lastName,
+            reference: createPayload.reference,
           }
         : undefined;
     setCreating((prev) => ({ ...prev, [queueId]: true }));
@@ -197,6 +206,44 @@ export default function ManualMatchPage() {
 
   return (
     <div className="flex flex-col gap-6 text-primary">
+      {selectedIds.size > 0 ? (
+        <div className="fixed bottom-4 left-1/2 z-30 w-[90%] max-w-5xl -translate-x-1/2 rounded-2xl border border-white/15 bg-white/10 px-4 py-3 backdrop-blur">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-sm text-primary font-semibold">
+              {selectedIds.size} selected
+            </span>
+            <input
+              type="text"
+              placeholder="Search name/email or paste Lead ID"
+              className="min-w-[240px] flex-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-primary"
+              list="lead-options-floating"
+              value={leadIdInput.__bulk ?? ""}
+              onChange={(e) => setLeadIdInput((prev) => ({ ...prev, __bulk: e.target.value }))}
+            />
+            <datalist id="lead-options-floating">
+              {leads.map((lead) => (
+                <option key={lead.id} value={lead.id}>
+                  {lead.label}
+                </option>
+              ))}
+            </datalist>
+            <button
+              className="rounded-full bg-black px-4 py-2 text-xs font-semibold text-white disabled:opacity-50"
+              onClick={() => handleBulkAttach(leadIdInput.__bulk)}
+              disabled={!leadIdInput.__bulk}
+            >
+              Attach selected
+            </button>
+            <button
+              className="text-xs text-muted underline"
+              onClick={() => setSelectedIds(new Set())}
+            >
+              Clear selection
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       <section className="glass-panel flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <div>
@@ -301,16 +348,15 @@ export default function ManualMatchPage() {
                       <input
                         type="checkbox"
                         className="accent-emerald-300"
-                        checked={selectedIds.has(item.transaction?.id || "")}
+                        checked={selectedIds.has(item.id)}
                         onChange={(e) => {
-                          const txId = item.transaction?.id;
-                          if (!txId) return;
+                          const id = item.id;
                           setSelectedIds((prev) => {
                             const next = new Set(prev);
                             if (e.target.checked) {
-                              next.add(txId);
+                              next.add(id);
                             } else {
-                              next.delete(txId);
+                              next.delete(id);
                             }
                             return next;
                           });
@@ -385,6 +431,7 @@ export default function ManualMatchPage() {
                               phone: phone ?? "",
                               firstName: "",
                               lastName: "",
+                              reference: item.transaction?.reference ?? "",
                             });
                           }}
                         >
@@ -437,12 +484,30 @@ export default function ManualMatchPage() {
                                 }))
                               }
                             />
+                            <input
+                              className="rounded-xl border border-white/10 bg-white/5 px-3 py-2"
+                              placeholder="Reference (for Starling auto-match)"
+                              value={createPayload.reference}
+                              onChange={(e) =>
+                                setCreatePayload((prev) => ({
+                                  ...prev,
+                                  reference: e.target.value,
+                                }))
+                              }
+                            />
                             <div className="flex gap-2">
                               <button
                                 className="rounded-full bg-black px-4 py-2 text-xs font-semibold text-white"
                                 onClick={() => {
                                   handleCreate(item.id);
-                                  setCreatePayload({ queueId: null, email: "", phone: "", firstName: "", lastName: "" });
+                                  setCreatePayload({
+                                    queueId: null,
+                                    email: "",
+                                    phone: "",
+                                    firstName: "",
+                                    lastName: "",
+                                    reference: "",
+                                  });
                                 }}
                               >
                                 Save & attach
@@ -450,7 +515,14 @@ export default function ManualMatchPage() {
                               <button
                                 className="rounded-full bg-white/10 px-4 py-2 text-xs font-semibold text-primary"
                                 onClick={() =>
-                                  setCreatePayload({ queueId: null, email: "", phone: "", firstName: "", lastName: "" })
+                                  setCreatePayload({
+                                    queueId: null,
+                                    email: "",
+                                    phone: "",
+                                    firstName: "",
+                                    lastName: "",
+                                    reference: "",
+                                  })
                                 }
                               >
                                 Cancel

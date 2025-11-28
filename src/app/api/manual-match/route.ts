@@ -53,7 +53,7 @@ export async function POST(request: Request) {
     const queueId = body?.queueId as string | undefined;
     const leadId = body?.leadId as string | undefined;
     const leadPayload = body?.lead as
-      | { firstName?: string | null; lastName?: string | null; email?: string | null; phone?: string | null }
+      | { firstName?: string | null; lastName?: string | null; email?: string | null; phone?: string | null; reference?: string | null }
       | undefined;
     const mapRelated = body?.mapRelated ?? true;
 
@@ -72,6 +72,8 @@ export async function POST(request: Request) {
     if (!queueItem || !queueItem.transaction) {
       return NextResponse.json({ ok: false, message: "Queue item not found." }, { status: 404 });
     }
+
+    let responseMessage: string | undefined;
 
     if (action === "attach") {
       if (!leadId) {
@@ -142,11 +144,7 @@ export async function POST(request: Request) {
             });
           }
 
-          return NextResponse.json({
-            ok: true,
-            message: `Attached and auto-mapped ${unmappedIds.length} Starling transactions with this reference/person name.`,
-            relatedIds: unmappedIds,
-          });
+          responseMessage = `Attached and auto-mapped ${unmappedIds.length} Starling transactions with this reference/person name.`;
         }
       }
     }
@@ -170,6 +168,7 @@ export async function POST(request: Request) {
         undefined;
       const email = typeof emailCandidate === "string" ? emailCandidate : undefined;
       const phone = leadPayload?.phone ?? (raw?.["Phone"] as string | undefined) ?? undefined;
+      const reference = leadPayload?.reference ?? queueItem.transaction.reference ?? undefined;
       const [firstName, ...rest] = (personName ?? "").split(" ").filter(Boolean);
       const lastName = rest.join(" ");
 
@@ -184,7 +183,7 @@ export async function POST(request: Request) {
           membershipName: queueItem.transaction.productType ?? null,
           metadata: {
             ...((metadataPayload as Record<string, unknown>) ?? {}),
-            reference: queueItem.transaction.reference ?? null,
+            reference: reference ?? null,
           } as Prisma.InputJsonValue,
         },
       });
@@ -253,7 +252,7 @@ export async function POST(request: Request) {
       },
     });
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, message: responseMessage });
   } catch (error) {
     return NextResponse.json(
       { ok: false, message: error instanceof Error ? error.message : "Failed to update manual queue." },
