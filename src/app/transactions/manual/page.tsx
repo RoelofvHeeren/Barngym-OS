@@ -81,6 +81,7 @@ export default function ManualMatchPage() {
     firstName: "",
     lastName: "",
   });
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const load = async () => {
@@ -137,6 +138,27 @@ export default function ManualMatchPage() {
       return;
     }
     setQueue((prev) => prev.filter((item) => item.id !== queueId));
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.delete(queueId);
+      return next;
+    });
+  };
+
+  const handleBulkAttach = async (leadId: string | undefined) => {
+    if (!leadId || !selectedIds.size) return;
+    const response = await fetch("/api/manual-match/bulk", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ leadId, transactionIds: Array.from(selectedIds) }),
+    });
+    const payload = await response.json();
+    if (!payload.ok) {
+      alert(payload.message || "Failed to bulk attach");
+      return;
+    }
+    setQueue((prev) => prev.filter((item) => !selectedIds.has(item.transaction?.id || "")));
+    setSelectedIds(new Set());
   };
 
   const handleCreate = async (queueId: string) => {
@@ -225,6 +247,29 @@ export default function ManualMatchPage() {
           >
             Retry bulk match
           </button>
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              placeholder="Search name/email or paste Lead ID"
+              className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-primary"
+              list="lead-options-bulk"
+              onChange={(e) => setLeadIdInput((prev) => ({ ...prev, __bulk: e.target.value }))}
+            />
+            <datalist id="lead-options-bulk">
+              {leads.map((lead) => (
+                <option key={lead.id} value={lead.id}>
+                  {lead.label}
+                </option>
+              ))}
+            </datalist>
+            <button
+              className="rounded-full bg-white/10 px-4 py-2 text-xs font-semibold text-primary disabled:opacity-50"
+              onClick={() => handleBulkAttach(leadIdInput.__bulk)}
+              disabled={!selectedIds.size}
+            >
+              Attach selected ({selectedIds.size})
+            </button>
+          </div>
         </div>
       </section>
 
@@ -251,6 +296,26 @@ export default function ManualMatchPage() {
               <tbody>
                 {filteredQueue.map((item) => (
                   <tr key={item.id} className="rounded-2xl border border-white/20 bg-white/5 shadow-sm">
+                    <td className="px-3 align-top">
+                      <input
+                        type="checkbox"
+                        className="accent-emerald-300"
+                        checked={selectedIds.has(item.transaction?.id || "")}
+                        onChange={(e) => {
+                          const txId = item.transaction?.id;
+                          if (!txId) return;
+                          setSelectedIds((prev) => {
+                            const next = new Set(prev);
+                            if (e.target.checked) {
+                              next.add(txId);
+                            } else {
+                              next.delete(txId);
+                            }
+                            return next;
+                          });
+                        }}
+                      />
+                    </td>
                     <td className="py-3 pr-4 text-muted">
                       {item.transaction ? formatDateTime(item.transaction.occurredAt) : "—"}
                     </td>
