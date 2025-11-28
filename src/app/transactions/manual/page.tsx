@@ -151,6 +151,30 @@ export default function ManualMatchPage() {
             Back to ledger
           </Link>
         </div>
+        <div className="flex flex-wrap gap-3 text-sm">
+          <button
+            className="rounded-full bg-black px-4 py-2 text-xs font-semibold text-white"
+            onClick={async () => {
+              const source = window.prompt("Retry source: all, stripe, glofox, starling", "all") || "all";
+              const response = await fetch("/api/manual-match/retry", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ source }),
+              });
+              const payload = await response.json();
+              if (!payload.ok) {
+                alert(payload.message || "Retry failed");
+                return;
+              }
+              alert(
+                `Bulk retry complete. Matched ${payload.matched}, auto-mapped ${payload.autoMapped}, still unmatched ${payload.failed}. Refreshing…`
+              );
+              window.location.reload();
+            }}
+          >
+            Retry bulk match
+          </button>
+        </div>
       </section>
 
       <section className="glass-panel">

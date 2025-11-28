@@ -55,6 +55,7 @@ model Lead {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   transactions   Transaction[]
+  counterpartyMappings CounterpartyMapping[]
 
   @@index([email])
   @@index([phone])
@@ -128,4 +129,17 @@ model Goal {
   periodStart DateTime
   periodEnd   DateTime
   createdAt   DateTime @default(now())
+}
+
+model CounterpartyMapping {
+  id        String   @id @default(cuid())
+  provider  String
+  key       String
+  leadId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lead Lead @relation(fields: [leadId], references: [id])
+
+  @@unique([provider, key])
 }

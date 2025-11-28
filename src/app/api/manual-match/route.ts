@@ -85,6 +85,20 @@ export async function POST(request: Request) {
           confidence: "Matched",
         },
       });
+
+      if (
+        queueItem.transaction.provider === "Starling" &&
+        (queueItem.transaction.personName || queueItem.transaction.reference)
+      ) {
+        const key = (queueItem.transaction.personName || queueItem.transaction.reference || "").toLowerCase();
+        if (key.trim().length) {
+          await prisma.counterpartyMapping.upsert({
+            where: { provider_key: { provider: "Starling", key } },
+            update: { leadId },
+            create: { provider: "Starling", key, leadId },
+          });
+        }
+      }
     }
 
     if (action === "create") {
