@@ -237,7 +237,7 @@ export default function ManualMatchPage() {
           <div className="text-muted">No manual matches pending.</div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-base">
+            <table className="w-full text-left text-base border-separate border-spacing-y-3">
               <thead className="text-muted">
                 <tr>
                   <th className="pb-3 pr-4 font-medium">Occurred</th>
@@ -248,9 +248,9 @@ export default function ManualMatchPage() {
                   <th className="pb-3 pr-4 font-medium">Attach</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/5">
+              <tbody>
                 {filteredQueue.map((item) => (
-                  <tr key={item.id} className="rounded-2xl border border-white/10 bg-white/5">
+                  <tr key={item.id} className="rounded-2xl border border-white/20 bg-white/5 shadow-sm">
                     <td className="py-3 pr-4 text-muted">
                       {item.transaction ? formatDateTime(item.transaction.occurredAt) : "—"}
                     </td>
