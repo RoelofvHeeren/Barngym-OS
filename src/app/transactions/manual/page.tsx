@@ -206,16 +206,13 @@ export default function ManualMatchPage() {
 
   return (
     <div className="flex flex-col gap-6 text-primary">
-      {selectedIds.size > 0 ? (
-        <div className="fixed bottom-4 left-1/2 z-30 w-[90%] max-w-5xl -translate-x-1/2 rounded-2xl border border-white/15 bg-white/10 px-4 py-3 backdrop-blur">
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="text-sm text-primary font-semibold">
-              {selectedIds.size} selected
-            </span>
+      {selectedIds.size > 1 ? (
+        <div className="fixed bottom-4 left-1/2 z-30 w-[90%] max-w-3xl -translate-x-1/2 rounded-full border border-emerald-200/60 bg-white/90 px-4 py-3 shadow-lg shadow-emerald-900/10 backdrop-blur">
+          <div className="flex flex-wrap items-center justify-center gap-3 text-sm">
             <input
               type="text"
               placeholder="Search name/email or paste Lead ID"
-              className="min-w-[240px] flex-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-primary"
+              className="min-w-[220px] flex-1 rounded-full border border-emerald-200/60 bg-white px-3 py-2 text-xs text-primary"
               list="lead-options-floating"
               value={leadIdInput.__bulk ?? ""}
               onChange={(e) => setLeadIdInput((prev) => ({ ...prev, __bulk: e.target.value }))}
@@ -232,13 +229,13 @@ export default function ManualMatchPage() {
               onClick={() => handleBulkAttach(leadIdInput.__bulk)}
               disabled={!leadIdInput.__bulk}
             >
-              Attach selected
+              Attach selected ({selectedIds.size})
             </button>
             <button
               className="text-xs text-muted underline"
               onClick={() => setSelectedIds(new Set())}
             >
-              Clear selection
+              Clear
             </button>
           </div>
         </div>
