@@ -206,8 +206,8 @@ export default function ManualMatchPage() {
 
   return (
     <div className="flex flex-col gap-6 text-primary">
-      {selectedIds.size > 1 ? (
-        <div className="fixed bottom-4 left-1/2 z-30 w-[90%] max-w-3xl -translate-x-1/2 rounded-full border border-emerald-200/60 bg-white/90 px-4 py-3 shadow-lg shadow-emerald-900/10 backdrop-blur">
+      {selectedIds.size >= 2 ? (
+        <div className="fixed bottom-6 left-1/2 z-30 w-[90%] max-w-3xl -translate-x-1/2 rounded-full border border-emerald-200/70 bg-white/95 px-4 py-3 shadow-xl shadow-emerald-900/10 backdrop-blur">
           <div className="flex flex-wrap items-center justify-center gap-3 text-sm">
             <input
               type="text"
@@ -341,10 +341,10 @@ export default function ManualMatchPage() {
               <tbody>
                 {filteredQueue.map((item) => (
                   <tr key={item.id} className="rounded-2xl border border-white/20 bg-white/5 shadow-sm">
-                    <td className="px-3 align-top">
+                    <td className="px-3 align-middle text-center">
                       <input
                         type="checkbox"
-                        className="accent-emerald-300"
+                        className="h-5 w-5 accent-emerald-400"
                         checked={selectedIds.has(item.id)}
                         onChange={(e) => {
                           const id = item.id;
