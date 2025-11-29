@@ -207,8 +207,8 @@ export default function ManualMatchPage() {
   return (
     <div className="flex flex-col gap-6 text-primary">
       {selectedIds.size >= 2 ? (
-        <div className="fixed bottom-6 left-1/2 z-30 w-[90%] max-w-3xl -translate-x-1/2 rounded-full border border-emerald-200/70 bg-white/95 px-4 py-3 shadow-xl shadow-emerald-900/10 backdrop-blur">
-          <div className="flex flex-wrap items-center justify-center gap-3 text-sm">
+        <div className="fixed inset-x-0 bottom-4 z-40 flex justify-center pointer-events-none">
+          <div className="pointer-events-auto flex w-[90%] max-w-3xl flex-wrap items-center justify-center gap-3 rounded-full border border-emerald-200/70 bg-white/95 px-4 py-3 shadow-xl shadow-emerald-900/10 backdrop-blur">
             <input
               type="text"
               placeholder="Search name/email or paste Lead ID"
