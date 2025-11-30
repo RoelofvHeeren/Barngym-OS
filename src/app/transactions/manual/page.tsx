@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 
 type QueueItem = {
@@ -90,6 +91,7 @@ export default function ManualMatchPage() {
     reference: "",
   });
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -131,6 +133,10 @@ export default function ManualMatchPage() {
       }
     };
     loadLeads();
+  }, []);
+
+  useEffect(() => {
+    setMounted(true);
   }, []);
 
   const handleAttach = async (queueId: string, leadId: string | undefined) => {
@@ -204,42 +210,48 @@ export default function ManualMatchPage() {
     [queue, sourceFilter]
   );
 
+  const floatingBar =
+    mounted && selectedIds.size >= 2
+      ? createPortal(
+          <div className="fixed inset-x-0 top-auto bottom-4 z-[200] flex justify-center pointer-events-none">
+            <div className="pointer-events-auto flex w-[90%] max-w-3xl flex-wrap items-center justify-center gap-3 rounded-full border border-emerald-200/70 bg-white/95 px-4 py-3 shadow-xl shadow-emerald-900/10 backdrop-blur">
+              <input
+                type="text"
+                placeholder="Search name/email or paste Lead ID"
+                className="min-w-[220px] flex-1 rounded-full border border-emerald-200/60 bg-white px-3 py-2 text-xs text-primary"
+                list="lead-options-floating"
+                value={leadIdInput.__bulk ?? ""}
+                onChange={(e) => setLeadIdInput((prev) => ({ ...prev, __bulk: e.target.value }))}
+              />
+              <datalist id="lead-options-floating">
+                {leads.map((lead) => (
+                  <option key={lead.id} value={lead.id}>
+                    {lead.label}
+                  </option>
+                ))}
+              </datalist>
+              <button
+                className="rounded-full bg-black px-4 py-2 text-xs font-semibold text-white disabled:opacity-50"
+                onClick={() => handleBulkAttach(leadIdInput.__bulk)}
+                disabled={!leadIdInput.__bulk}
+              >
+                Attach selected ({selectedIds.size})
+              </button>
+              <button
+                className="text-xs text-muted underline"
+                onClick={() => setSelectedIds(new Set())}
+              >
+                Clear
+              </button>
+            </div>
+          </div>,
+          document.body
+        )
+      : null;
+
   return (
     <div className="flex flex-col gap-6 text-primary">
-      {selectedIds.size >= 2 ? (
-        <div className="fixed inset-x-0 bottom-4 z-40 flex justify-center pointer-events-none">
-          <div className="pointer-events-auto flex w-[90%] max-w-3xl flex-wrap items-center justify-center gap-3 rounded-full border border-emerald-200/70 bg-white/95 px-4 py-3 shadow-xl shadow-emerald-900/10 backdrop-blur">
-            <input
-              type="text"
-              placeholder="Search name/email or paste Lead ID"
-              className="min-w-[220px] flex-1 rounded-full border border-emerald-200/60 bg-white px-3 py-2 text-xs text-primary"
-              list="lead-options-floating"
-              value={leadIdInput.__bulk ?? ""}
-              onChange={(e) => setLeadIdInput((prev) => ({ ...prev, __bulk: e.target.value }))}
-            />
-            <datalist id="lead-options-floating">
-              {leads.map((lead) => (
-                <option key={lead.id} value={lead.id}>
-                  {lead.label}
-                </option>
-              ))}
-            </datalist>
-            <button
-              className="rounded-full bg-black px-4 py-2 text-xs font-semibold text-white disabled:opacity-50"
-              onClick={() => handleBulkAttach(leadIdInput.__bulk)}
-              disabled={!leadIdInput.__bulk}
-            >
-              Attach selected ({selectedIds.size})
-            </button>
-            <button
-              className="text-xs text-muted underline"
-              onClick={() => setSelectedIds(new Set())}
-            >
-              Clear
-            </button>
-          </div>
-        </div>
-      ) : null}
+      {floatingBar}
 
       <section className="glass-panel flex flex-col gap-3">
         <div className="flex items-center justify-between">
