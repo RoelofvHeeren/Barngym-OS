@@ -5,6 +5,7 @@ import {
   StarlingFeedItem,
   mapStarlingFeedItem,
   mapStripeCharge,
+  mapGlofoxPayment,
   upsertTransactions,
 } from "@/lib/transactions";
 
@@ -22,9 +23,18 @@ type StarlingBackfillRequest = {
   days?: number;
 };
 
+type GlofoxBackfillRequest = {
+  apiKey: string;
+  apiToken: string;
+  branchId: string;
+  startDate?: string; // ISO yyyy-mm-dd
+  endDate?: string; // ISO yyyy-mm-dd
+};
+
 type BackfillPayload = {
   stripe?: StripeBackfillRequest;
   starling?: StarlingBackfillRequest;
+  glofox?: GlofoxBackfillRequest;
 };
 
 type BackfillSummary = {
@@ -47,6 +57,13 @@ type StripeSecretPayload = {
 type StarlingSecretPayload = {
   accessToken?: string;
   webhookUrl?: string;
+};
+
+type GlofoxSecretPayload = {
+  apiKey?: string;
+  apiToken?: string;
+  branchId?: string;
+  webhookSalt?: string;
 };
 
 async function getConnectionSecret(provider: string) {
@@ -178,6 +195,51 @@ async function runStarlingBackfill(config: StarlingBackfillRequest): Promise<Bac
   };
 }
 
+async function runGlofoxBackfill(config: GlofoxBackfillRequest): Promise<BackfillRunResult> {
+  const today = new Date();
+  const yesterday = new Date(Date.now() - DAY_MS);
+  const start_date = config.startDate ?? yesterday.toISOString().slice(0, 10);
+  const end_date = config.endDate ?? today.toISOString().slice(0, 10);
+
+  const resp = await fetch("https://gf-api.aws.glofox.com/prod/Analytics/report", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": config.apiKey,
+      "x-glofox-api-token": config.apiToken,
+      "x-glofox-branch-id": config.branchId,
+    },
+    body: JSON.stringify({
+      branch_id: config.branchId,
+      start_date,
+      end_date,
+    }),
+  });
+
+  if (!resp.ok) {
+    const body = await resp.text();
+    throw new Error(`Glofox report failed (${resp.status}). ${body || "No details"}`);
+  }
+
+  const payload = await resp.json().catch(() => null);
+  const payments: Record<string, unknown>[] =
+    (payload?.payments as Record<string, unknown>[]) ??
+    (payload?.data?.payments as Record<string, unknown>[]) ??
+    (Array.isArray(payload) ? payload : []);
+
+  const transactions = payments.map(mapGlofoxPayment);
+
+  return {
+    summary: {
+      source: "Glofox",
+      status: "success",
+      message: `Fetched ${transactions.length} payment${transactions.length === 1 ? "" : "s"} from ${start_date} to ${end_date}.`,
+      records: transactions.length,
+    },
+    transactions,
+  };
+}
+
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as BackfillPayload;
@@ -262,6 +324,43 @@ export async function POST(request: Request) {
         source: "Starling",
         status: "skipped",
         message: "No stored Starling credentials. Connect Starling first.",
+      });
+    }
+
+    const glofoxSecretRecord = await getConnectionSecret("glofox");
+    const storedGlofoxSecret = (glofoxSecretRecord?.secret as GlofoxSecretPayload | null) ?? null;
+    const glofoxApiKey = body?.glofox?.apiKey?.trim() || storedGlofoxSecret?.apiKey;
+    const glofoxApiToken = body?.glofox?.apiToken?.trim() || storedGlofoxSecret?.apiToken;
+    const glofoxBranchId = body?.glofox?.branchId?.trim() || storedGlofoxSecret?.branchId;
+
+    if (glofoxApiKey && glofoxApiToken && glofoxBranchId) {
+      try {
+        const result = await runGlofoxBackfill({
+          apiKey: glofoxApiKey,
+          apiToken: glofoxApiToken,
+          branchId: glofoxBranchId,
+          startDate: body?.glofox?.startDate,
+          endDate: body?.glofox?.endDate,
+        });
+        const stats = await upsertTransactions(result.transactions);
+        pushSummary({
+          ...result.summary,
+          message: `${result.summary.message} Stored ${stats.added} new entr${
+            stats.added === 1 ? "y" : "ies"
+          }.`,
+        });
+      } catch (error) {
+        pushSummary({
+          source: "Glofox",
+          status: "error",
+          message: error instanceof Error ? error.message : "Glofox backfill failed unexpectedly.",
+        });
+      }
+    } else {
+      pushSummary({
+        source: "Glofox",
+        status: "skipped",
+        message: "No stored Glofox credentials. Connect Glofox first.",
       });
     }
 

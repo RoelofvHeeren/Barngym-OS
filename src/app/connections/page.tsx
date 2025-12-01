@@ -400,7 +400,43 @@ export default function ConnectionsPage() {
               {glofoxStatus === "loading" ? "Testing..." : "Test Connection"}
             </button>
             <button className="chip text-xs">Upload CSV Export</button>
-            <button className="chip text-xs">Schedule daily import</button>
+            <button
+              className="chip text-xs"
+              onClick={async () => {
+                setGlofoxStatus("loading");
+                setGlofoxMessage("");
+                try {
+                  const response = await fetch("/api/backfill", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      glofox: {
+                        branchId: glofoxStudio || undefined,
+                        // dates optional; server defaults to yesterday->today
+                      },
+                    }),
+                  });
+                  const result = await response.json();
+                  if (!response.ok || !result.ok) {
+                    throw new Error(
+                      result?.summaries?.find((s: any) => s.source === "Glofox")?.message ||
+                        result.message ||
+                        "Backfill failed"
+                    );
+                  }
+                  const summary =
+                    result?.summaries?.find((s: any) => s.source === "Glofox")?.message ||
+                    "Backfill triggered.";
+                  setGlofoxStatus("success");
+                  setGlofoxMessage(summary);
+                } catch (error) {
+                  setGlofoxStatus("error");
+                  setGlofoxMessage(error instanceof Error ? error.message : "Backfill failed.");
+                }
+              }}
+            >
+              Run backfill
+            </button>
           </div>
           {glofoxStatus !== "idle" && (
             <p
