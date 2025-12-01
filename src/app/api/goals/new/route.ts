@@ -7,25 +7,25 @@ export const runtime = "nodejs";
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as {
-      year: number;
-      quarter?: number | null;
-      revenueStream: string;
+      category: string;
+      period: string;
       targetAmount: number;
+      notes?: string;
     };
 
-    if (!body.year || !body.revenueStream || !body.targetAmount) {
+    if (!body.category || !body.period || body.targetAmount === undefined) {
       return NextResponse.json(
-        { ok: false, message: "Provide year, revenueStream, and targetAmount." },
+        { ok: false, message: "Provide category, period, and targetAmount." },
         { status: 400 }
       );
     }
 
     const goal = await prisma.revenueGoal.create({
       data: {
-        year: body.year,
-        quarter: body.quarter ?? null,
-        revenueStream: body.revenueStream,
-        targetAmount: new Prisma.Decimal(body.targetAmount),
+        category: body.category,
+        period: body.period,
+        targetAmount: body.targetAmount,
+        notes: body.notes,
       },
     });
 
@@ -42,10 +42,10 @@ export async function PUT(request: Request) {
   try {
     const body = (await request.json()) as {
       id: string;
-      year?: number;
-      quarter?: number | null;
-      revenueStream?: string;
+      category?: string;
+      period?: string;
       targetAmount?: number;
+      notes?: string;
     };
 
     if (!body.id) {
@@ -55,11 +55,10 @@ export async function PUT(request: Request) {
     const goal = await prisma.revenueGoal.update({
       where: { id: body.id },
       data: {
-        year: body.year ?? undefined,
-        quarter: body.quarter ?? undefined,
-        revenueStream: body.revenueStream ?? undefined,
-        targetAmount:
-          body.targetAmount !== undefined ? new Prisma.Decimal(body.targetAmount) : undefined,
+        category: body.category ?? undefined,
+        period: body.period ?? undefined,
+        targetAmount: body.targetAmount ?? undefined,
+        notes: body.notes ?? undefined,
       },
     });
 

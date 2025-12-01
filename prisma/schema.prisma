@@ -101,13 +101,14 @@ model Transaction {
 }
 
 model RevenueGoal {
-  id            String   @id @default(uuid())
-  year          Int
-  quarter       Int?
-  revenueStream String
-  targetAmount  Decimal
+  id            String   @id @default(cuid())
+  category      String   // e.g. "Total Revenue", "PT", "Classes", "Online", "Corporate", "Retreats", "Q1", etc.
+  period        String   // "Yearly", "Quarterly", "Monthly"
+  targetAmount  Float
+  currentAmount Float    @default(0)
+  progress      Float    @default(0)
+  notes         String?
   createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
 }
 
 model SyncLog {

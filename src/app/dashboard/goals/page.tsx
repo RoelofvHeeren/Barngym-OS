@@ -1,29 +1,29 @@
- "use client";
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
-
-type Stream = "total" | "classes" | "pt" | "online_coaching" | "corporate" | "retreats";
+import Link from "next/link";
 
 type Goal = {
   id: string;
-  year: number;
-  quarter: number | null;
-  revenueStream: Stream;
-  targetAmount: string;
+  category: string;
+  period: string;
+  targetAmount: number;
+  currentAmount: number;
+  progress: number;
+  notes?: string | null;
 };
 
-type AchievedEntry = {
-  stream: Stream;
-  ytd: number;
-  qtd: number;
-  month: number;
+type RevenueTotals = {
+  total: number;
+  pt: number;
+  classes: number;
+  online: number;
+  corporate: number;
+  retreats: number;
+  yearToDate: number;
 };
 
-type ApiPayload = {
-  ok: boolean;
-  goals: Goal[];
-  achieved: AchievedEntry[];
-};
+type ApiPayload = { ok: boolean; goals: Goal[]; revenue: RevenueTotals };
 
 function progressColor(pct: number) {
   if (pct >= 100) return "bg-emerald-500";
@@ -58,10 +58,10 @@ export default function GoalsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
-    year: new Date().getFullYear(),
-    quarter: "",
-    revenueStream: "total" as Stream,
+    category: "Total Revenue",
+    period: "Yearly",
     targetAmount: "",
+    notes: "",
   });
 
   const load = async () => {
@@ -89,65 +89,80 @@ export default function GoalsPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          year: Number(form.year),
-          quarter: form.quarter ? Number(form.quarter) : null,
-          revenueStream: form.revenueStream,
+          category: form.category,
+          period: form.period,
           targetAmount: Number(form.targetAmount),
+          notes: form.notes || undefined,
         }),
       });
       const json = await resp.json();
       if (!json.ok) throw new Error(json.message || "Failed to add goal.");
-      setForm((prev) => ({ ...prev, targetAmount: "" }));
+      setForm((p) => ({ ...p, targetAmount: "", notes: "" }));
       load();
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to add goal.");
     }
   };
 
-  const achieved = data?.achieved ?? [];
   const goals = data?.goals ?? [];
-  const streams: Stream[] = ["total", "classes", "pt", "online_coaching", "corporate", "retreats"];
+  const revenue = data?.revenue ?? {
+    total: 0,
+    pt: 0,
+    classes: 0,
+    online: 0,
+    corporate: 0,
+    retreats: 0,
+    yearToDate: 0,
+  };
 
-  const byStream = useMemo(() => {
-    const map = new Map<Stream, { goal: number; actual: number }>();
-    streams.forEach((s) => {
-      const goal = goals
-        .filter((g) => g.revenueStream === s && g.quarter == null)
-        .reduce((sum, g) => sum + Number(g.targetAmount), 0);
-      const actual = achieved.find((a) => a.stream === s)?.ytd ?? 0;
-      map.set(s, { goal, actual });
-    });
-    return map;
-  }, [goals, achieved]);
-
-  const currentYear = new Date().getFullYear();
   const yearlyGoal = goals
-    .filter((g) => g.revenueStream === "total" && g.year === currentYear && g.quarter == null)
-    .reduce((sum, g) => sum + Number(g.targetAmount), 0);
-  const yearlyActual = achieved.find((a) => a.stream === "total")?.ytd ?? 0;
+    .filter((g) => g.category.toLowerCase() === "total revenue" && g.period.toLowerCase() === "yearly")
+    .reduce((sum, g) => sum + g.targetAmount, 0);
+  const yearlyActual = revenue.total;
 
   const pctYear = yearlyGoal > 0 ? (yearlyActual / yearlyGoal) * 100 : 0;
   const remaining = Math.max(yearlyGoal - yearlyActual, 0);
   const daysPassed =
-    (Date.now() - new Date(currentYear, 0, 1).getTime()) / (1000 * 60 * 60 * 24) + 1;
+    (Date.now() - new Date(new Date().getFullYear(), 0, 1).getTime()) /
+      (1000 * 60 * 60 * 24) +
+    1;
   const velocity = daysPassed > 0 ? yearlyActual / daysPassed : 0;
   const projected = velocity * 365;
-  const pace = projected >= yearlyGoal ? "On pace" : "Behind";
+  const pace = projected >= yearlyGoal ? "Above pace — keep pressure!" : "Below projection — adjust!";
 
-  const quarter = Math.floor(new Date().getMonth() / 3) + 1;
-  const quarterGoal = goals
-    .filter((g) => g.revenueStream === "total" && g.year === currentYear && g.quarter === quarter)
-    .reduce((sum, g) => sum + Number(g.targetAmount), 0);
-  const quarterActual = achieved.find((a) => a.stream === "total")?.qtd ?? 0;
-  const pctQuarter = quarterGoal > 0 ? (quarterActual / quarterGoal) * 100 : 0;
+  const quarterlyGoals = ["Q1", "Q2", "Q3", "Q4"].map((q) => {
+    const goal = goals
+      .filter((g) => g.category.toLowerCase() === q.toLowerCase() && g.period.toLowerCase() === "quarterly")
+      .reduce((sum, g) => sum + g.targetAmount, 0);
+    const actual = revenue.total; // approximation until quarter tagging exists
+    const pct = goal > 0 ? (actual / goal) * 100 : 0;
+    return { q, goal, actual, pct };
+  });
+
+  const streamCards = [
+    { key: "PT", actual: revenue.pt },
+    { key: "Classes", actual: revenue.classes },
+    { key: "Online Coaching", actual: revenue.online },
+    { key: "Corporate Wellness", actual: revenue.corporate },
+    { key: "Retreats", actual: revenue.retreats },
+  ].map((s) => {
+    const goalVal = goals
+      .filter(
+        (g) =>
+          g.category.toLowerCase() === s.key.toLowerCase() &&
+          g.period.toLowerCase() === "yearly"
+      )
+      .reduce((sum, g) => sum + g.targetAmount, 0);
+    return { ...s, goal: goalVal };
+  });
 
   return (
     <div className="flex flex-col gap-6 p-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-xs uppercase tracking-[0.35em] text-muted">Dashboard</p>
-          <h1 className="text-3xl font-semibold text-primary">Revenue Goals</h1>
-          <p className="text-sm text-muted">Targets vs real performance. Live data.</p>
+          <p className="text-xs uppercase tracking-[0.35em] text-muted">Business Goals</p>
+          <h1 className="text-3xl font-semibold text-primary">Goals & Performance</h1>
+          <p className="text-sm text-muted">Targets vs real performance. Live from unified transactions.</p>
         </div>
         <button
           className="rounded-full border border-white/10 px-4 py-2 text-sm text-primary"
@@ -157,28 +172,32 @@ export default function GoalsPage() {
         </button>
       </div>
 
-      {error && <div className="rounded-xl border border-rose-400/50 bg-rose-500/10 p-3 text-rose-100">{error}</div>}
+      {error && (
+        <div className="rounded-xl border border-rose-400/50 bg-rose-500/10 p-3 text-rose-100">
+          {error}
+        </div>
+      )}
       {loading && <div className="text-muted">Loading…</div>}
 
       {!loading && (
         <>
-          {/* Yearly overview */}
-          <section className="glass-panel grid gap-4 p-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="text-xs uppercase tracking-[0.35em] text-muted">Yearly Overview</p>
-                <h2 className="text-2xl font-semibold text-primary">{currentYear}</h2>
-              </div>
-              <div className="text-right">
-                <p className="text-sm text-muted">Goal: {formatCurrency(yearlyGoal)}</p>
-                <p className="text-sm text-primary">Achieved: {formatCurrency(yearlyActual)}</p>
-                <p className="text-sm text-muted">
-                  Remaining: {formatCurrency(remaining)} · {pace} · Pace: {formatCurrency(velocity)}/day
-                </p>
-                <p className="text-sm text-muted">
-                  Projected: {formatCurrency(projected)} ({pctYear.toFixed(1)}%)
-                </p>
-              </div>
+          {/* Summary */}
+          <section className="glass-panel p-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-xs uppercase tracking-[0.35em] text-muted">Annual Target</p>
+              <h2 className="text-2xl font-semibold text-primary">{formatCurrency(yearlyGoal)}</h2>
+              <p className="text-sm text-muted">
+                Revenue to date: {formatCurrency(yearlyActual)} ({pctYear.toFixed(1)}%)
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="text-sm text-muted">Remaining: {formatCurrency(remaining)}</p>
+              <p className="text-sm text-muted">
+                Pace: {formatCurrency(velocity)}/day · Projected: {formatCurrency(projected)}
+              </p>
+              <p className={`text-sm font-semibold ${pace.includes("Above") ? "text-emerald-400" : "text-rose-300"}`}>
+                {pace}
+              </p>
             </div>
             <div className="h-3 w-full rounded-full bg-white/10">
               <div
@@ -188,49 +207,40 @@ export default function GoalsPage() {
             </div>
           </section>
 
-          {/* Quarterly breakdown */}
+          {/* Yearly goal card */}
           <section className="glass-panel p-4">
-            <p className="text-xs uppercase tracking-[0.35em] text-muted">Quarterly</p>
-            <div className="mt-3 grid grid-cols-4 gap-3 text-sm">
-              {[1, 2, 3, 4].map((q) => {
-                const goalQ = goals
-                  .filter((g) => g.revenueStream === "total" && g.year === currentYear && g.quarter === q)
-                  .reduce((sum, g) => sum + Number(g.targetAmount), 0);
-                const actualQ = achieved.find((a) => a.stream === "total")?.qtd ?? 0;
-                const pctQ = goalQ > 0 ? (actualQ / goalQ) * 100 : 0;
-                return (
-                  <div key={q} className="rounded-2xl border border-white/10 bg-white/5 p-3">
-                    <p className="text-sm font-semibold text-primary">Q{q}</p>
-                    <p className="text-xs text-muted">Goal: {formatCurrency(goalQ)}</p>
-                    <p className="text-xs text-primary">Actual: {formatCurrency(actualQ)}</p>
-                    <div className="mt-2 h-2 w-full rounded-full bg-white/10">
-                      <div
-                        className={`h-full rounded-full ${progressColor(pctQ)}`}
-                        style={{ width: `${Math.min(pctQ, 100)}%` }}
-                      />
-                    </div>
-                    <p className="text-xs text-muted mt-1">{pctQ.toFixed(1)}%</p>
+            <p className="text-xs uppercase tracking-[0.35em] text-muted">Yearly Goal</p>
+            <ProgressBox name="Total Revenue" target={yearlyGoal} actual={yearlyActual} />
+          </section>
+
+          {/* Quarterly grid */}
+          <section className="glass-panel p-4">
+            <p className="text-xs uppercase tracking-[0.35em] text-muted">Quarterly Breakdown</p>
+            <div className="mt-3 grid gap-3 md:grid-cols-4">
+              {quarterlyGoals.map((q) => (
+                <div key={q.q} className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                  <p className="text-sm font-semibold text-primary">{q.q}</p>
+                  <p className="text-xs text-muted">Goal: {formatCurrency(q.goal)}</p>
+                  <p className="text-xs text-primary">Actual: {formatCurrency(q.actual)}</p>
+                  <div className="mt-2 h-2 w-full rounded-full bg-white/10">
+                    <div
+                      className={`h-full rounded-full ${progressColor(q.pct)}`}
+                      style={{ width: `${Math.min(q.pct, 100)}%` }}
+                    />
                   </div>
-                );
-              })}
+                  <p className="text-xs text-muted mt-1">{q.pct.toFixed(1)}%</p>
+                </div>
+              ))}
             </div>
           </section>
 
-          {/* Streams */}
+          {/* Stream performance */}
           <section className="glass-panel p-4">
-            <p className="text-xs uppercase tracking-[0.35em] text-muted">Streams</p>
+            <p className="text-xs uppercase tracking-[0.35em] text-muted">Revenue Streams</p>
             <div className="mt-3 grid gap-3 md:grid-cols-3">
-              {streams.map((s) => {
-                const entry = byStream.get(s)!;
-                return (
-                  <ProgressBox
-                    key={s}
-                    name={s.replace("_", " ").toUpperCase()}
-                    target={entry.goal}
-                    actual={entry.actual}
-                  />
-                );
-              })}
+              {streamCards.map((s) => (
+                <ProgressBox key={s.key} name={s.key} target={s.goal} actual={s.actual} />
+              ))}
             </div>
           </section>
 
@@ -240,28 +250,18 @@ export default function GoalsPage() {
             <div className="mt-3 grid gap-3 md:grid-cols-4">
               <input
                 className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm"
-                type="number"
-                placeholder="Year"
-                value={form.year}
-                onChange={(e) => setForm((p) => ({ ...p, year: Number(e.target.value) }))}
-              />
-              <input
-                className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm"
-                type="number"
-                placeholder="Quarter (1-4 optional)"
-                value={form.quarter}
-                onChange={(e) => setForm((p) => ({ ...p, quarter: e.target.value }))}
+                placeholder="Category (e.g. PT, Q1)"
+                value={form.category}
+                onChange={(e) => setForm((p) => ({ ...p, category: e.target.value }))}
               />
               <select
                 className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm"
-                value={form.revenueStream}
-                onChange={(e) => setForm((p) => ({ ...p, revenueStream: e.target.value as Stream }))}
+                value={form.period}
+                onChange={(e) => setForm((p) => ({ ...p, period: e.target.value }))}
               >
-                {streams.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
+                <option>Yearly</option>
+                <option>Quarterly</option>
+                <option>Monthly</option>
               </select>
               <input
                 className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm"
@@ -269,6 +269,12 @@ export default function GoalsPage() {
                 placeholder="Target amount"
                 value={form.targetAmount}
                 onChange={(e) => setForm((p) => ({ ...p, targetAmount: e.target.value }))}
+              />
+              <input
+                className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm"
+                placeholder="Notes"
+                value={form.notes}
+                onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
               />
             </div>
             <div className="mt-3 flex gap-2">
@@ -288,28 +294,30 @@ export default function GoalsPage() {
                     className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-3 py-2"
                   >
                     <span>
-                      {g.year} {g.quarter ? `Q${g.quarter}` : "Year"} · {g.revenueStream} ·{" "}
-                      {formatCurrency(Number(g.targetAmount))}
+                      {g.category} · {g.period} · {formatCurrency(g.targetAmount)}
                     </span>
-                    <button
-                      className="text-xs text-rose-300 underline"
-                      onClick={async () => {
-                        if (!confirm("Delete goal?")) return;
-                        const resp = await fetch("/api/goals/new", {
-                          method: "DELETE",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ id: g.id }),
-                        });
-                        const json = await resp.json();
-                        if (!json.ok) {
-                          alert(json.message || "Delete failed");
-                          return;
-                        }
-                        load();
-                      }}
-                    >
-                      Delete
-                    </button>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-muted">{g.notes}</span>
+                      <button
+                        className="text-xs text-rose-300 underline"
+                        onClick={async () => {
+                          if (!confirm("Delete goal?")) return;
+                          const resp = await fetch("/api/goals/new", {
+                            method: "DELETE",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ id: g.id }),
+                          });
+                          const json = await resp.json();
+                          if (!json.ok) {
+                            alert(json.message || "Delete failed");
+                            return;
+                          }
+                          load();
+                        }}
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
