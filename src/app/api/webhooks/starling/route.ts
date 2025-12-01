@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { NormalizedTransaction, StarlingFeedItem, mapStarlingFeedItem, upsertTransactions } from "@/lib/transactions";
+import {
+  NormalizedTransaction,
+  StarlingFeedItem,
+  mapStarlingFeedItem,
+  upsertTransactions,
+  isIncomingStarling,
+} from "@/lib/transactions";
 
 export const runtime = "nodejs";
 
@@ -37,10 +43,10 @@ export async function POST(request: Request) {
     }
 
     const payload = (await request.json().catch(() => ({}))) as Record<string, unknown>;
-    const feedItems = extractFeedItems(payload).filter(Boolean);
+    const feedItems = extractFeedItems(payload).filter(Boolean).filter(isIncomingStarling);
 
     if (!feedItems.length) {
-      return NextResponse.json({ ok: true, message: "No feed items provided." });
+      return NextResponse.json({ ok: true, message: "No incoming feed items provided." });
     }
 
     const normalized: NormalizedTransaction[] = feedItems.map((item) => mapStarlingFeedItem(item));

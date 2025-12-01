@@ -189,6 +189,19 @@ export type StarlingFeedItem = {
   spendingCategory?: string;
 };
 
+export function isIncomingStarling(item: StarlingFeedItem): boolean {
+  const dir = (item?.direction ?? "").toString().toUpperCase();
+  const amountMinor =
+    item?.amount?.minorUnits ??
+    item?.totalAmount?.minorUnits ??
+    item?.sourceAmount?.minorUnits ??
+    0;
+  if (dir) {
+    return dir === "IN" || dir === "CREDIT";
+  }
+  return (amountMinor ?? 0) > 0;
+}
+
 type GlofoxPaymentPayload = {
   id?: string | number;
   payment_id?: string | number;

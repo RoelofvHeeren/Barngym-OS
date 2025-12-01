@@ -7,6 +7,7 @@ import {
   mapStripeCharge,
   mapGlofoxPayment,
   upsertTransactions,
+  isIncomingStarling,
 } from "@/lib/transactions";
 
 export const runtime = "nodejs";
@@ -180,7 +181,8 @@ async function runStarlingBackfill(config: StarlingBackfillRequest): Promise<Bac
     (Array.isArray(feedPayload?.items) && (feedPayload.items as StarlingFeedItem[])) ||
     [];
 
-  const transactions = feedItems.map(mapStarlingFeedItem);
+  const incomingFeedItems = feedItems.filter(isIncomingStarling);
+  const transactions = incomingFeedItems.map(mapStarlingFeedItem);
 
   return {
     summary: {
