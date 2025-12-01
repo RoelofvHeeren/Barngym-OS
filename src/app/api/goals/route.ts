@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { startOfYear } from "date-fns";
+import { startOfQuarter, startOfYear, endOfQuarter } from "date-fns";
 
 export const runtime = "nodejs";
 
@@ -30,13 +30,19 @@ function classifyStream(provider: string, productType?: string | null): string {
   return "Total Revenue";
 }
 
-async function aggregateRevenue() {
+async function aggregateRevenue(targetYear: number) {
+  const yearStart = startOfYear(new Date(targetYear, 0, 1));
+  const yearEnd = new Date(targetYear, 11, 31, 23, 59, 59, 999);
+  const qStart = startOfQuarter(new Date());
+  const qEnd = endOfQuarter(new Date());
+
   const txs = await prisma.transaction.findMany({
-    where: { amountMinor: { gt: 0 } },
+    where: {
+      amountMinor: { gt: 0 },
+      occurredAt: { gte: yearStart, lte: yearEnd },
+    },
     select: { amountMinor: true, provider: true, productType: true, occurredAt: true },
   });
-
-  const yearStart = startOfYear(new Date()).getTime();
 
   const totals = {
     total: 0,
@@ -46,12 +52,23 @@ async function aggregateRevenue() {
     corporate: 0,
     retreats: 0,
     yearToDate: 0,
+    quarterTotals: { 1: 0, 2: 0, 3: 0, 4: 0 } as Record<number, number>,
   };
 
   for (const tx of txs) {
     const amount = (tx.amountMinor ?? 0) / 100;
     totals.total += amount;
-    if (tx.occurredAt.getTime() >= yearStart) totals.yearToDate += amount;
+    totals.yearToDate += amount;
+    const month = tx.occurredAt.getMonth(); // 0-based
+    const quarter = Math.floor(month / 3) + 1;
+    totals.quarterTotals[quarter] = (totals.quarterTotals[quarter] ?? 0) + amount;
+
+    // If we're in the target year AND current quarter, accumulate for QTD as well
+    const t = tx.occurredAt.getTime();
+    if (t >= qStart.getTime() && t <= qEnd.getTime()) {
+      totals.quarterTotals[Math.floor(new Date().getMonth() / 3) + 1] += 0; // already counted above
+    }
+
     const stream = classifyStream(tx.provider ?? "", tx.productType);
     if (stream === "PT") totals.pt += amount;
     if (stream === "Classes") totals.classes += amount;
@@ -65,8 +82,28 @@ async function aggregateRevenue() {
 
 export async function GET() {
   try {
-    const goals = await prisma.revenueGoal.findMany();
-    const revenue = await aggregateRevenue();
+    const targetYear = 2026;
+
+    let goals = await prisma.revenueGoal.findMany();
+    if (goals.length === 0) {
+      // Auto-seed if empty (baseline 2026 plan)
+      const seedGoals = [
+        { category: "Total Revenue", period: "Yearly", targetAmount: 500000, notes: "2026 total target" },
+        { category: "Q1", period: "Quarterly", targetAmount: 125000, notes: "Q1 target" },
+        { category: "Q2", period: "Quarterly", targetAmount: 125000, notes: "Q2 target" },
+        { category: "Q3", period: "Quarterly", targetAmount: 125000, notes: "Q3 target" },
+        { category: "Q4", period: "Quarterly", targetAmount: 125000, notes: "Q4 target" },
+        { category: "PT", period: "Yearly", targetAmount: 200000, notes: "In-person PT" },
+        { category: "Classes", period: "Yearly", targetAmount: 140000, notes: "Classes stream" },
+        { category: "Online Coaching", period: "Yearly", targetAmount: 60000, notes: "Online coaching + community" },
+        { category: "Corporate Wellness", period: "Yearly", targetAmount: 50000, notes: "Corporate" },
+        { category: "Retreats", period: "Yearly", targetAmount: 50000, notes: "Retreats" },
+      ];
+      await prisma.revenueGoal.createMany({ data: seedGoals });
+      goals = await prisma.revenueGoal.findMany();
+    }
+
+    const revenue = await aggregateRevenue(targetYear);
 
     const updatedGoals: Goal[] = goals.map((goal) => {
       const target = goal.targetAmount;

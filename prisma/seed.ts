@@ -10,19 +10,19 @@ async function main() {
   }
 
   const baseGoals = [
-    // Yearly total
-    { category: "Total Revenue", period: "Yearly", targetAmount: 600000, notes: "Annual target" },
-    // Quarterly totals
-    { category: "Q1", period: "Quarterly", targetAmount: 150000, notes: "Q1 target" },
-    { category: "Q2", period: "Quarterly", targetAmount: 150000, notes: "Q2 target" },
-    { category: "Q3", period: "Quarterly", targetAmount: 150000, notes: "Q3 target" },
-    { category: "Q4", period: "Quarterly", targetAmount: 150000, notes: "Q4 target" },
+    // Yearly total (per 2026 plan PDF)
+    { category: "Total Revenue", period: "Yearly", targetAmount: 500000, notes: "2026 total target" },
+    // Quarterly totals (even split)
+    { category: "Q1", period: "Quarterly", targetAmount: 125000, notes: "Q1 target" },
+    { category: "Q2", period: "Quarterly", targetAmount: 125000, notes: "Q2 target" },
+    { category: "Q3", period: "Quarterly", targetAmount: 125000, notes: "Q3 target" },
+    { category: "Q4", period: "Quarterly", targetAmount: 125000, notes: "Q4 target" },
     // Streams yearly
-    { category: "PT", period: "Yearly", targetAmount: 200000, notes: "PT stream" },
-    { category: "Classes", period: "Yearly", targetAmount: 120000, notes: "Classes stream" },
-    { category: "Online Coaching", period: "Yearly", targetAmount: 150000, notes: "Online stream" },
-    { category: "Corporate Wellness", period: "Yearly", targetAmount: 80000, notes: "Corporate stream" },
-    { category: "Retreats", period: "Yearly", targetAmount: 50000, notes: "Retreats stream" },
+    { category: "PT", period: "Yearly", targetAmount: 200000, notes: "In-person PT" },
+    { category: "Classes", period: "Yearly", targetAmount: 140000, notes: "Classes stream" },
+    { category: "Online Coaching", period: "Yearly", targetAmount: 60000, notes: "Online coaching + community" },
+    { category: "Corporate Wellness", period: "Yearly", targetAmount: 50000, notes: "Corporate" },
+    { category: "Retreats", period: "Yearly", targetAmount: 50000, notes: "Retreats" },
   ];
 
   // Cast to any to avoid compile-time drift if client types are stale before migration.

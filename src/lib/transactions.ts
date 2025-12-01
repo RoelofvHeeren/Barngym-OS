@@ -191,14 +191,14 @@ export type StarlingFeedItem = {
 
 export function isIncomingStarling(item: StarlingFeedItem): boolean {
   const dir = (item?.direction ?? "").toString().toUpperCase();
+  if (dir) {
+    return dir === "IN" || dir === "CREDIT";
+  }
   const amountMinor =
     item?.amount?.minorUnits ??
     item?.totalAmount?.minorUnits ??
     item?.sourceAmount?.minorUnits ??
     0;
-  if (dir) {
-    return dir === "IN" || dir === "CREDIT";
-  }
   return (amountMinor ?? 0) > 0;
 }
 

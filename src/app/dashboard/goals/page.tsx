@@ -113,6 +113,7 @@ export default function GoalsPage() {
     corporate: 0,
     retreats: 0,
     yearToDate: 0,
+    quarterTotals: { 1: 0, 2: 0, 3: 0, 4: 0 } as Record<number, number>,
   };
 
   const yearlyGoal = goals
@@ -134,7 +135,7 @@ export default function GoalsPage() {
     const goal = goals
       .filter((g) => g.category.toLowerCase() === q.toLowerCase() && g.period.toLowerCase() === "quarterly")
       .reduce((sum, g) => sum + g.targetAmount, 0);
-    const actual = revenue.total; // approximation until quarter tagging exists
+    const actual = (revenue.quarterTotals as Record<number, number>)[Number(q.replace("Q", ""))] ?? 0;
     const pct = goal > 0 ? (actual / goal) * 100 : 0;
     return { q, goal, actual, pct };
   });
