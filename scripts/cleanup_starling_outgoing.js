@@ -2,18 +2,24 @@
  * One-off helper to remove outgoing Starling feed items from the DB.
  * Keeps only incoming (credits). Safe to run multiple times.
  */
-const { PrismaClient } = require("@prisma/client");
+// Use the generated client at src/generated/prisma (output is set in prisma/schema.prisma)
+const { PrismaClient } = require("../src/generated/prisma");
 
 async function main() {
   const prisma = new PrismaClient();
   try {
-    const result = await prisma.transaction.deleteMany({
-      where: {
-        provider: "Starling",
-        amountMinor: { lt: 0 },
-      },
-    });
-    console.log(`Removed ${result.count} outgoing Starling transactions.`);
+    const deleted = await prisma.$executeRawUnsafe(`
+      DELETE FROM "Transaction"
+      WHERE provider = 'Starling'
+      AND (
+        "amountMinor" < 0
+        OR (
+          "metadata"->>'direction' IS NOT NULL
+          AND upper("metadata"->>'direction') NOT IN ('IN', 'CREDIT')
+        )
+      );
+    `);
+    console.log(`Removed ${deleted} outgoing Starling transactions.`);
   } finally {
     await prisma.$disconnect();
   }
