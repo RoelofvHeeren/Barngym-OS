@@ -188,7 +188,7 @@ export default function ConnectionsPage() {
         body: JSON.stringify({
           apiKey: glofoxKey,
           apiToken: glofoxToken,
-          studioId: glofoxStudio,
+          branchId: glofoxStudio,
           webhookSalt: glofoxSalt,
         }),
       });
@@ -200,8 +200,8 @@ export default function ConnectionsPage() {
       setGlofoxMessage(result.message || "Connection succeeded.");
       setGlofoxKey("");
       setGlofoxToken("");
-      if (result.studioId) {
-        setGlofoxStudio(result.studioId);
+      if (result.branchId) {
+        setGlofoxStudio(result.branchId);
       }
       setGlofoxSalt("");
       await refreshConnectionState();
@@ -358,7 +358,7 @@ export default function ConnectionsPage() {
             <p className="text-xs uppercase tracking-[0.35em] text-muted">Glofox</p>
             <h3 className="mt-2 text-2xl font-semibold">Studio Ops</h3>
             <p className="text-sm text-muted">
-              API or CSV fallback. Choose the access model that fits your contract.
+              API or CSV fallback. Use the live API key, token, and branch ID from Glofox support. Add webhook salt to validate events.
             </p>
           </div>
           <div className="grid gap-3 md:grid-cols-2">
@@ -379,7 +379,7 @@ export default function ConnectionsPage() {
           </div>
           <input
             type="text"
-            placeholder="Studio ID (optional)"
+            placeholder="Branch ID"
             className="rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-sm"
             value={glofoxStudio}
             onChange={(event) => setGlofoxStudio(event.target.value)}
