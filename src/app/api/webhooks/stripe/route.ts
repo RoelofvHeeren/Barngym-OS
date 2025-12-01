@@ -62,16 +62,28 @@ export async function POST(request: Request) {
 
     const record = await prisma.connectionSecret.findUnique({ where: { provider: "stripe" } });
     const secret = (record?.secret as StripeSecret | null) ?? null;
-    if (!secret?.webhookSecret || !secret?.secretKey) {
+    const webhookSecret = secret?.webhookSecret || process.env.STRIPE_WEBHOOK_SECRET;
+    const secretKey = secret?.secretKey || process.env.STRIPE_SECRET_KEY;
+
+    if (!webhookSecret || !secretKey) {
       return NextResponse.json(
         { ok: false, message: "Stripe webhook is not configured. Add the secret on the Connections page." },
         { status: 400 }
       );
     }
 
-    const stripe = new Stripe(secret.secretKey);
+    const stripe = new Stripe(secretKey);
 
-    const event = stripe.webhooks.constructEvent(body, signature, secret.webhookSecret) as StripeEvent;
+    let event: StripeEvent;
+    try {
+      event = stripe.webhooks.constructEvent(body, signature, webhookSecret) as StripeEvent;
+    } catch (err) {
+      return NextResponse.json(
+        { ok: false, message: err instanceof Error ? err.message : "Invalid Stripe signature." },
+        { status: 400 }
+      );
+    }
+
     const normalized = normalizeStripeEvent(event);
 
     if (!normalized.length) {
