@@ -21,6 +21,7 @@ type RevenueTotals = {
   corporate: number;
   retreats: number;
   yearToDate: number;
+  quarterTotals: Record<number, number>;
 };
 
 type ApiPayload = { ok: boolean; goals: Goal[]; revenue: RevenueTotals };
@@ -105,16 +106,17 @@ export default function GoalsPage() {
   };
 
   const goals = data?.goals ?? [];
-  const revenue = data?.revenue ?? {
-    total: 0,
-    pt: 0,
-    classes: 0,
-    online: 0,
-    corporate: 0,
-    retreats: 0,
-    yearToDate: 0,
-    quarterTotals: { 1: 0, 2: 0, 3: 0, 4: 0 } as Record<number, number>,
-  };
+  const revenue: RevenueTotals =
+    data?.revenue ?? {
+      total: 0,
+      pt: 0,
+      classes: 0,
+      online: 0,
+      corporate: 0,
+      retreats: 0,
+      yearToDate: 0,
+      quarterTotals: { 1: 0, 2: 0, 3: 0, 4: 0 },
+    };
 
   const yearlyGoal = goals
     .filter((g) => g.category.toLowerCase() === "total revenue" && g.period.toLowerCase() === "yearly")
@@ -135,7 +137,7 @@ export default function GoalsPage() {
     const goal = goals
       .filter((g) => g.category.toLowerCase() === q.toLowerCase() && g.period.toLowerCase() === "quarterly")
       .reduce((sum, g) => sum + g.targetAmount, 0);
-    const actual = (revenue.quarterTotals as Record<number, number>)[Number(q.replace("Q", ""))] ?? 0;
+    const actual = revenue.quarterTotals[Number(q.replace("Q", ""))] ?? 0;
     const pct = goal > 0 ? (actual / goal) * 100 : 0;
     return { q, goal, actual, pct };
   });
