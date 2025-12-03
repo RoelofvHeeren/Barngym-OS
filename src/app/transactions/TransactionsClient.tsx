@@ -17,6 +17,7 @@ type TransactionRecord = {
   confidence: string | null;
   reference?: string | null;
   leadId?: string | null;
+  metadata?: Record<string, unknown> | null;
 };
 
 type Props = {
@@ -99,6 +100,11 @@ export default function TransactionsClient({ transactions }: Props) {
         transaction.status === "Needs Review",
       reference: transaction.reference,
       leadId: transaction.leadId,
+      email:
+        (transaction.metadata as Record<string, unknown> | undefined)?.customer_email?.toString() ??
+        (transaction.metadata as Record<string, unknown> | undefined)?.email?.toString() ??
+        (transaction.metadata as Record<string, unknown> | undefined)?.customerEmail?.toString() ??
+        "",
     }));
 
     let filtered = normalized;
@@ -265,15 +271,18 @@ export default function TransactionsClient({ transactions }: Props) {
                   <tr key={`${transaction.id}-${index}`}>
                     <td className="py-4 pr-4 text-muted">{formatDateTime(transaction.occurredAt)}</td>
                     <td
-                      className={`pr-4 font-semibold ${
-                        transaction.leadId ? "text-primary" : "text-amber-200"
-                      }`}
-                    >
-                      {transaction.person}
-                      {transaction.reference ? (
-                        <div className="text-xs text-muted">Ref: {transaction.reference}</div>
-                      ) : null}
-                    </td>
+                    className={`pr-4 font-semibold ${
+                      transaction.leadId ? "text-primary" : "text-amber-200"
+                    }`}
+                  >
+                    {transaction.person}
+                    {transaction.email ? (
+                      <div className="text-xs text-muted">Email: {transaction.email}</div>
+                    ) : null}
+                    {transaction.reference ? (
+                      <div className="text-xs text-muted">Ref: {transaction.reference}</div>
+                    ) : null}
+                  </td>
                     <td className="pr-4 font-semibold text-primary">
                       {formatCurrency(transaction.amountMinor ?? 0, transaction.currency ?? "GBP")}
                     </td>
