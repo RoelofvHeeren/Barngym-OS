@@ -47,6 +47,16 @@ export default function ConnectionsPage() {
   const [starlingMessage, setStarlingMessage] = useState("");
   const [starlingAccount, setStarlingAccount] = useState<string | null>(null);
 
+  const [ghlKey, setGhlKey] = useState("");
+  const [ghlLocationId, setGhlLocationId] = useState("");
+  const [ghlStatus, setGhlStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [ghlMessage, setGhlMessage] = useState("");
+
+  const [metaToken, setMetaToken] = useState("");
+  const [metaAdAccountId, setMetaAdAccountId] = useState("");
+  const [metaStatus, setMetaStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [metaMessage, setMetaMessage] = useState("");
+
   const [syncLogs, setSyncLogs] = useState<SyncLog[]>([]);
   const [backfillStatus, setBackfillStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [backfillMessage, setBackfillMessage] = useState("");
@@ -98,6 +108,31 @@ export default function ConnectionsPage() {
           );
         }
       }
+
+      const ghl = data.ghl;
+      if (ghl) {
+        if (ghl.status === "connected") {
+          setGhlStatus("success");
+          setGhlMessage(
+            ghl.accountId
+              ? `Location ${ghl.accountId} linked.`
+              : "GHL API key stored."
+          );
+        }
+      }
+
+      const meta = data.meta;
+      if (meta) {
+        if (meta.status === "connected") {
+          setMetaStatus("success");
+          setMetaMessage(
+            meta.accountId ? `Ad account ${meta.accountId} connected.` : "Meta access token stored."
+          );
+          if (meta.accountId) {
+            setMetaAdAccountId(meta.accountId);
+          }
+        }
+      }
     } catch (error) {
       console.error("Failed to refresh connection state", error);
     }
@@ -147,6 +182,13 @@ export default function ConnectionsPage() {
       })),
     [syncLogs]
   );
+
+  const statusBadge = (status: "idle" | "loading" | "success" | "error") => {
+    if (status === "loading") return <span className="text-amber-200 text-xs">Testing…</span>;
+    if (status === "success") return <span className="text-emerald-200 text-xs">Connected</span>;
+    if (status === "error") return <span className="text-rose-200 text-xs">Failed</span>;
+    return <span className="text-muted text-xs">Not connected</span>;
+  };
 
   const testStripeConnection = async () => {
     setStripeStatus("loading");
@@ -245,6 +287,124 @@ export default function ConnectionsPage() {
     }
   };
 
+  const testGhlConnection = async () => {
+    setGhlStatus("loading");
+    setGhlMessage("");
+    try {
+      const response = await fetch("/api/connections/ghl/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          apiKey: ghlKey,
+          locationId: ghlLocationId,
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.ok) {
+        throw new Error(result.message || "Unable to verify GoHighLevel.");
+      }
+      setGhlStatus("success");
+      setGhlMessage(result.message || "GoHighLevel connected.");
+      if (result.locationId) {
+        setGhlLocationId(result.locationId);
+      }
+      setGhlKey("");
+      await refreshConnectionState();
+      await refreshLogs();
+    } catch (error) {
+      setGhlStatus("error");
+      setGhlMessage(error instanceof Error ? error.message : "Connection failed.");
+      await refreshLogs();
+    }
+  };
+
+  const saveGhlConnection = async () => {
+    setGhlStatus("loading");
+    setGhlMessage("");
+    try {
+      const response = await fetch("/api/connections/ghl/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          apiKey: ghlKey,
+          locationId: ghlLocationId,
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.ok) {
+        throw new Error(result.message || "Unable to save GoHighLevel connection.");
+      }
+      setGhlStatus("success");
+      setGhlMessage(result.message || "GoHighLevel credentials saved.");
+      setGhlKey("");
+      await refreshConnectionState();
+      await refreshLogs();
+    } catch (error) {
+      setGhlStatus("error");
+      setGhlMessage(error instanceof Error ? error.message : "Save failed.");
+      await refreshLogs();
+    }
+  };
+
+  const testMetaConnection = async () => {
+    setMetaStatus("loading");
+    setMetaMessage("");
+    try {
+      const response = await fetch("/api/connections/meta/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          accessToken: metaToken,
+          adAccountId: metaAdAccountId,
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.ok) {
+        throw new Error(result.message || "Unable to verify Meta Ads.");
+      }
+      setMetaStatus("success");
+      setMetaMessage(result.message || "Meta Ads connected.");
+      if (result.adAccountId) {
+        setMetaAdAccountId(result.adAccountId);
+      }
+      setMetaToken("");
+      await refreshConnectionState();
+      await refreshLogs();
+    } catch (error) {
+      setMetaStatus("error");
+      setMetaMessage(error instanceof Error ? error.message : "Connection failed.");
+      await refreshLogs();
+    }
+  };
+
+  const saveMetaConnection = async () => {
+    setMetaStatus("loading");
+    setMetaMessage("");
+    try {
+      const response = await fetch("/api/connections/meta/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          accessToken: metaToken,
+          adAccountId: metaAdAccountId,
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.ok) {
+        throw new Error(result.message || "Unable to save Meta Ads connection.");
+      }
+      setMetaStatus("success");
+      setMetaMessage(result.message || "Meta Ads credentials saved.");
+      setMetaToken("");
+      await refreshConnectionState();
+      await refreshLogs();
+    } catch (error) {
+      setMetaStatus("error");
+      setMetaMessage(error instanceof Error ? error.message : "Save failed.");
+      await refreshLogs();
+    }
+  };
+
   const handleBackfill = async () => {
     setBackfillStatus("loading");
     setBackfillMessage("");
@@ -275,9 +435,7 @@ export default function ConnectionsPage() {
   return (
     <div className="flex flex-col gap-8 text-primary">
       <section className="glass-panel flex flex-col gap-3">
-        <p className="text-xs uppercase tracking-[0.35em] text-muted">
-          Connections
-        </p>
+        <p className="text-xs uppercase tracking-[0.35em] text-muted">Connections</p>
         <h1 className="text-3xl font-semibold">Integrations Control Room</h1>
         <p className="text-sm text-muted">
           Paste keys, click test, see confidence immediately. Onboarding should take a minute.
@@ -286,345 +444,185 @@ export default function ConnectionsPage() {
 
       <section className="grid gap-6 lg:grid-cols-2">
         <div className="glass-panel flex flex-col gap-4">
-          <div>
-            <p className="text-xs uppercase tracking-[0.35em] text-muted">Stripe</p>
-            <h3 className="mt-2 text-2xl font-semibold">Payment Core</h3>
-            <p className="text-sm text-muted">
-              Secret keys stay encrypted. Webhook signature verified on ingest.
-            </p>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs uppercase tracking-[0.35em] text-muted">Stripe</p>
+              <h3 className="mt-2 text-2xl font-semibold">Payment Core</h3>
+              <p className="text-sm text-muted">Secret keys stay encrypted. Webhook signature verified on ingest.</p>
+            </div>
+            {statusBadge(stripeStatus)}
           </div>
           <div className="space-y-3">
-            <input
-              type="password"
-              placeholder="Stripe Secret Key"
-              className="w-full rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-sm"
-              value={stripeSecret}
-              onChange={(event) => setStripeSecret(event.target.value)}
-            />
-            <input
-              type="password"
-              placeholder="Webhook Signing Secret"
-              className="w-full rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-sm"
-              value={stripeWebhook}
-              onChange={(event) => setStripeWebhook(event.target.value)}
-            />
+            <input type="password" placeholder="Stripe Secret Key" className="w-full rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-sm" value={stripeSecret} onChange={(event) => setStripeSecret(event.target.value)} />
+            <input type="password" placeholder="Webhook Signing Secret" className="w-full rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-sm" value={stripeWebhook} onChange={(event) => setStripeWebhook(event.target.value)} />
           </div>
-          <div className="flex items-center justify-between">
-            <button
-              className="rounded-full bg-black px-5 py-2 text-sm font-semibold text-white disabled:opacity-50"
-              onClick={testStripeConnection}
-              disabled={stripeStatus === "loading"}
-            >
+          <div className="flex items-center gap-3">
+            <button className="rounded-full bg-black px-5 py-2 text-sm font-semibold text-white disabled:opacity-50" onClick={testStripeConnection} disabled={stripeStatus === "loading"}>
               {stripeStatus === "loading" ? "Testing..." : "Test Connection"}
             </button>
-            <span
-              className={`chip text-xs ${
-                stripeStatus === "success"
-                  ? "text-emerald-200"
-                  : stripeStatus === "error"
-                  ? "text-amber-200"
-                  : "text-muted"
-              }`}
-            >
-              Status ·{" "}
-              {stripeStatus === "success"
-                ? "Connected"
-                : stripeStatus === "error"
-                ? "Error"
-                : "Not tested"}
-            </span>
           </div>
           {stripeStatus !== "idle" && stripeMessage && (
-            <p
-              className={`flex flex-wrap items-center gap-2 text-sm ${
-                stripeStatus === "success" ? "text-emerald-700" : "text-amber-600"
-              }`}
-            >
+            <p className={`flex flex-wrap items-center gap-2 text-sm ${stripeStatus === "success" ? "text-emerald-700" : "text-amber-600"}`}>
               <span>{stripeMessage}</span>
-              {stripeAccount && (
-                <span className="rounded-full border border-emerald-900/20 px-2 py-0.5 text-xs text-muted">
-                  {stripeAccount}
-                </span>
-              )}
+              {stripeAccount && <span className="rounded-full border border-emerald-900/20 px-2 py-0.5 text-xs text-muted">{stripeAccount}</span>}
             </p>
           )}
-          {connectionState.stripe?.hasSecret && stripeStatus !== "error" && (
-            <p className="text-xs text-muted">Secret stored securely on the server.</p>
-          )}
+          {connectionState.stripe?.hasSecret && stripeStatus !== "error" && <p className="text-xs text-muted">Secret stored securely on the server.</p>}
         </div>
 
         <div className="glass-panel flex flex-col gap-4">
-          <div>
-            <p className="text-xs uppercase tracking-[0.35em] text-muted">Glofox</p>
-            <h3 className="mt-2 text-2xl font-semibold">Studio Ops</h3>
-            <p className="text-sm text-muted">
-              API or CSV fallback. Use the live API key, token, and branch ID from Glofox support. Add webhook salt to validate events.
-            </p>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs uppercase tracking-[0.35em] text-muted">Glofox</p>
+              <h3 className="mt-2 text-2xl font-semibold">Studio Ops</h3>
+              <p className="text-sm text-muted">API + Token ingests all membership and payment data from Glofox.</p>
+            </div>
+            {statusBadge(glofoxStatus)}
           </div>
-          <div className="grid gap-3 md:grid-cols-2">
-            <input
-              type="text"
-              placeholder="API Key"
-              className="rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-sm"
-              value={glofoxKey}
-              onChange={(event) => setGlofoxKey(event.target.value)}
-            />
-            <input
-              type="text"
-              placeholder="API Token"
-              className="rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-sm"
-              value={glofoxToken}
-              onChange={(event) => setGlofoxToken(event.target.value)}
-            />
+          <div className="space-y-3">
+            <input type="password" placeholder="API Key" className="w-full rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-sm" value={glofoxKey} onChange={(event) => setGlofoxKey(event.target.value)} />
+            <input type="password" placeholder="API Token" className="w-full rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-sm" value={glofoxToken} onChange={(event) => setGlofoxToken(event.target.value)} />
+            <input type="text" placeholder="Studio / Branch ID (optional)" className="w-full rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-sm" value={glofoxStudio} onChange={(event) => setGlofoxStudio(event.target.value)} />
+            <input type="password" placeholder="Webhook Salt (for signatures)" className="w-full rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-sm" value={glofoxSalt} onChange={(event) => setGlofoxSalt(event.target.value)} />
           </div>
-          <input
-            type="text"
-            placeholder="Branch ID"
-            className="rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-sm"
-            value={glofoxStudio}
-            onChange={(event) => setGlofoxStudio(event.target.value)}
-          />
-          <input
-            type="text"
-            placeholder="Webhook Signature Salt (optional)"
-            className="rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-sm"
-            value={glofoxSalt}
-            onChange={(event) => setGlofoxSalt(event.target.value)}
-          />
-          <div className="flex flex-wrap gap-3">
-            <button
-              className="rounded-full bg-black px-5 py-2 text-sm font-semibold text-white disabled:opacity-50"
-              onClick={testGlofoxConnection}
-              disabled={glofoxStatus === "loading"}
-            >
+          <div className="flex items-center gap-3">
+            <button className="rounded-full bg-black px-5 py-2 text-sm font-semibold text-white disabled:opacity-50" onClick={testGlofoxConnection} disabled={glofoxStatus === "loading"}>
               {glofoxStatus === "loading" ? "Testing..." : "Test Connection"}
             </button>
-            <button className="chip text-xs">Upload CSV Export</button>
-            <button
-              className="chip text-xs"
-              onClick={async () => {
-                setGlofoxStatus("loading");
-                setGlofoxMessage("");
-                try {
-                  const response = await fetch("/api/backfill", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                      glofox: {
-                        branchId: glofoxStudio || undefined,
-                        // dates optional; server defaults to yesterday->today
-                      },
-                    }),
-                  });
-                  const result = await response.json();
-                  if (!response.ok || !result.ok) {
-                    throw new Error(
-                      result?.summaries?.find((s: any) => s.source === "Glofox")?.message ||
-                        result.message ||
-                        "Backfill failed"
-                    );
-                  }
-                  const summary =
-                    result?.summaries?.find((s: any) => s.source === "Glofox")?.message ||
-                    "Backfill triggered.";
-                  setGlofoxStatus("success");
-                  setGlofoxMessage(summary);
-                } catch (error) {
-                  setGlofoxStatus("error");
-                  setGlofoxMessage(error instanceof Error ? error.message : "Backfill failed.");
-                }
-              }}
-            >
-              Run backfill
-            </button>
           </div>
-          {glofoxStatus !== "idle" && (
-            <p
-              className={`text-sm ${
-                glofoxStatus === "success" ? "text-emerald-700" : "text-amber-600"
-              }`}
-            >
-              {glofoxMessage ||
-                (glofoxStatus === "success"
-                  ? "Connection succeeded."
-                  : "Unable to verify connection.")}
+          {glofoxStatus !== "idle" && glofoxMessage && (
+            <p className={`flex flex-wrap items-center gap-2 text-sm ${glofoxStatus === "success" ? "text-emerald-700" : "text-amber-600"}`}>
+              <span>{glofoxMessage}</span>
+              {glofoxStudio && <span className="rounded-full border border-emerald-900/20 px-2 py-0.5 text-xs text-muted">{glofoxStudio}</span>}
             </p>
           )}
           {connectionState.glofox?.hasSecret && glofoxStatus !== "error" && (
-            <p className="text-xs text-muted">Credentials stored securely.</p>
+            <p className="text-xs text-muted">Webhook salt validates HMAC signatures on incoming events.</p>
           )}
         </div>
 
         <div className="glass-panel flex flex-col gap-4">
-          <div>
-            <p className="text-xs uppercase tracking-[0.35em] text-muted">
-              Starling Bank
-            </p>
-            <h3 className="mt-2 text-2xl font-semibold">Bank Feed</h3>
-            <p className="text-sm text-muted">
-              Personal Access Token or OAuth as a TPP. Webhooks keep reconciliations fresh.
-            </p>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs uppercase tracking-[0.35em] text-muted">Starling</p>
+              <h3 className="mt-2 text-2xl font-semibold">Bank Feeds</h3>
+              <p className="text-sm text-muted">Token + webhook URL ingests feed items as transactions.</p>
+            </div>
+            {statusBadge(starlingStatus)}
           </div>
-          <select className="rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-sm text-primary">
-            <option className="bg-[#031018] text-primary">Personal Access Token</option>
-            <option className="bg-[#031018] text-primary">OAuth / Marketplace</option>
-          </select>
-          <input
-            type="password"
-            placeholder="Starling Personal Access Token"
-            className="rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-sm"
-            value={starlingToken}
-            onChange={(event) => setStarlingToken(event.target.value)}
-          />
-          <input
-            type="text"
-            placeholder="Webhook URL (optional)"
-            className="rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-sm"
-            value={starlingWebhookUrl}
-            onChange={(event) => setStarlingWebhookUrl(event.target.value)}
-          />
-          <label className="flex items-center gap-2 text-sm text-muted">
-            <input type="checkbox" className="accent-emerald-300" defaultChecked />
-            Enable Webhooks
-          </label>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <button
-              className="rounded-full bg-black px-5 py-2 text-sm font-semibold text-white disabled:opacity-50"
-              onClick={testStarlingConnection}
-              disabled={starlingStatus === "loading"}
-            >
-              {starlingStatus === "loading" ? "Testing..." : "Validate & Save"}
+          <div className="space-y-3">
+            <input type="password" placeholder="Starling Access Token" className="w-full rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-sm" value={starlingToken} onChange={(event) => setStarlingToken(event.target.value)} />
+            <input type="text" placeholder="Webhook URL" className="w-full rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-sm" value={starlingWebhookUrl} onChange={(event) => setStarlingWebhookUrl(event.target.value)} />
+          </div>
+          <div className="flex items-center gap-3">
+            <button className="rounded-full bg-black px-5 py-2 text-sm font-semibold text-white disabled:opacity-50" onClick={testStarlingConnection} disabled={starlingStatus === "loading"}>
+              {starlingStatus === "loading" ? "Testing..." : "Test Connection"}
             </button>
-            <span
-              className={`chip text-xs ${
-                starlingStatus === "success"
-                  ? "text-emerald-200"
-                  : starlingStatus === "error"
-                  ? "text-amber-200"
-                  : "text-muted"
-              }`}
-            >
-              Status ·{" "}
-              {starlingStatus === "success"
-                ? "Connected"
-                : starlingStatus === "error"
-                ? "Error"
-                : "Not tested"}
-            </span>
           </div>
           {starlingStatus !== "idle" && starlingMessage && (
-            <p
-              className={`flex flex-wrap items-center gap-2 text-sm ${
-                starlingStatus === "success" ? "text-emerald-700" : "text-amber-600"
-              }`}
-            >
+            <p className={`flex flex-wrap items-center gap-2 text-sm ${starlingStatus === "success" ? "text-emerald-700" : "text-amber-600"}`}>
               <span>{starlingMessage}</span>
-              {starlingAccount && (
-                <span className="rounded-full border border-emerald-900/20 px-2 py-0.5 text-xs text-muted">
-                  {starlingAccount}
-                </span>
-              )}
+              {starlingAccount && <span className="rounded-full border border-emerald-900/20 px-2 py-0.5 text-xs text-muted">{starlingAccount}</span>}
             </p>
           )}
           {connectionState.starling?.hasSecret && starlingStatus !== "error" && (
-            <p className="text-xs text-muted">Token stored securely.</p>
+            <p className="text-xs text-muted">Token stored securely on the server.</p>
           )}
         </div>
 
         <div className="glass-panel flex flex-col gap-4">
-          <div>
-            <p className="text-xs uppercase tracking-[0.35em] text-muted">
-              Matching Rules
-            </p>
-            <h3 className="mt-2 text-2xl font-semibold">Confidence Engine</h3>
-            <p className="text-sm text-muted">
-              Define reference priority + auto-link thresholds.
-            </p>
-          </div>
-          <div className="rounded-3xl border border-white/10 bg-white/5 p-4 text-sm">
-            <div className="flex items-center justify-between">
-              <span>Auto-link threshold</span>
-              <span className="font-semibold text-emerald-200">0.85</span>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs uppercase tracking-[0.35em] text-muted">Ads & CRM</p>
+              <h3 className="mt-2 text-2xl font-semibold">GoHighLevel</h3>
+              <p className="text-sm text-muted">Store your GHL API key and optional location ID. Keys are encrypted.</p>
             </div>
-            <input type="range" min="0.5" max="1" step="0.01" defaultValue="0.85" className="mt-3 w-full" />
-            <p className="mt-2 text-xs text-muted">
-              Anything below remains in review queue.
-            </p>
+            {statusBadge(ghlStatus)}
           </div>
-          <div className="rounded-3xl border border-white/10 bg-white/5 p-4 text-sm">
-            <p className="text-xs uppercase tracking-[0.35em] text-muted">
-              Reference priority
-            </p>
-            <ol className="mt-3 list-decimal space-y-2 pl-5 text-primary">
-              <li>Invoice number</li>
-              <li>Member ID</li>
-              <li>Email stem</li>
-              <li>Fuzzy name + amount</li>
-            </ol>
+          <div className="space-y-3">
+            <input type="password" placeholder="GoHighLevel API Key" className="w-full rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-sm" value={ghlKey} onChange={(event) => setGhlKey(event.target.value)} />
+            <input type="text" placeholder="Location ID (optional)" className="w-full rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-sm" value={ghlLocationId} onChange={(event) => setGhlLocationId(event.target.value)} />
           </div>
-          <div className="flex flex-col gap-2">
-            <button
-              className="rounded-full bg-black px-5 py-2 text-sm font-semibold text-white disabled:opacity-50"
-              onClick={handleBackfill}
-              disabled={backfillStatus === "loading"}
-            >
-              {backfillStatus === "loading"
-                ? "Backfill running..."
-                : "Backfill now (90d Starling / 30d Stripe)"}
+          {ghlMessage && <p className="text-xs text-muted">{ghlMessage}</p>}
+          <div className="flex items-center gap-3">
+            <button className="rounded-full bg-black px-5 py-2 text-sm font-semibold text-white disabled:opacity-50" onClick={saveGhlConnection} disabled={ghlStatus === "loading" || (!ghlKey && !ghlLocationId)}>
+              {ghlStatus === "loading" ? "Saving..." : "Save"}
             </button>
-            {backfillStatus !== "idle" && backfillMessage && (
-              <p
-                className={`text-sm ${
-                  backfillStatus === "success" ? "text-emerald-700" : "text-amber-600"
-                }`}
-              >
-                {backfillMessage}
-              </p>
-            )}
+            <button className="rounded-full border border-white/10 px-5 py-2 text-sm font-semibold text-primary disabled:opacity-50" onClick={testGhlConnection} disabled={ghlStatus === "loading"}>
+              {ghlStatus === "loading" ? "Testing..." : "Test"}
+            </button>
+          </div>
+        </div>
+
+        <div className="glass-panel flex flex-col gap-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs uppercase tracking-[0.35em] text-muted">Ads</p>
+              <h3 className="mt-2 text-2xl font-semibold">Meta Ads</h3>
+              <p className="text-sm text-muted">Add your Meta access token and ad account ID. Stored encrypted for insights.</p>
+            </div>
+            {statusBadge(metaStatus)}
+          </div>
+          <div className="space-y-3">
+            <input type="password" placeholder="Meta Access Token" className="w-full rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-sm" value={metaToken} onChange={(event) => setMetaToken(event.target.value)} />
+            <input type="text" placeholder="Ad Account ID (e.g. act_123456789)" className="w-full rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-sm" value={metaAdAccountId} onChange={(event) => setMetaAdAccountId(event.target.value)} />
+          </div>
+          {metaMessage && <p className="text-xs text-muted">{metaMessage}</p>}
+          <div className="flex items-center gap-3">
+            <button className="rounded-full bg-black px-5 py-2 text-sm font-semibold text-white disabled:opacity-50" onClick={saveMetaConnection} disabled={metaStatus === "loading" || (!metaToken && !metaAdAccountId)}>
+              {metaStatus === "loading" ? "Saving..." : "Save"}
+            </button>
+            <button className="rounded-full border border-white/10 px-5 py-2 text-sm font-semibold text-primary disabled:opacity-50" onClick={testMetaConnection} disabled={metaStatus === "loading"}>
+              {metaStatus === "loading" ? "Testing..." : "Test"}
+            </button>
           </div>
         </div>
       </section>
 
       <section className="glass-panel flex flex-col gap-4">
-        <div>
-          <p className="text-xs uppercase tracking-[0.35em] text-muted">
-            Sync Logs
-          </p>
-          <h3 className="text-2xl font-semibold">Sync Logs</h3>
-          <p className="text-sm text-muted">
-            Every job recorded. Logs persist locally until cleared.
-          </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs uppercase tracking-[0.35em] text-muted">Backfill</p>
+            <h3 className="mt-2 text-2xl font-semibold">Historical Ingest</h3>
+            <p className="text-sm text-muted">Optional: fetch historical transactions from Stripe/Starling using short-lived keys.</p>
+          </div>
+          <button className="rounded-full bg-white/10 px-5 py-2 text-sm font-semibold text-primary disabled:opacity-50" onClick={handleBackfill} disabled={backfillStatus === "loading"}>
+            {backfillStatus === "loading" ? "Running..." : "Run Backfill"}
+          </button>
         </div>
-        {formattedLogs.length === 0 ? (
-          <div className="rounded-3xl border border-white/10 bg-white/5 p-5 text-sm text-muted">
-            No sync activity yet. Run a connection test or backfill to generate entries.
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[560px] text-left text-sm">
-              <thead className="text-muted">
-                <tr>
-                  {["Date", "Source", "Detail", "Records", "Errors"].map((header) => (
-                    <th key={header} className="pb-3 pr-4 font-medium">
-                      {header}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/10">
-                {formattedLogs.map((log) => (
-                  <tr key={log.id}>
-                    <td className="py-3 pr-4 text-muted">{log.formattedDate}</td>
-                    <td className="pr-4 font-semibold text-primary">{log.source}</td>
-                    <td className="pr-4 text-muted">{log.detail}</td>
-                    <td className="pr-4">{log.records ?? "—"}</td>
-                    <td className="pr-4 text-amber-600">{log.errors ?? "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        {backfillMessage && (
+          <p className={`text-sm ${backfillStatus === "success" ? "text-emerald-200" : "text-amber-200"}`}>
+            {backfillMessage}
+          </p>
         )}
+      </section>
+
+      <section className="glass-panel">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <h3 className="text-lg font-semibold">Sync Activity</h3>
+            <span className="text-xs text-muted">Recent connection tests and ingests</span>
+          </div>
+        </div>
+        <div className="mt-4 space-y-2">
+          {formattedLogs.length === 0 && <p className="text-sm text-muted">No recent sync events.</p>}
+          {formattedLogs.map((log) => (
+            <div
+              key={log.id}
+              className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm"
+            >
+              <div className="flex flex-col">
+                <span className="font-semibold text-primary">{log.source}</span>
+                <span className="text-muted">{log.detail}</span>
+              </div>
+              <div className="flex flex-col items-end text-xs text-muted">
+                <span>{log.formattedDate}</span>
+                {log.records ? <span>Records: {log.records}</span> : null}
+                {log.errors ? <span className="text-amber-300">Error: {log.errors}</span> : null}
+              </div>
+            </div>
+          ))}
+        </div>
       </section>
     </div>
   );

@@ -1,9 +1,8 @@
 /* eslint-disable react/no-array-index-key */
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 
 type TransactionRecord = {
   id: string;
@@ -74,12 +73,46 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-export default function TransactionsClient({ transactions }: Props) {
-  const router = useRouter();
+export default function TransactionsClient({ transactions: initialTransactions }: Props) {
+  const [transactions, setTransactions] = useState<TransactionRecord[]>(initialTransactions);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
   const [sourceFilter, setSourceFilter] = useState<string>("All");
   const [matchFilter, setMatchFilter] = useState<MatchFilter>("all");
   const [sortBy, setSortBy] = useState<SortOption>("date_desc");
   const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    setTransactions(initialTransactions);
+  }, [initialTransactions]);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    setRefreshError(null);
+    try {
+      const response = await fetch("/api/transactions", { cache: "no-store" });
+      const payload = await response.json();
+      if (!response.ok || !payload.ok || !Array.isArray(payload.data)) {
+        throw new Error(payload.message || "Unable to refresh transactions.");
+      }
+      const freshTransactions = (payload.data as TransactionRecord[]).map((transaction) => ({
+        ...transaction,
+        occurredAt:
+          typeof transaction.occurredAt === "string"
+            ? transaction.occurredAt
+            : transaction.occurredAt?.toString() ?? new Date().toISOString(),
+        metadata: (transaction as { metadata?: Record<string, unknown> | null }).metadata ?? null,
+      }));
+      setTransactions(freshTransactions);
+    } catch (error) {
+      console.error("Failed to refresh transactions", error);
+      setRefreshError(
+        error instanceof Error ? error.message : "Unable to refresh transactions."
+      );
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
 
   const ledgerRows = useMemo(() => {
     const normalized = transactions.map((transaction) => ({
@@ -218,13 +251,6 @@ export default function TransactionsClient({ transactions }: Props) {
               Amount low → high
             </option>
           </select>
-          <button
-            type="button"
-            onClick={() => router.refresh()}
-            className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-primary hover:bg-white/10 transition"
-          >
-            Refresh now
-          </button>
         </div>
         <div className="flex items-center gap-3 text-sm">
           <Link href="/transactions/manual" className="text-emerald-200 underline">
@@ -236,11 +262,24 @@ export default function TransactionsClient({ transactions }: Props) {
       </section>
 
       <section className="glass-panel">
-        <div className="flex flex-col gap-2">
-          <h2 className="text-2xl font-semibold">Financial Truth Table</h2>
-          <p className="text-sm text-muted">
-            Click “Fix” on unmatched rows to open the manual queue. Showing occurred date (not upload date).
-          </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex flex-col gap-2">
+            <h2 className="text-2xl font-semibold">Financial Truth Table</h2>
+            <p className="text-sm text-muted">
+              Click “Fix” on unmatched rows to open the manual queue. Showing occurred date (not upload date).
+            </p>
+            {refreshError ? (
+              <p className="text-xs text-rose-200">{refreshError}</p>
+            ) : null}
+          </div>
+          <button
+            type="button"
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-primary transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {refreshing ? "Refreshing..." : "Refresh now"}
+          </button>
         </div>
         {!ledgerRows.length ? (
           <div className="mt-6 rounded-3xl border border-white/10 bg-white/5 p-6 text-sm text-muted">

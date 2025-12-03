@@ -106,6 +106,7 @@ type StripeChargePayload =
   | Stripe.Charge
   | {
       id?: string;
+      payment_intent?: string | Stripe.PaymentIntent | null;
       created?: number;
       amount?: number;
       currency?: string;
@@ -127,12 +128,14 @@ type StripePaymentIntentPayload =
       amount_capturable?: number;
       amount_details?: Stripe.PaymentIntent.AmountDetails;
       charges?: { data?: Array<StripeChargePayload | Stripe.Charge> };
+      invoice?: string | StripeInvoicePayload | null;
     });
 
 type StripeInvoicePayload =
   | Stripe.Invoice
   | {
       id?: string;
+      payment_intent?: string | Stripe.PaymentIntent | null;
       created?: number;
       amount_paid?: number;
       currency?: string;
@@ -242,6 +245,24 @@ function resolvedConfidence(payload?: { paid?: boolean; counterPartyName?: strin
 
 const DEFAULT_CURRENCY = "EUR";
 
+function stripeExternalId({
+  paymentIntentId,
+  invoiceId,
+  chargeId,
+  sessionId,
+}: {
+  paymentIntentId?: string;
+  invoiceId?: string;
+  chargeId?: string;
+  sessionId?: string;
+}) {
+  if (paymentIntentId) return `stripe_pi_${paymentIntentId}`;
+  if (invoiceId) return `stripe_inv_${invoiceId}`;
+  if (chargeId) return `stripe_${chargeId}`;
+  if (sessionId) return `stripe_cs_${sessionId}`;
+  return `stripe_${randomUUID()}`;
+}
+
 export function mapStripeCharge(charge: StripeChargePayload): NormalizedTransaction {
   const created = typeof charge?.created === "number" ? charge.created * 1000 : Date.now();
   const amountMinor = typeof charge?.amount === "number" ? charge.amount : 0;
@@ -250,13 +271,19 @@ export function mapStripeCharge(charge: StripeChargePayload): NormalizedTransact
     charge && typeof charge === "object" && "invoice" in charge
       ? (charge as { invoice?: string | Stripe.Invoice | null }).invoice
       : undefined;
+  const paymentIntentId =
+    typeof charge?.payment_intent === "string"
+      ? charge.payment_intent
+      : (charge as { payment_intent?: { id?: string } })?.payment_intent?.id;
+  const invoiceId = typeof invoiceReference === "string" ? invoiceReference : undefined;
+  const chargeId = typeof charge?.id === "string" ? charge.id : undefined;
   const status = resolveStripeStatus({
     status: charge?.status ?? undefined,
     paid: charge?.paid,
   });
 
   return {
-    externalId: `stripe_${charge?.id ?? randomUUID()}`,
+    externalId: stripeExternalId({ paymentIntentId, invoiceId, chargeId }),
     provider: "Stripe",
     amountMinor,
     currency: (charge?.currency ?? DEFAULT_CURRENCY).toUpperCase(),
@@ -271,8 +298,11 @@ export function mapStripeCharge(charge: StripeChargePayload): NormalizedTransact
     status,
     confidence: charge?.paid ? "High" : "Needs Review",
     description: charge?.description ?? charge?.statement_descriptor,
-    reference: charge?.id,
+    reference: paymentIntentId ?? chargeId ?? invoiceId ?? charge?.id,
     metadata: {
+      paymentIntentId,
+      chargeId,
+      invoiceId,
       customer: charge?.customer,
       email:
         charge?.billing_details?.email ??
@@ -296,6 +326,10 @@ export function mapStripePaymentIntent(intent: StripePaymentIntentPayload): Norm
   if (charge) {
     return mapStripeCharge({
       ...charge,
+      payment_intent:
+        typeof intent === "object" && intent && "id" in intent && typeof intent.id === "string"
+          ? intent.id
+          : (charge as { payment_intent?: string | null })?.payment_intent,
       amount: charge.amount ?? intent.amount,
       currency: charge.currency ?? intent.currency,
       status: charge.status ?? intent.status,
@@ -312,8 +346,14 @@ export function mapStripePaymentIntent(intent: StripePaymentIntentPayload): Norm
       : 0;
 
   const metadata = intent?.metadata ?? {};
+  const paymentIntentId =
+    typeof (intent as { id?: string })?.id === "string" ? (intent as { id?: string }).id : undefined;
+  const invoiceId =
+    typeof (intent as { invoice?: string })?.invoice === "string"
+      ? (intent as { invoice?: string }).invoice
+      : undefined;
   return {
-    externalId: `stripe_pi_${intent?.id ?? randomUUID()}`,
+    externalId: stripeExternalId({ paymentIntentId, invoiceId }),
     provider: "Stripe",
     amountMinor,
     currency: (intent?.currency ?? DEFAULT_CURRENCY).toUpperCase(),
@@ -330,8 +370,10 @@ export function mapStripePaymentIntent(intent: StripePaymentIntentPayload): Norm
     }),
     confidence: amountMinor > 0 ? "High" : "Needs Review",
     description: intent?.description,
-    reference: intent?.id,
+    reference: paymentIntentId ?? invoiceId ?? intent?.id,
     metadata: {
+      paymentIntentId,
+      invoiceId,
       email:
         safeString((intent as { billing_details?: { email?: string } })?.billing_details?.email) ??
         safeString((metadata.customer_email as string) ?? (metadata.email as string) ?? undefined),
@@ -346,8 +388,13 @@ export function mapStripePaymentIntent(intent: StripePaymentIntentPayload): Norm
 export function mapStripeInvoice(invoice: StripeInvoicePayload): NormalizedTransaction {
   const created = typeof invoice?.created === "number" ? invoice.created * 1000 : Date.now();
   const amountMinor = typeof invoice?.amount_paid === "number" ? invoice.amount_paid : 0;
+  const invoiceId = typeof invoice?.id === "string" ? invoice.id : undefined;
+  const paymentIntentId =
+    typeof invoice?.payment_intent === "string"
+      ? invoice.payment_intent
+      : invoice?.payment_intent?.id;
   return {
-    externalId: `stripe_inv_${invoice?.id ?? randomUUID()}`,
+    externalId: stripeExternalId({ paymentIntentId, invoiceId }),
     provider: "Stripe",
     amountMinor,
     currency: (invoice?.currency ?? DEFAULT_CURRENCY).toUpperCase(),
@@ -360,8 +407,10 @@ export function mapStripeInvoice(invoice: StripeInvoicePayload): NormalizedTrans
     }),
     confidence: amountMinor > 0 ? "High" : "Needs Review",
     description: invoice?.number ?? invoice?.hosted_invoice_url,
-    reference: invoice?.id,
+    reference: paymentIntentId ?? invoiceId ?? invoice?.id,
     metadata: {
+      paymentIntentId,
+      invoiceId,
       email: invoice?.customer_email,
       rawMetadata: invoice?.metadata,
     },
@@ -377,8 +426,13 @@ export function mapStripeCheckoutSession(session: StripeCheckoutSessionPayload):
     paid: amountMinor > 0,
   });
 
+  const paymentIntentId =
+    typeof session?.payment_intent === "string"
+      ? session.payment_intent
+      : (session?.payment_intent as { id?: string } | undefined)?.id;
+  const sessionId = typeof session?.id === "string" ? session.id : undefined;
   return {
-    externalId: `stripe_cs_${session?.id ?? randomUUID()}`,
+    externalId: stripeExternalId({ paymentIntentId, sessionId }),
     provider: "Stripe",
     amountMinor,
     currency: (session?.currency ?? DEFAULT_CURRENCY).toUpperCase(),
@@ -388,12 +442,10 @@ export function mapStripeCheckoutSession(session: StripeCheckoutSessionPayload):
     status,
     confidence: amountMinor > 0 ? "High" : "Needs Review",
     description: session?.id ?? "Checkout Session",
-    reference: session?.payment_intent
-      ? typeof session.payment_intent === "string"
-        ? session.payment_intent
-        : session.payment_intent.id
-      : session?.id,
+    reference: paymentIntentId ?? sessionId ?? session?.id,
     metadata: {
+      paymentIntentId,
+      sessionId,
       email: session?.customer_details?.email,
       rawMetadata: session?.metadata,
     },
