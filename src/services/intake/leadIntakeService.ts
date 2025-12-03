@@ -210,7 +210,7 @@ export async function processLeadIntake(rawPayload: unknown) {
       campaignId: normalized.trackingIds.campaignId ?? undefined,
       adsetId: normalized.trackingIds.adsetId ?? undefined,
       platform: normalized.trackingIds.platform ?? undefined,
-      rawPayload: normalized.raw,
+      rawPayload: normalized.raw as Prisma.JsonValue,
     },
   });
 
