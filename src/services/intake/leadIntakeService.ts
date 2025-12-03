@@ -155,8 +155,8 @@ export async function processLeadIntake(rawPayload: unknown) {
       ...(existing?.metadata as Record<string, unknown> | undefined),
       source: normalized.source ?? "ghl",
       ghlTags: normalized.tags,
-      raw: normalized.raw,
-    },
+      raw: normalized.raw as unknown,
+    } as unknown as Record<string, unknown>,
   };
 
   let leadId = existing?.id;
