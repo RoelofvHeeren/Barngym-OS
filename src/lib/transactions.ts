@@ -389,10 +389,11 @@ export function mapStripeInvoice(invoice: StripeInvoicePayload): NormalizedTrans
   const created = typeof invoice?.created === "number" ? invoice.created * 1000 : Date.now();
   const amountMinor = typeof invoice?.amount_paid === "number" ? invoice.amount_paid : 0;
   const invoiceId = typeof invoice?.id === "string" ? invoice.id : undefined;
-  const paymentIntentId =
-    typeof invoice?.payment_intent === "string"
-      ? invoice.payment_intent
-      : invoice?.payment_intent?.id;
+  const paymentIntentId = (() => {
+    const payload = (invoice as { payment_intent?: string | { id?: string } } | null)?.payment_intent;
+    if (typeof payload === "string") return payload;
+    return payload?.id;
+  })();
   return {
     externalId: stripeExternalId({ paymentIntentId, invoiceId }),
     provider: "Stripe",
