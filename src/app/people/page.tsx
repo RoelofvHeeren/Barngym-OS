@@ -258,11 +258,17 @@ const computeDisplayName = (lead: ApiLead, metadataContact?: { first_name?: stri
 };
 
 const getStatusInfo = (status?: string | null, source?: string | null) => {
-  const normalized = (status ?? "LEAD").toUpperCase();
-  if (normalized === "CLIENT") {
+  const normalizedStatus = status ? status.toUpperCase() : null;
+  const sourceLower = (source ?? "").toLowerCase();
+  const fromAds = sourceLower === "ads" || sourceLower.startsWith("ads ");
+
+  if (normalizedStatus === "CLIENT") {
     return { label: "Client", tone: "client" as const, sourceLabel: source ?? "Converted" };
   }
-  return { label: "Lead (from Ads)", tone: "lead" as const, sourceLabel: source ?? "Ads (GHL Webhook)" };
+  if ((normalizedStatus === "LEAD" && fromAds) || fromAds) {
+    return { label: "Lead (from Ads)", tone: "lead" as const, sourceLabel: source ?? "Ads (GHL Webhook)" };
+  }
+  return null;
 };
 
 const buildProfileFromLead = (lead: ApiLead, displayName: string): LeadProfile => {

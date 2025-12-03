@@ -40,13 +40,15 @@ const computeDisplayName = (
 
 const getStatusInfo = (status?: string | null, source?: string | null) => {
   const normalizedStatus = status ? status.toUpperCase() : null;
-  const fromAds = (source ?? "").toLowerCase() === "ads";
+  const sourceLower = (source ?? "").toLowerCase();
+  const fromAds = sourceLower === "ads" || sourceLower.startsWith("ads ");
 
   if (normalizedStatus === "CLIENT") {
     return { label: "Client", tone: "client" as const, sourceLabel: source ?? "Converted" };
   }
 
-  if (normalizedStatus === "LEAD" || fromAds) {
+  // Only treat as ads-lead when the source explicitly indicates ads
+  if ((normalizedStatus === "LEAD" && fromAds) || fromAds) {
     return { label: "Lead (from Ads)", tone: "lead" as const, sourceLabel: source ?? "Ads (GHL Webhook)" };
   }
 
