@@ -1,6 +1,7 @@
 import Stripe from "stripe";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { revalidatePath } from "next/cache";
 import {
   NormalizedTransaction,
   mapStripeCharge,
@@ -100,6 +101,10 @@ export async function POST(request: Request) {
         records: result.added.toString(),
       },
     });
+
+    // Immediately revalidate transaction pages so the UI reflects new data without redeploy.
+    revalidatePath("/transactions");
+    revalidatePath("/transactions/manual");
 
     return NextResponse.json({ ok: true, processed: normalized.length, stored: result.added });
   } catch (error) {

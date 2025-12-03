@@ -3,6 +3,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 type TransactionRecord = {
   id: string;
@@ -72,6 +73,7 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 export default function TransactionsClient({ transactions }: Props) {
+  const router = useRouter();
   const [sourceFilter, setSourceFilter] = useState<string>("All");
   const [matchFilter, setMatchFilter] = useState<MatchFilter>("all");
   const [sortBy, setSortBy] = useState<SortOption>("date_desc");
@@ -209,6 +211,13 @@ export default function TransactionsClient({ transactions }: Props) {
               Amount low → high
             </option>
           </select>
+          <button
+            type="button"
+            onClick={() => router.refresh()}
+            className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-primary hover:bg-white/10 transition"
+          >
+            Refresh now
+          </button>
         </div>
         <div className="flex items-center gap-3 text-sm">
           <Link href="/transactions/manual" className="text-emerald-200 underline">

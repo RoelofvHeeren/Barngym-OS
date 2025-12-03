@@ -263,6 +263,7 @@ export function mapStripeCharge(charge: StripeChargePayload): NormalizedTransact
     occurredAt: new Date(created).toISOString(),
     personName:
       safeString(charge?.billing_details?.name) ||
+      safeString(metadata.customer_name as string | undefined) ||
       safeString(metadata.member_name) ||
       safeString(charge?.customer) ||
       undefined,
@@ -273,7 +274,11 @@ export function mapStripeCharge(charge: StripeChargePayload): NormalizedTransact
     reference: charge?.id,
     metadata: {
       customer: charge?.customer,
-      email: charge?.billing_details?.email ?? charge?.receipt_email,
+      email:
+        charge?.billing_details?.email ??
+        charge?.receipt_email ??
+        (metadata.customer_email as string | undefined) ??
+        (metadata.email as string | undefined),
       phone: charge?.billing_details?.phone,
       invoice: invoiceReference,
       rawMetadata: metadata,
@@ -315,6 +320,7 @@ export function mapStripePaymentIntent(intent: StripePaymentIntentPayload): Norm
     occurredAt: new Date(created).toISOString(),
     personName:
       safeString((intent as { billing_details?: { name?: string } })?.billing_details?.name) ??
+      safeString(metadata.customer_name as string | undefined) ??
       safeString(metadata.member_name as string | undefined) ??
       safeString(intent?.customer),
     productType: safeString(intent?.metadata?.product_type as string | undefined) ?? "Stripe Payment Intent",
@@ -328,7 +334,7 @@ export function mapStripePaymentIntent(intent: StripePaymentIntentPayload): Norm
     metadata: {
       email:
         safeString((intent as { billing_details?: { email?: string } })?.billing_details?.email) ??
-        safeString((metadata.email as string) ?? undefined),
+        safeString((metadata.customer_email as string) ?? (metadata.email as string) ?? undefined),
       phone: (intent as { billing_details?: { phone?: string } })?.billing_details?.phone,
       customer: intent?.customer,
       rawMetadata: intent?.metadata,
