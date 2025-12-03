@@ -152,6 +152,8 @@ export async function processLeadIntake(rawPayload: unknown) {
     raw: normalized.raw as unknown as Prisma.JsonValue,
   };
 
+  const rawTrackingJson: Prisma.InputJsonValue = (normalized.raw as Prisma.InputJsonValue) ?? {};
+
   const baseData = {
     firstName: normalized.firstName ?? undefined,
     lastName: normalized.lastName ?? undefined,
@@ -210,7 +212,7 @@ export async function processLeadIntake(rawPayload: unknown) {
       campaignId: normalized.trackingIds.campaignId ?? undefined,
       adsetId: normalized.trackingIds.adsetId ?? undefined,
       platform: normalized.trackingIds.platform ?? undefined,
-      rawPayload: normalized.raw as Prisma.JsonValue,
+      rawPayload: rawTrackingJson,
     },
   });
 
