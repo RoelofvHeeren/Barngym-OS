@@ -224,8 +224,8 @@ export async function processLeadIntake(rawPayload: unknown) {
         source: normalized.source,
         tags: normalized.tags,
         tracking: normalized.utm,
-        raw: normalized.raw,
-      },
+        raw: normalized.raw as Prisma.JsonValue,
+      } as Prisma.InputJsonValue,
     },
   });
 
