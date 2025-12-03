@@ -126,16 +126,18 @@ export async function processLeadIntake(rawPayload: unknown) {
 
   const leadWhere = {
     OR: [
-      normalized.contactId ? { ghlContactId: normalized.contactId } : undefined,
-      normalized.email ? { email: normalized.email } : undefined,
-      normalized.phone ? { phone: normalized.phone } : undefined,
-    ].filter(Boolean),
+      normalized.contactId ? { ghlContactId: normalized.contactId } : null,
+      normalized.email ? { email: normalized.email } : null,
+      normalized.phone ? { phone: normalized.phone } : null,
+    ].filter(Boolean) as Array<{
+      ghlContactId?: string;
+      email?: string;
+      phone?: string;
+    }>,
   };
 
   const existing =
-    (leadWhere.OR as unknown[] | undefined)?.length
-      ? await prisma.lead.findFirst({ where: leadWhere })
-      : null;
+    (leadWhere.OR?.length ?? 0) > 0 ? await prisma.lead.findFirst({ where: leadWhere }) : null;
 
   const baseData = {
     firstName: normalized.firstName ?? undefined,
