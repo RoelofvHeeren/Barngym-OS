@@ -78,7 +78,7 @@ function normalizePayload(rawPayload: Record<string, any>): NormalizedPayload {
   const source =
     normalizeString(root.source) ||
     normalizeString(contact.source) ||
-    "ghl";
+    "ads";
 
   const tags = extractArray(root.tags ?? contact.tags);
 
@@ -160,7 +160,8 @@ export async function processLeadIntake(rawPayload: unknown) {
     email: normalized.email ?? undefined,
     phone: normalized.phone ?? undefined,
     goal: normalized.goal ?? undefined,
-    source: normalized.source ?? "ghl",
+    source: normalized.source ?? "ads",
+    status: "LEAD" as const,
     ghlContactId: normalized.contactId ?? undefined,
     tags: tagsJson as Prisma.InputJsonValue,
     metadata: metadataJson as Prisma.InputJsonValue,
@@ -177,6 +178,7 @@ export async function processLeadIntake(rawPayload: unknown) {
     if (!existing.phone && baseData.phone) updateData.phone = baseData.phone;
     if (!existing.goal && baseData.goal) updateData.goal = baseData.goal;
     if (!existing.source && baseData.source) updateData.source = baseData.source;
+    if (!existing.status && baseData.status) updateData.status = baseData.status;
     if (!existing.ghlContactId && baseData.ghlContactId) updateData.ghlContactId = baseData.ghlContactId;
     updateData.tags = baseData.tags;
     updateData.metadata = baseData.metadata;

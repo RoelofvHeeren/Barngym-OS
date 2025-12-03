@@ -42,6 +42,9 @@ const searchHints = [
 type LeadRow = {
   id: string;
   name: string;
+  statusLabel?: string;
+  statusTone?: "lead" | "client" | string;
+  source?: string | null;
   channel: string;
   stage: string;
   owner: string;
@@ -55,6 +58,9 @@ type LeadProfile = {
   title: string;
   email: string;
   phone: string;
+  status?: string;
+  statusTone?: "lead" | "client" | string;
+  source?: string;
   tags: string[];
   identities: { label: string; value: string }[];
   stats: {
@@ -195,6 +201,8 @@ type ApiLead = {
   nextStep: string | null;
   valueMinor: number | null;
   membershipName: string | null;
+  source: string | null;
+  status: string | null;
   metadata: unknown;
 };
 
@@ -224,7 +232,41 @@ const isLeadProfile = (value: unknown): value is LeadProfile => {
   );
 };
 
+const computeDisplayName = (lead: ApiLead, metadataContact?: { first_name?: string; firstName?: string; last_name?: string; lastName?: string }) => {
+  const metadataFirst =
+    metadataContact?.first_name ??
+    metadataContact?.firstName;
+  const metadataLast =
+    metadataContact?.last_name ??
+    metadataContact?.lastName;
+
+  const fromNames = [lead.firstName ?? "", lead.lastName ?? ""]
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join(" ");
+  const metadataNames = [metadataFirst ?? "", metadataLast ?? ""]
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join(" ");
+
+  return (
+    fromNames ||
+    metadataNames ||
+    lead.email ||
+    "Unnamed Lead"
+  );
+};
+
+const getStatusInfo = (status?: string | null, source?: string | null) => {
+  const normalized = (status ?? "LEAD").toUpperCase();
+  if (normalized === "CLIENT") {
+    return { label: "Client", tone: "client" as const, sourceLabel: source ?? "Converted" };
+  }
+  return { label: "Lead (from Ads)", tone: "lead" as const, sourceLabel: source ?? "Ads (GHL Webhook)" };
+};
+
 const buildProfileFromLead = (lead: ApiLead, displayName: string): LeadProfile => {
+  const statusInfo = getStatusInfo(lead.status, lead.source);
   const initials = displayName
     .split(" ")
     .map((part) => part.charAt(0))
@@ -238,6 +280,9 @@ const buildProfileFromLead = (lead: ApiLead, displayName: string): LeadProfile =
     title: lead.membershipName ?? "Imported Lead",
     email: lead.email ?? "",
     phone: lead.phone ?? "",
+    status: statusInfo.label,
+    statusTone: statusInfo.tone,
+    source: statusInfo.sourceLabel,
     tags: [lead.channel ?? "Imported"],
     identities: [
       lead.email ? { label: "Email", value: lead.email } : null,
@@ -275,29 +320,28 @@ function normalizeApiLead(lead: ApiLead): NormalizedLead {
       ? ((metadata as { raw?: unknown }).raw as Record<string, unknown> | undefined)
       : undefined;
 
-  const metadataFirstName =
-    (metadataContact as { first_name?: string; firstName?: string })?.first_name ??
-    (metadataContact as { firstName?: string })?.firstName;
-  const metadataLastName =
-    (metadataContact as { last_name?: string; lastName?: string })?.last_name ??
-    (metadataContact as { lastName?: string })?.lastName;
-
-  const displayName =
-    [lead.firstName ?? "", lead.lastName ?? ""].map((part) => part.trim()).join(" ").trim() ||
-    [metadataFirstName ?? "", metadataLastName ?? ""].map((part) => part?.trim() ?? "").join(" ").trim() ||
-    lead.email ||
-    lead.phone ||
-    "Imported Lead";
+  const displayName = computeDisplayName(
+    lead,
+    metadataContact as
+      | { first_name?: string; firstName?: string; last_name?: string; lastName?: string }
+      | undefined
+  );
   const storedProfile = isLeadProfile(metadataProfile) ? metadataProfile : null;
   const profileBase = storedProfile ?? buildProfileFromLead(lead, displayName);
   const profile = {
     ...profileBase,
+    status: profileBase.status ?? getStatusInfo(lead.status, lead.source).label,
+    statusTone: profileBase.statusTone ?? getStatusInfo(lead.status, lead.source).tone,
+    source: profileBase.source ?? getStatusInfo(lead.status, lead.source).sourceLabel,
     history: Array.isArray(profileBase.history) ? profileBase.history : [],
   };
 
   const row: LeadRow = {
     id: leadId,
     name: displayName,
+    statusLabel: profile.status,
+    statusTone: profile.statusTone,
+    source: profile.source,
     channel: lead.channel ?? "Imported",
     stage: lead.stage ?? "New",
     owner: lead.owner ?? "Unassigned",
@@ -939,7 +983,25 @@ export default function PeoplePage() {
                   >
                     <td className="py-3 pr-4">
                       <p className="font-semibold text-primary">{lead.name}</p>
-                      <p className="text-xs text-muted">{lead.id}</p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        {lead.statusLabel && (
+                          <span
+                            className={`chip text-[10px] ${
+                              lead.statusTone === "client"
+                                ? "!bg-emerald-100 !text-emerald-800 !border-emerald-200"
+                                : "!bg-amber-100 !text-amber-800 !border-amber-200"
+                            }`}
+                          >
+                            {lead.statusLabel}
+                          </span>
+                        )}
+                        {lead.source && (
+                          <span className="chip text-[10px] !bg-white/70 !text-primary !border-white/30">
+                            Source: {lead.source}
+                          </span>
+                        )}
+                        <span className="text-[11px] text-muted">{lead.id}</span>
+                      </div>
                     </td>
                     <td className="pr-4 text-muted">{lead.channel}</td>
                     <td className="pr-4">
@@ -1005,6 +1067,22 @@ export default function PeoplePage() {
                 </p>
                 <h3 className="mt-2 text-2xl font-semibold">{selectedLeadProfile.name}</h3>
                 <p className="text-sm text-muted">{selectedLeadProfile.title}</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <span
+                    className={`chip text-xs ${
+                      selectedLeadProfile.statusTone === "client"
+                        ? "!bg-emerald-100 !text-emerald-800 !border-emerald-200"
+                        : "!bg-amber-100 !text-amber-800 !border-amber-200"
+                    }`}
+                  >
+                    {selectedLeadProfile.status ?? "Lead (from Ads)"}
+                  </span>
+                  {selectedLeadProfile.source && (
+                    <span className="chip text-xs !bg-white/80 !text-primary !border-white/40">
+                      Source: {selectedLeadProfile.source}
+                    </span>
+                  )}
+                </div>
               </div>
               <button
                 type="button"

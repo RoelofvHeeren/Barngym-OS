@@ -18,7 +18,32 @@ type LeadPayload = {
   nextStep?: string;
   valueMinor?: number | null;
   membershipName?: string;
+  source?: string | null;
+  status?: string | null;
   metadata?: Record<string, unknown>;
+};
+
+const computeDisplayName = (
+  lead: {
+    firstName: string | null;
+    lastName: string | null;
+    email: string | null;
+  }
+) => {
+  const fullName = [lead.firstName ?? "", lead.lastName ?? ""]
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join(" ");
+
+  return fullName || lead.email || "Unnamed Lead";
+};
+
+const getStatusInfo = (status?: string | null, source?: string | null) => {
+  const normalized = (status ?? "LEAD").toUpperCase();
+  if (normalized === "CLIENT") {
+    return { label: "Client", tone: "client" as const, sourceLabel: source ?? "Converted" };
+  }
+  return { label: "Lead (from Ads)", tone: "lead" as const, sourceLabel: source ?? "Ads (GHL Webhook)" };
 };
 
 export async function GET() {
@@ -77,21 +102,23 @@ export async function GET() {
         timeStyle: "short",
       }).format(date);
 
-  const enriched = leads.map((lead) => {
-    const stats = statsMap.get(lead.id) ?? {
-      lifetimeMinor: 0,
-      payments: [],
-    };
-    const recentPayments = stats.payments.slice(0, 5);
-    const historyPayments = stats.payments.slice(0, 50);
+    const enriched = leads.map((lead) => {
+      const stats = statsMap.get(lead.id) ?? {
+        lifetimeMinor: 0,
+        payments: [],
+      };
+      const recentPayments = stats.payments.slice(0, 5);
+      const historyPayments = stats.payments.slice(0, 50);
       const lastPayment = recentPayments[0];
+      const displayName = computeDisplayName({
+        firstName: lead.firstName,
+        lastName: lead.lastName,
+        email: lead.email,
+      });
+      const statusInfo = getStatusInfo(lead.status, lead.source);
 
       const profile = {
-        name:
-          [lead.firstName ?? "", lead.lastName ?? ""].map((part) => part.trim()).join(" ").trim() ||
-          lead.email ||
-          lead.phone ||
-          "Imported Lead",
+        name: displayName,
         initials: (
           ((lead.firstName ?? "").charAt(0) + (lead.lastName ?? "").charAt(0)) ||
           (lead.email ?? "BG").slice(0, 2)
@@ -99,20 +126,23 @@ export async function GET() {
         title: lead.membershipName ?? lead.channel ?? "Lead",
         email: lead.email ?? "",
         phone: lead.phone ?? "",
-          tags: [lead.channel, lead.stage, lead.membershipName].filter(
-            (tag): tag is string => Boolean(tag && tag.trim())
-          ),
-          identities: [
-            lead.email ? { label: "Email", value: lead.email } : null,
-            lead.phone ? { label: "Phone", value: lead.phone } : null,
-            lead.metadata && typeof lead.metadata === "object" && (lead.metadata as Record<string, unknown>).reference
-              ? {
-                  label: "Reference",
-                  value: (lead.metadata as Record<string, unknown>).reference as string,
-                }
-              : null,
-            lead.membershipName ? { label: "Membership", value: lead.membershipName } : null,
-          ].filter(Boolean),
+        status: statusInfo.label,
+        statusTone: statusInfo.tone,
+        source: statusInfo.sourceLabel,
+        tags: [lead.channel, lead.stage, lead.membershipName, statusInfo.label].filter(
+          (tag): tag is string => Boolean(tag && tag.trim())
+        ),
+        identities: [
+          lead.email ? { label: "Email", value: lead.email } : null,
+          lead.phone ? { label: "Phone", value: lead.phone } : null,
+          lead.metadata && typeof lead.metadata === "object" && (lead.metadata as Record<string, unknown>).reference
+            ? {
+                label: "Reference",
+                value: (lead.metadata as Record<string, unknown>).reference as string,
+              }
+            : null,
+          lead.membershipName ? { label: "Membership", value: lead.membershipName } : null,
+        ].filter(Boolean),
         stats: {
           lifetimeSpend: formatCurrency(stats.lifetimeMinor || 0),
           memberships: lead.membershipName ?? "Unassigned",
