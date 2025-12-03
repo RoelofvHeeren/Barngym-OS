@@ -32,10 +32,13 @@ model Lead {
   externalId     String?  @unique
   glofoxMemberId String?  @unique
   stripeCustomerId String?
+  ghlContactId   String?  @unique
   firstName      String?
   lastName       String?
   email          String?
   phone          String?
+  goal           String?
+  source         String?
   gender         String?
   dateOfBirth    DateTime?
   street         String?
@@ -56,9 +59,12 @@ model Lead {
   updatedAt      DateTime @updatedAt
   transactions   Transaction[]
   counterpartyMappings CounterpartyMapping[]
+  leadTracking   LeadTracking[]
+  leadEvents     LeadEvent[]
 
   @@index([email])
   @@index([phone])
+  @@index([ghlContactId])
 }
 
 model Transaction {
@@ -130,6 +136,43 @@ model ManualMatchQueue {
   resolvedBy         String?
 
   transaction Transaction @relation(fields: [transactionId], references: [id])
+}
+
+model LeadTracking {
+  id          String   @id @default(cuid())
+  leadId      String
+  utmSource   String?
+  utmMedium   String?
+  utmCampaign String?
+  utmTerm     String?
+  utmContent  String?
+  fbclid      String?
+  gclid       String?
+  formId      String?
+  adId        String?
+  campaignId  String?
+  adsetId     String?
+  platform    String?
+  rawPayload  Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  lead Lead @relation(fields: [leadId], references: [id])
+
+  @@index([leadId])
+}
+
+model LeadEvent {
+  id        String   @id @default(cuid())
+  leadId    String
+  eventType String
+  payload   Json?
+  createdAt DateTime @default(now())
+
+  lead Lead @relation(fields: [leadId], references: [id])
+
+  @@index([leadId])
+  @@index([eventType])
 }
 
 model Goal {
