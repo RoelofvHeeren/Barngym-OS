@@ -39,11 +39,18 @@ const computeDisplayName = (
 };
 
 const getStatusInfo = (status?: string | null, source?: string | null) => {
-  const normalized = (status ?? "LEAD").toUpperCase();
-  if (normalized === "CLIENT") {
+  const normalizedStatus = status ? status.toUpperCase() : null;
+  const fromAds = (source ?? "").toLowerCase() === "ads";
+
+  if (normalizedStatus === "CLIENT") {
     return { label: "Client", tone: "client" as const, sourceLabel: source ?? "Converted" };
   }
-  return { label: "Lead (from Ads)", tone: "lead" as const, sourceLabel: source ?? "Ads (GHL Webhook)" };
+
+  if (normalizedStatus === "LEAD" || fromAds) {
+    return { label: "Lead (from Ads)", tone: "lead" as const, sourceLabel: source ?? "Ads (GHL Webhook)" };
+  }
+
+  return null;
 };
 
 export async function GET() {
@@ -126,10 +133,10 @@ export async function GET() {
         title: lead.membershipName ?? lead.channel ?? "Lead",
         email: lead.email ?? "",
         phone: lead.phone ?? "",
-        status: statusInfo.label,
-        statusTone: statusInfo.tone,
-        source: statusInfo.sourceLabel,
-        tags: [lead.channel, lead.stage, lead.membershipName, statusInfo.label].filter(
+        status: statusInfo?.label,
+        statusTone: statusInfo?.tone,
+        source: statusInfo?.sourceLabel,
+        tags: [lead.channel, lead.stage, lead.membershipName, statusInfo?.label].filter(
           (tag): tag is string => Boolean(tag && tag.trim())
         ),
         identities: [

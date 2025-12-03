@@ -43,7 +43,7 @@ model Lead {
   email          String?
   phone          String?
   goal           String?
-  status         LeadStatus @default(LEAD)
+  status         LeadStatus?
   source         String?
   gender         String?
   dateOfBirth    DateTime?

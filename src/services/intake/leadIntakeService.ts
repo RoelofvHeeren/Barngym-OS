@@ -161,7 +161,7 @@ export async function processLeadIntake(rawPayload: unknown) {
     phone: normalized.phone ?? undefined,
     goal: normalized.goal ?? undefined,
     source: normalized.source ?? "ads",
-    status: "LEAD" as const,
+    status: (normalized.source ?? "ads") === "ads" ? ("LEAD" as any) : undefined,
     ghlContactId: normalized.contactId ?? undefined,
     tags: tagsJson as Prisma.InputJsonValue,
     metadata: metadataJson as Prisma.InputJsonValue,

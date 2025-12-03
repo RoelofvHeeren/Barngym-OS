@@ -280,9 +280,9 @@ const buildProfileFromLead = (lead: ApiLead, displayName: string): LeadProfile =
     title: lead.membershipName ?? "Imported Lead",
     email: lead.email ?? "",
     phone: lead.phone ?? "",
-    status: statusInfo.label,
-    statusTone: statusInfo.tone,
-    source: statusInfo.sourceLabel,
+    status: statusInfo?.label,
+    statusTone: statusInfo?.tone,
+    source: statusInfo?.sourceLabel,
     tags: [lead.channel ?? "Imported"],
     identities: [
       lead.email ? { label: "Email", value: lead.email } : null,
@@ -330,9 +330,9 @@ function normalizeApiLead(lead: ApiLead): NormalizedLead {
   const profileBase = storedProfile ?? buildProfileFromLead(lead, displayName);
   const profile = {
     ...profileBase,
-    status: profileBase.status ?? getStatusInfo(lead.status, lead.source).label,
-    statusTone: profileBase.statusTone ?? getStatusInfo(lead.status, lead.source).tone,
-    source: profileBase.source ?? getStatusInfo(lead.status, lead.source).sourceLabel,
+    status: profileBase.status ?? getStatusInfo(lead.status, lead.source)?.label,
+    statusTone: profileBase.statusTone ?? getStatusInfo(lead.status, lead.source)?.tone,
+    source: profileBase.source ?? getStatusInfo(lead.status, lead.source)?.sourceLabel,
     history: Array.isArray(profileBase.history) ? profileBase.history : [],
   };
 
