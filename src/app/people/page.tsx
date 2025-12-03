@@ -265,17 +265,29 @@ type NormalizedLead = {
 
 function normalizeApiLead(lead: ApiLead): NormalizedLead {
   const leadId = lead.externalId ?? lead.id;
-  const displayName =
-    [lead.firstName ?? "", lead.lastName ?? ""].map((part) => part.trim()).join(" ").trim() ||
-    lead.email ||
-    lead.phone ||
-    "Imported Lead";
-
   const metadata = (lead.metadata ?? {}) as Record<string, unknown>;
   const metadataProfile =
     typeof metadata === "object" && metadata !== null && "profile" in metadata
       ? (metadata as { profile?: unknown }).profile
       : null;
+  const metadataContact =
+    typeof metadata === "object" && metadata !== null && "raw" in metadata
+      ? ((metadata as { raw?: unknown }).raw as Record<string, unknown> | undefined)
+      : undefined;
+
+  const metadataFirstName =
+    (metadataContact as { first_name?: string; firstName?: string })?.first_name ??
+    (metadataContact as { firstName?: string })?.firstName;
+  const metadataLastName =
+    (metadataContact as { last_name?: string; lastName?: string })?.last_name ??
+    (metadataContact as { lastName?: string })?.lastName;
+
+  const displayName =
+    [lead.firstName ?? "", lead.lastName ?? ""].map((part) => part.trim()).join(" ").trim() ||
+    [metadataFirstName ?? "", metadataLastName ?? ""].map((part) => part?.trim() ?? "").join(" ").trim() ||
+    lead.email ||
+    lead.phone ||
+    "Imported Lead";
   const storedProfile = isLeadProfile(metadataProfile) ? metadataProfile : null;
   const profileBase = storedProfile ?? buildProfileFromLead(lead, displayName);
   const profile = {
