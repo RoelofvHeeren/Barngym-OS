@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@/generated/prisma";
 
 type NormalizedPayload = {
   firstName?: string | null;
@@ -139,6 +140,18 @@ export async function processLeadIntake(rawPayload: unknown) {
   const existing =
     (leadWhere.OR?.length ?? 0) > 0 ? await prisma.lead.findFirst({ where: leadWhere }) : null;
 
+  const tagsJson: Prisma.JsonValue = {
+    ...(existing?.tags as Prisma.JsonObject | undefined),
+    ghlTags: normalized.tags,
+  };
+
+  const metadataJson: Prisma.JsonValue = {
+    ...(existing?.metadata as Prisma.JsonObject | undefined),
+    source: normalized.source ?? "ghl",
+    ghlTags: normalized.tags,
+    raw: normalized.raw as unknown,
+  };
+
   const baseData = {
     firstName: normalized.firstName ?? undefined,
     lastName: normalized.lastName ?? undefined,
@@ -147,16 +160,8 @@ export async function processLeadIntake(rawPayload: unknown) {
     goal: normalized.goal ?? undefined,
     source: normalized.source ?? "ghl",
     ghlContactId: normalized.contactId ?? undefined,
-    tags: {
-      ...(existing?.tags as Record<string, unknown> | undefined),
-      ghlTags: normalized.tags,
-    },
-    metadata: {
-      ...(existing?.metadata as Record<string, unknown> | undefined),
-      source: normalized.source ?? "ghl",
-      ghlTags: normalized.tags,
-      raw: normalized.raw as unknown,
-    } as unknown as Record<string, unknown>,
+    tags: tagsJson as Prisma.InputJsonValue,
+    metadata: metadataJson as Prisma.InputJsonValue,
   };
 
   let leadId = existing?.id;
