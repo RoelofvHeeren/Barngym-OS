@@ -149,7 +149,7 @@ export async function processLeadIntake(rawPayload: unknown) {
     ...(existing?.metadata as Prisma.JsonObject | undefined),
     source: normalized.source ?? "ghl",
     ghlTags: normalized.tags,
-    raw: normalized.raw as unknown,
+    raw: normalized.raw as unknown as Prisma.JsonValue,
   };
 
   const baseData = {
