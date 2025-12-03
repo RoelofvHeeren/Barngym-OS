@@ -19,6 +19,7 @@ type TransactionRecord = {
   leadId?: string | null;
   metadata?: Record<string, unknown> | null;
 };
+export type { TransactionRecord };
 
 type Props = {
   transactions: TransactionRecord[];
