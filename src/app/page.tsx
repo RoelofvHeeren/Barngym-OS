@@ -112,6 +112,14 @@ type AdsOverview = {
   roas: number;
 };
 
+type LtvCategorySnapshot = {
+  avgAllCents: number;
+  avgAdsCents: number;
+  avgPtCents: number;
+  avgOnlineCoachingCents: number;
+  avgClassesCents: number;
+};
+
 const timeBuckets: TimeBucket[] = ["Today", "This Week", "This Month", "Custom"];
 const sourceFilters: SourceFilter[] = ["All Sources", "Stripe", "Glofox", "Starling"];
 const timeframeFilters: TimeframeFilter[] = ["Day", "Week", "Month", "Year"];
@@ -337,6 +345,8 @@ export default function Home() {
   const [unmatchedPayments, setUnmatchedPayments] = useState<UnmatchedPayment[]>([]);
   const [adsOverview, setAdsOverview] = useState<AdsOverview | null>(null);
   const [adsOverviewError, setAdsOverviewError] = useState<string | null>(null);
+  const [ltvCategories, setLtvCategories] = useState<LtvCategorySnapshot | null>(null);
+  const [ltvError, setLtvError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -393,6 +403,33 @@ export default function Home() {
     }
     fetchAdsOverview();
     const interval = setInterval(fetchAdsOverview, 60_000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchLtvCategories() {
+      try {
+        const response = await fetch("/api/ltv/categories");
+        const payload = await response.json();
+        if (!response.ok || !payload.ok) {
+          throw new Error(payload.message || "Unable to load LTV categories.");
+        }
+        if (!cancelled) {
+          setLtvCategories(payload.data as LtvCategorySnapshot);
+          setLtvError(null);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setLtvError(error instanceof Error ? error.message : "Failed to load LTV data.");
+        }
+      }
+    }
+    fetchLtvCategories();
+    const interval = setInterval(fetchLtvCategories, 120_000);
     return () => {
       cancelled = true;
       clearInterval(interval);
@@ -478,16 +515,9 @@ export default function Home() {
     {
       key: "trialMembers",
       label: "Trial Members Right Now",
-      value: (snapshot?.stats.members.trial ?? 0).toLocaleString(),
-      delta: `${snapshot?.stats.alerts.expiringMemberships ?? 0} expiring soon`,
-      sparkline: Array(7).fill(snapshot?.stats.members.trial ?? 0),
-    },
-    {
-      key: "corporateClients",
-      label: "Corporate Clients Enrolled",
-      value: (snapshot?.stats.members.corporate ?? 0).toLocaleString(),
-      delta: `${snapshot?.stats.members.corporate ?? 0} active`,
-      sparkline: Array(7).fill(snapshot?.stats.members.corporate ?? 0),
+      value: "—",
+      delta: "Removed",
+      sparkline: Array(7).fill(0),
     },
     {
       key: "adsRoas",
@@ -499,9 +529,37 @@ export default function Home() {
     {
       key: "adsLtv",
       label: "Ads Avg LTV",
-      value: adsOverview ? formatCurrency(adsOverview.avgLtvAdsCents ?? 0, activeCurrency) : "—",
-      delta: adsOverviewError ? adsOverviewError : `${adsOverview?.leadsCount ?? 0} leads`,
-      sparkline: Array(7).fill(adsOverview?.avgLtvAdsCents ?? 0),
+      value: ltvCategories ? formatCurrency(ltvCategories.avgAdsCents ?? 0, activeCurrency) : "—",
+      delta: ltvError ? ltvError : `${adsOverview?.leadsCount ?? 0} leads`,
+      sparkline: Array(7).fill(ltvCategories?.avgAdsCents ?? 0),
+    },
+    {
+      key: "ltvAll",
+      label: "Avg LTV (All Clients)",
+      value: ltvCategories ? formatCurrency(ltvCategories.avgAllCents ?? 0, activeCurrency) : "—",
+      delta: ltvError ?? "",
+      sparkline: Array(7).fill(ltvCategories?.avgAllCents ?? 0),
+    },
+    {
+      key: "ltvPt",
+      label: "Avg LTV (PT)",
+      value: ltvCategories ? formatCurrency(ltvCategories.avgPtCents ?? 0, activeCurrency) : "—",
+      delta: ltvError ?? "",
+      sparkline: Array(7).fill(ltvCategories?.avgPtCents ?? 0),
+    },
+    {
+      key: "ltvOnline",
+      label: "Avg LTV (Online Coaching)",
+      value: ltvCategories ? formatCurrency(ltvCategories.avgOnlineCoachingCents ?? 0, activeCurrency) : "—",
+      delta: ltvError ?? "",
+      sparkline: Array(7).fill(ltvCategories?.avgOnlineCoachingCents ?? 0),
+    },
+    {
+      key: "ltvClasses",
+      label: "Avg LTV (Pay As You Go)",
+      value: ltvCategories ? formatCurrency(ltvCategories.avgClassesCents ?? 0, activeCurrency) : "—",
+      delta: ltvError ?? "",
+      sparkline: Array(7).fill(ltvCategories?.avgClassesCents ?? 0),
     },
   ];
 
