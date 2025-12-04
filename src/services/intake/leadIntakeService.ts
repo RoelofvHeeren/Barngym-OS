@@ -169,7 +169,6 @@ export async function processLeadIntake(rawPayload: unknown) {
   };
 
   const rawTrackingJson: Prisma.InputJsonValue = (normalized.raw as Prisma.InputJsonValue) ?? {};
-  const fullName = normalizeString(normalized.fullName);
 
   const baseData = {
     firstName: normalized.firstName ?? undefined,
