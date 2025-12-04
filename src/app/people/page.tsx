@@ -347,8 +347,8 @@ function normalizeApiLead(lead: ApiLead): NormalizedLead {
     profileBase.status === "Lead (from Ads)" && !statusInfo;
   const profile = {
     ...profileBase,
-    status: shouldClearStoredLeadTag ? null : profileBase.status ?? statusInfo?.label,
-    statusTone: shouldClearStoredLeadTag ? undefined : profileBase.statusTone ?? statusInfo?.tone,
+    status: shouldClearStoredLeadTag ? undefined : profileBase.status ?? statusInfo?.label ?? undefined,
+    statusTone: shouldClearStoredLeadTag ? undefined : profileBase.statusTone ?? statusInfo?.tone ?? undefined,
     source: profileBase.source ?? statusInfo?.sourceLabel,
     history: Array.isArray(profileBase.history) ? profileBase.history : [],
   };
