@@ -7,10 +7,14 @@ import Link from "next/link";
 import { navGroups } from "./navigation";
 
 const plusJakarta = localFont({
-  src: "/fonts/plus-jakarta-regular.woff2",
+  src: [
+    {
+      path: "/fonts/plus-jakarta-regular.woff2",
+      weight: "400",
+      style: "normal",
+    },
+  ],
   variable: "--font-plus-jakarta",
-  weight: "400",
-  style: "normal",
   display: "swap",
 });
 
