@@ -1,14 +1,17 @@
 import type { Metadata } from "next";
-import { Plus_Jakarta_Sans } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import Sidebar from "./components/Sidebar";
 import TopBar from "./components/TopBar";
 import Link from "next/link";
 import { navGroups } from "./navigation";
 
-const plusJakarta = Plus_Jakarta_Sans({
-  subsets: ["latin"],
+const plusJakarta = localFont({
+  src: "/fonts/plus-jakarta-regular.woff2",
   variable: "--font-plus-jakarta",
+  weight: "400",
+  style: "normal",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
