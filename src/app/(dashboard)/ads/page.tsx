@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 type RangeKey = "today" | "7d" | "30d" | "month" | "all";
@@ -66,7 +66,7 @@ const formatDate = (value?: string | null) => {
   return date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 };
 
-export default function AdsDashboardPage() {
+function AdsDashboardContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -448,5 +448,13 @@ export default function AdsDashboardPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function AdsDashboardPage() {
+  return (
+    <Suspense fallback={<div className="glass-panel">Loading ads dashboard...</div>}>
+      <AdsDashboardContent />
+    </Suspense>
   );
 }
