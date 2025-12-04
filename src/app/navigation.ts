@@ -6,6 +6,7 @@ import {
   Cable,
   Building2,
   Target,
+  Megaphone,
 } from "lucide-react";
 
 export const navGroups = [
@@ -18,6 +19,7 @@ export const navGroups = [
       { name: "Payments & Transactions", href: "/transactions", icon: CreditCard },
       { name: "Products & Services", href: "/products", icon: Boxes },
       { name: "Connections", href: "/connections", icon: Cable },
+      { name: "Ads Dashboard", href: "/ads", icon: Megaphone },
     ],
   },
   {

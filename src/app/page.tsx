@@ -100,6 +100,18 @@ type GraphPoint = {
   value: number;
 };
 
+type AdsOverview = {
+  range: string;
+  spendCents: number;
+  leadsCount: number;
+  conversionsCount: number;
+  revenueFromAdsCents: number;
+  avgLtvAdsCents: number;
+  cplCents: number;
+  cpaCents: number;
+  roas: number;
+};
+
 const timeBuckets: TimeBucket[] = ["Today", "This Week", "This Month", "Custom"];
 const sourceFilters: SourceFilter[] = ["All Sources", "Stripe", "Glofox", "Starling"];
 const timeframeFilters: TimeframeFilter[] = ["Day", "Week", "Month", "Year"];
@@ -323,6 +335,8 @@ export default function Home() {
   const [loadingSnapshot, setLoadingSnapshot] = useState(true);
   const [snapshotError, setSnapshotError] = useState<string | null>(null);
   const [unmatchedPayments, setUnmatchedPayments] = useState<UnmatchedPayment[]>([]);
+  const [adsOverview, setAdsOverview] = useState<AdsOverview | null>(null);
+  const [adsOverviewError, setAdsOverviewError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -350,6 +364,35 @@ export default function Home() {
     }
     fetchSnapshot();
     const interval = setInterval(fetchSnapshot, 60_000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchAdsOverview() {
+      try {
+        const response = await fetch("/api/ads/overview?range=30d");
+        const payload = await response.json();
+        if (!response.ok || !payload.ok) {
+          throw new Error(payload.message || "Unable to load ads overview.");
+        }
+        if (!cancelled) {
+          setAdsOverview(payload.data as AdsOverview);
+          setAdsOverviewError(null);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setAdsOverviewError(
+            error instanceof Error ? error.message : "Failed to load ads overview."
+          );
+        }
+      }
+    }
+    fetchAdsOverview();
+    const interval = setInterval(fetchAdsOverview, 60_000);
     return () => {
       cancelled = true;
       clearInterval(interval);
@@ -445,6 +488,20 @@ export default function Home() {
       value: (snapshot?.stats.members.corporate ?? 0).toLocaleString(),
       delta: `${snapshot?.stats.members.corporate ?? 0} active`,
       sparkline: Array(7).fill(snapshot?.stats.members.corporate ?? 0),
+    },
+    {
+      key: "adsRoas",
+      label: "Ads ROAS (30d)",
+      value: adsOverview ? `${(adsOverview.roas ?? 0).toFixed(2)}x` : "—",
+      delta: adsOverviewError ? adsOverviewError : `${adsOverview?.conversionsCount ?? 0} conversions`,
+      sparkline: Array(7).fill(adsOverview?.roas ?? 0),
+    },
+    {
+      key: "adsLtv",
+      label: "Ads Avg LTV",
+      value: adsOverview ? formatCurrency(adsOverview.avgLtvAdsCents ?? 0, activeCurrency) : "—",
+      delta: adsOverviewError ? adsOverviewError : `${adsOverview?.leadsCount ?? 0} leads`,
+      sparkline: Array(7).fill(adsOverview?.avgLtvAdsCents ?? 0),
     },
   ];
 
