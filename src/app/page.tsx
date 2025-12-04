@@ -345,6 +345,8 @@ export default function Home() {
   const [unmatchedPayments, setUnmatchedPayments] = useState<UnmatchedPayment[]>([]);
   const [adsOverview, setAdsOverview] = useState<AdsOverview | null>(null);
   const [adsOverviewError, setAdsOverviewError] = useState<string | null>(null);
+  const [adsOverviewAll, setAdsOverviewAll] = useState<AdsOverview | null>(null);
+  const [adsOverviewAllError, setAdsOverviewAllError] = useState<string | null>(null);
   const [ltvCategories, setLtvCategories] = useState<LtvCategorySnapshot | null>(null);
   const [ltvError, setLtvError] = useState<string | null>(null);
   const [ltvView, setLtvView] = useState<"all" | "ads" | "pt" | "online" | "classes">("all");
@@ -404,6 +406,35 @@ export default function Home() {
     }
     fetchAdsOverview();
     const interval = setInterval(fetchAdsOverview, 60_000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchAdsOverviewAll() {
+      try {
+        const response = await fetch("/api/ads/overview?range=all");
+        const payload = await response.json();
+        if (!response.ok || !payload.ok) {
+          throw new Error(payload.message || "Unable to load ads overview.");
+        }
+        if (!cancelled) {
+          setAdsOverviewAll(payload.data as AdsOverview);
+          setAdsOverviewAllError(null);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setAdsOverviewAllError(
+            error instanceof Error ? error.message : "Failed to load ads overview."
+          );
+        }
+      }
+    }
+    fetchAdsOverviewAll();
+    const interval = setInterval(fetchAdsOverviewAll, 60_000);
     return () => {
       cancelled = true;
       clearInterval(interval);
@@ -975,17 +1006,13 @@ export default function Home() {
                   <div className="rounded-3xl border border-white/40 bg-white/70 p-4 shadow-sm">
                     <p className="text-xs uppercase tracking-[0.25em] text-muted">ROAS (All Time)</p>
                     <p className="mt-2 text-2xl font-semibold text-primary">
-                      {adsOverview ? `${(adsOverview.roas ?? 0).toFixed(2)}x` : "—"}
+                      {adsOverviewAll ? `${(adsOverviewAll.roas ?? 0).toFixed(2)}x` : "—"}
                     </p>
                     <p className="mt-1 text-xs text-muted">All-time revenue from ads vs spend.</p>
-                    {adsOverviewError && <p className="mt-2 text-xs text-amber-700">{adsOverviewError}</p>}
+                    {adsOverviewAllError && <p className="mt-2 text-xs text-amber-700">{adsOverviewAllError}</p>}
                   </div>
                 </div>
-              ) : (
-                <div className="rounded-3xl border border-dashed border-emerald-900/20 bg-white/50 p-4 text-sm text-muted">
-                  LTV shown for this segment only.
-                </div>
-              )}
+              ) : null}
             </div>
           </div>
         </div>
