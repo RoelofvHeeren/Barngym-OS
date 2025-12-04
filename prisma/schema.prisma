@@ -118,6 +118,17 @@ model AdsRevenue {
   @@index([paymentId])
 }
 
+model AdsSpend {
+  id          String   @id @default(cuid())
+  periodStart DateTime
+  periodEnd   DateTime
+  amountCents Int
+  source      String
+  createdAt   DateTime @default(now())
+
+  @@index([periodStart, periodEnd])
+}
+
 model UnmatchedPayment {
   id                String   @id @default(cuid())
   externalPaymentId String
