@@ -9,7 +9,7 @@ import { navGroups } from "./navigation";
 const plusJakarta = localFont({
   src: [
     {
-      path: "/fonts/plus-jakarta-regular.woff2",
+      path: "./fonts/plus-jakarta-regular.woff2",
       weight: "400",
       style: "normal",
     },
