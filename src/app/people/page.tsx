@@ -356,7 +356,7 @@ function normalizeApiLead(lead: ApiLead): NormalizedLead {
   const row: LeadRow = {
     id: leadId,
     name: displayName,
-    statusLabel: profile.status,
+    statusLabel: profile.status ?? undefined,
     statusTone: profile.statusTone,
     source: profile.source,
     channel: lead.channel ?? "Imported",
