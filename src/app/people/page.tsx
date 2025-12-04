@@ -193,6 +193,7 @@ type ApiLead = {
   externalId: string | null;
   firstName: string | null;
   lastName: string | null;
+  fullName?: string | null;
   email: string | null;
   phone: string | null;
   channel: string | null;
@@ -204,6 +205,8 @@ type ApiLead = {
   source: string | null;
   status: string | null;
   metadata: unknown;
+  hasPurchases?: boolean;
+  isClient?: boolean;
 };
 
 const formatMinorToCurrency = (minor?: number | null, currency = "EUR") => {
@@ -240,6 +243,10 @@ const computeDisplayName = (lead: ApiLead, metadataContact?: { first_name?: stri
     metadataContact?.last_name ??
     metadataContact?.lastName;
 
+  if (lead.fullName && lead.fullName.trim()) {
+    return lead.fullName.trim();
+  }
+
   const fromNames = [lead.firstName ?? "", lead.lastName ?? ""]
     .map((part) => part.trim())
     .filter(Boolean)
@@ -257,22 +264,23 @@ const computeDisplayName = (lead: ApiLead, metadataContact?: { first_name?: stri
   );
 };
 
-const getStatusInfo = (status?: string | null, source?: string | null) => {
+const getStatusInfo = (status?: string | null, source?: string | null, hasPurchases?: boolean) => {
   const normalizedStatus = status ? status.toUpperCase() : null;
   const sourceLower = (source ?? "").toLowerCase();
   const fromAds = sourceLower === "ads" || sourceLower.startsWith("ads ");
+  const fromGhl = fromAds || sourceLower.includes("ghl");
 
   if (normalizedStatus === "CLIENT") {
     return { label: "Client", tone: "client" as const, sourceLabel: source ?? "Converted" };
   }
-  if ((normalizedStatus === "LEAD" && fromAds) || fromAds) {
+  if (!hasPurchases && ((normalizedStatus === "LEAD" && fromGhl) || fromGhl)) {
     return { label: "Lead (from Ads)", tone: "lead" as const, sourceLabel: source ?? "Ads (GHL Webhook)" };
   }
   return null;
 };
 
 const buildProfileFromLead = (lead: ApiLead, displayName: string): LeadProfile => {
-  const statusInfo = getStatusInfo(lead.status, lead.source);
+  const statusInfo = getStatusInfo(lead.isClient ? "CLIENT" : lead.status, lead.source, lead.hasPurchases);
   const initials = displayName
     .split(" ")
     .map((part) => part.charAt(0))
@@ -333,12 +341,15 @@ function normalizeApiLead(lead: ApiLead): NormalizedLead {
       | undefined
   );
   const storedProfile = isLeadProfile(metadataProfile) ? metadataProfile : null;
+  const statusInfo = getStatusInfo(lead.isClient ? "CLIENT" : lead.status, lead.source, lead.hasPurchases);
   const profileBase = storedProfile ?? buildProfileFromLead(lead, displayName);
+  const shouldClearStoredLeadTag =
+    profileBase.status === "Lead (from Ads)" && !statusInfo;
   const profile = {
     ...profileBase,
-    status: profileBase.status ?? getStatusInfo(lead.status, lead.source)?.label,
-    statusTone: profileBase.statusTone ?? getStatusInfo(lead.status, lead.source)?.tone,
-    source: profileBase.source ?? getStatusInfo(lead.status, lead.source)?.sourceLabel,
+    status: shouldClearStoredLeadTag ? null : profileBase.status ?? statusInfo?.label,
+    statusTone: shouldClearStoredLeadTag ? undefined : profileBase.statusTone ?? statusInfo?.tone,
+    source: profileBase.source ?? statusInfo?.sourceLabel,
     history: Array.isArray(profileBase.history) ? profileBase.history : [],
   };
 
@@ -1074,15 +1085,17 @@ export default function PeoplePage() {
                 <h3 className="mt-2 text-2xl font-semibold">{selectedLeadProfile.name}</h3>
                 <p className="text-sm text-muted">{selectedLeadProfile.title}</p>
                 <div className="mt-2 flex flex-wrap gap-2">
-                  <span
-                    className={`chip text-xs ${
-                      selectedLeadProfile.statusTone === "client"
-                        ? "!bg-emerald-100 !text-emerald-800 !border-emerald-200"
-                        : "!bg-amber-100 !text-amber-800 !border-amber-200"
-                    }`}
-                  >
-                    {selectedLeadProfile.status ?? "Lead (from Ads)"}
-                  </span>
+                  {selectedLeadProfile.status && (
+                    <span
+                      className={`chip text-xs ${
+                        selectedLeadProfile.statusTone === "client"
+                          ? "!bg-emerald-100 !text-emerald-800 !border-emerald-200"
+                          : "!bg-amber-100 !text-amber-800 !border-amber-200"
+                      }`}
+                    >
+                      {selectedLeadProfile.status}
+                    </span>
+                  )}
                   {selectedLeadProfile.source && (
                     <span className="chip text-xs !bg-white/80 !text-primary !border-white/40">
                       Source: {selectedLeadProfile.source}

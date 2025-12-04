@@ -38,6 +38,7 @@ model Lead {
   glofoxMemberId String?  @unique
   stripeCustomerId String?
   ghlContactId   String?  @unique
+  fullName       String?
   firstName      String?
   lastName       String?
   email          String?
@@ -45,6 +46,7 @@ model Lead {
   goal           String?
   status         LeadStatus?
   source         String?
+  isClient       Boolean  @default(false)
   gender         String?
   dateOfBirth    DateTime?
   street         String?
@@ -61,9 +63,19 @@ model Lead {
   valueMinor     Int?
   membershipName String?
   metadata       Json?
+  ltvAllCents          Int @default(0)
+  ltvAdsCents          Int @default(0)
+  ltvPTCents           Int @default(0)
+  ltvClassesCents      Int @default(0)
+  ltvSixWeekCents      Int @default(0)
+  ltvOnlineCoachingCents Int @default(0)
+  ltvCommunityCents    Int @default(0)
+  ltvCorporateCents    Int @default(0)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   transactions   Transaction[]
+  payments       Payment[]
+  adsRevenue     AdsRevenue[]
   counterpartyMappings CounterpartyMapping[]
   leadTracking   LeadTracking[]
   leadEvents     LeadEvent[]
@@ -71,6 +83,52 @@ model Lead {
   @@index([email])
   @@index([phone])
   @@index([ghlContactId])
+}
+
+model Payment {
+  id                String   @id @default(cuid())
+  externalPaymentId String
+  amountCents       Int
+  currency          String
+  timestamp         DateTime
+  productName       String?
+  productType       String?
+  sourceSystem      String
+  rawPayload        Json
+  leadId            String?
+  lead              Lead?    @relation(fields: [leadId], references: [id])
+  adsRevenue        AdsRevenue[]
+  createdAt         DateTime @default(now())
+
+  @@index([externalPaymentId, sourceSystem])
+}
+
+model AdsRevenue {
+  id          String   @id @default(cuid())
+  leadId      String
+  paymentId   String
+  amountCents Int
+  timestamp   DateTime
+  createdAt   DateTime @default(now())
+
+  lead    Lead    @relation(fields: [leadId], references: [id])
+  payment Payment @relation(fields: [paymentId], references: [id])
+
+  @@index([leadId])
+  @@index([paymentId])
+}
+
+model UnmatchedPayment {
+  id                String   @id @default(cuid())
+  externalPaymentId String
+  sourceSystem      String
+  customerEmail     String?
+  customerPhone     String?
+  reason            String?
+  rawPayload        Json
+  createdAt         DateTime @default(now())
+
+  @@index([externalPaymentId, sourceSystem])
 }
 
 model Transaction {

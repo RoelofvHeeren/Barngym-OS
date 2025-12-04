@@ -27,28 +27,32 @@ const computeDisplayName = (
   lead: {
     firstName: string | null;
     lastName: string | null;
+    fullName?: string | null;
     email: string | null;
   }
 ) => {
-  const fullName = [lead.firstName ?? "", lead.lastName ?? ""]
-    .map((part) => part.trim())
-    .filter(Boolean)
-    .join(" ");
+  const fullName =
+    lead.fullName ||
+    [lead.firstName ?? "", lead.lastName ?? ""]
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .join(" ");
 
   return fullName || lead.email || "Unnamed Lead";
 };
 
-const getStatusInfo = (status?: string | null, source?: string | null) => {
+const getStatusInfo = (status?: string | null, source?: string | null, hasPurchases?: boolean) => {
   const normalizedStatus = status ? status.toUpperCase() : null;
   const sourceLower = (source ?? "").toLowerCase();
   const fromAds = sourceLower === "ads" || sourceLower.startsWith("ads ");
+  const fromGhl = fromAds || sourceLower.includes("ghl");
 
   if (normalizedStatus === "CLIENT") {
     return { label: "Client", tone: "client" as const, sourceLabel: source ?? "Converted" };
   }
 
-  // Only treat as ads-lead when the source explicitly indicates ads
-  if ((normalizedStatus === "LEAD" && fromAds) || fromAds) {
+  // Only treat as ads-lead when the source explicitly indicates ads/GHL and the lead has not purchased yet
+  if (!hasPurchases && ((normalizedStatus === "LEAD" && fromGhl) || fromGhl)) {
     return { label: "Lead (from Ads)", tone: "lead" as const, sourceLabel: source ?? "Ads (GHL Webhook)" };
   }
 
@@ -116,15 +120,17 @@ export async function GET() {
         lifetimeMinor: 0,
         payments: [],
       };
+      const hasPurchases = stats.payments.some((payment) => payment.status !== "Failed");
       const recentPayments = stats.payments.slice(0, 5);
       const historyPayments = stats.payments.slice(0, 50);
       const lastPayment = recentPayments[0];
       const displayName = computeDisplayName({
         firstName: lead.firstName,
         lastName: lead.lastName,
+        fullName: lead.fullName,
         email: lead.email,
       });
-      const statusInfo = getStatusInfo(lead.status, lead.source);
+      const statusInfo = getStatusInfo(lead.isClient ? "CLIENT" : lead.status, lead.source, hasPurchases);
 
       const profile = {
         name: displayName,
@@ -193,6 +199,7 @@ export async function GET() {
       return {
         ...lead,
         valueMinor: lead.valueMinor ?? stats.lifetimeMinor,
+        hasPurchases,
         metadata: {
           ...metadataValue,
           profile,

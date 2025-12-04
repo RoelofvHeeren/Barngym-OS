@@ -1,0 +1,8 @@
+{
+  "pt": ["Personal Training", "PT", "PT Pack", "PT Membership"],
+  "classes": ["Class", "Group Class", "Barn Class"],
+  "six_week": ["6 Week", "6-Week", "6 Week Transformation"],
+  "online_coaching": ["Online Coaching", "Remote Coaching"],
+  "community": ["Community Membership"],
+  "corporate": ["Corporate Wellness"]
+}

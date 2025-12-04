@@ -4,6 +4,7 @@ import { Prisma } from "@/generated/prisma";
 type NormalizedPayload = {
   firstName?: string | null;
   lastName?: string | null;
+  fullName?: string | null;
   email?: string | null;
   phone?: string | null;
   goal?: string | null;
@@ -60,6 +61,10 @@ function normalizePayload(rawPayload: Record<string, any>): NormalizedPayload {
   const contact = rawPayload.contact ?? {};
   const root = rawPayload ?? {};
 
+  const fullName =
+    normalizeString(root.fullName) ||
+    normalizeString(contact.full_name) ||
+    normalizeString(contact.fullName);
   const firstName =
     normalizeString(root.firstName) ||
     normalizeString(contact.first_name) ||
@@ -105,10 +110,18 @@ function normalizePayload(rawPayload: Record<string, any>): NormalizedPayload {
     normalizeString(root.contactId) ||
     normalizeString(contact.id) ||
     normalizeString(contact.contactId);
+  const composedFullName =
+    fullName ||
+    [firstName ?? "", lastName ?? ""]
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .join(" ") ||
+    null;
 
   return {
     firstName,
     lastName,
+    fullName: composedFullName,
     email,
     phone,
     goal,
@@ -149,14 +162,17 @@ export async function processLeadIntake(rawPayload: unknown) {
     ...(existing?.metadata as Prisma.JsonObject | undefined),
     source: normalized.source ?? "ghl",
     ghlTags: normalized.tags,
+    fullName: fullName ?? undefined,
     raw: normalized.raw as unknown as Prisma.JsonValue,
   };
 
   const rawTrackingJson: Prisma.InputJsonValue = (normalized.raw as Prisma.InputJsonValue) ?? {};
+  const fullName = normalizeString(normalized.fullName);
 
   const baseData = {
     firstName: normalized.firstName ?? undefined,
     lastName: normalized.lastName ?? undefined,
+    fullName: fullName ?? undefined,
     email: normalized.email ?? undefined,
     phone: normalized.phone ?? undefined,
     goal: normalized.goal ?? undefined,
@@ -174,6 +190,7 @@ export async function processLeadIntake(rawPayload: unknown) {
     const updateData: Record<string, unknown> = {};
     if (!existing.firstName && baseData.firstName) updateData.firstName = baseData.firstName;
     if (!existing.lastName && baseData.lastName) updateData.lastName = baseData.lastName;
+    if (!existing.fullName && baseData.fullName) updateData.fullName = baseData.fullName;
     if (!existing.email && baseData.email) updateData.email = baseData.email;
     if (!existing.phone && baseData.phone) updateData.phone = baseData.phone;
     if (!existing.goal && baseData.goal) updateData.goal = baseData.goal;
