@@ -96,7 +96,7 @@ export async function GET() {
     const avgAdsCents = computeAverage(
       (leadId) => {
         const lead = leadMap.get(leadId);
-        return lead?.isClient && isAdsLead(lead);
+        return !!lead?.isClient && isAdsLead(lead);
       },
       (totals) => totals.all
     );
