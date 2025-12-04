@@ -927,6 +927,69 @@ export default function Home() {
                     .join(" ")}
                 />
               </svg>
+            </div>
+          </div>
+
+          <div className="glass-panel">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-xs uppercase tracking-[0.35em] text-muted">Lifetime Value</p>
+                <h3 className="text-xl font-semibold text-primary">LTV by Segment</h3>
+                <p className="text-sm text-muted">View LTV and ROAS across key segments.</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {Object.entries(ltvViewMap).map(([key, entry]) => (
+                  <button
+                    key={key}
+                    className={`chip text-xs ${ltvView === key ? "!bg-emerald-600 !text-white" : ""}`}
+                    onClick={() => setLtvView(key as typeof ltvView)}
+                  >
+                    {entry.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              <div className="rounded-3xl border border-white/40 bg-white/70 p-4 shadow-sm">
+                <p className="text-xs uppercase tracking-[0.25em] text-muted">
+                  {ltvViewMap[ltvView].label}
+                </p>
+                <p className="mt-2 text-3xl font-semibold text-primary">
+                  {ltvCategories ? formatCurrency(ltvViewMap[ltvView].value ?? 0, activeCurrency) : "—"}
+                </p>
+                <p className="mt-1 text-sm text-muted">{ltvViewMap[ltvView].description}</p>
+                {ltvError && <p className="mt-2 text-xs text-amber-700">{ltvError}</p>}
+              </div>
+
+              {ltvView === "ads" ? (
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="rounded-3xl border border-white/40 bg-white/70 p-4 shadow-sm">
+                    <p className="text-xs uppercase tracking-[0.25em] text-muted">ROAS (30d)</p>
+                    <p className="mt-2 text-2xl font-semibold text-primary">
+                      {adsOverview ? `${(adsOverview.roas ?? 0).toFixed(2)}x` : "—"}
+                    </p>
+                    <p className="mt-1 text-xs text-muted">Revenue from ads vs spend over the last 30 days.</p>
+                    {adsOverviewError && <p className="mt-2 text-xs text-amber-700">{adsOverviewError}</p>}
+                  </div>
+                  <div className="rounded-3xl border border-white/40 bg-white/70 p-4 shadow-sm">
+                    <p className="text-xs uppercase tracking-[0.25em] text-muted">ROAS (All Time)</p>
+                    <p className="mt-2 text-2xl font-semibold text-primary">
+                      {adsOverview ? `${(adsOverview.roas ?? 0).toFixed(2)}x` : "—"}
+                    </p>
+                    <p className="mt-1 text-xs text-muted">All-time revenue from ads vs spend.</p>
+                    {adsOverviewError && <p className="mt-2 text-xs text-amber-700">{adsOverviewError}</p>}
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-3xl border border-dashed border-emerald-900/20 bg-white/50 p-4 text-sm text-muted">
+                  LTV shown for this segment only.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
         <div className="flex flex-col gap-6">
           <div className="glass-panel">
             <p className="text-xs uppercase tracking-[0.35em] text-muted">Quick Alerts</p>
