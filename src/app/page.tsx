@@ -347,6 +347,7 @@ export default function Home() {
   const [adsOverviewError, setAdsOverviewError] = useState<string | null>(null);
   const [ltvCategories, setLtvCategories] = useState<LtvCategorySnapshot | null>(null);
   const [ltvError, setLtvError] = useState<string | null>(null);
+  const [ltvView, setLtvView] = useState<"all" | "ads" | "pt" | "online" | "classes">("all");
 
   useEffect(() => {
     let cancelled = false;
@@ -526,41 +527,6 @@ export default function Home() {
       delta: adsOverviewError ? adsOverviewError : `${adsOverview?.conversionsCount ?? 0} conversions`,
       sparkline: Array(7).fill(adsOverview?.roas ?? 0),
     },
-    {
-      key: "adsLtv",
-      label: "Ads Avg LTV",
-      value: ltvCategories ? formatCurrency(ltvCategories.avgAdsCents ?? 0, activeCurrency) : "—",
-      delta: ltvError ? ltvError : `${adsOverview?.leadsCount ?? 0} leads`,
-      sparkline: Array(7).fill(ltvCategories?.avgAdsCents ?? 0),
-    },
-    {
-      key: "ltvAll",
-      label: "Avg LTV (All Clients)",
-      value: ltvCategories ? formatCurrency(ltvCategories.avgAllCents ?? 0, activeCurrency) : "—",
-      delta: ltvError ?? "",
-      sparkline: Array(7).fill(ltvCategories?.avgAllCents ?? 0),
-    },
-    {
-      key: "ltvPt",
-      label: "Avg LTV (PT)",
-      value: ltvCategories ? formatCurrency(ltvCategories.avgPtCents ?? 0, activeCurrency) : "—",
-      delta: ltvError ?? "",
-      sparkline: Array(7).fill(ltvCategories?.avgPtCents ?? 0),
-    },
-    {
-      key: "ltvOnline",
-      label: "Avg LTV (Online Coaching)",
-      value: ltvCategories ? formatCurrency(ltvCategories.avgOnlineCoachingCents ?? 0, activeCurrency) : "—",
-      delta: ltvError ?? "",
-      sparkline: Array(7).fill(ltvCategories?.avgOnlineCoachingCents ?? 0),
-    },
-    {
-      key: "ltvClasses",
-      label: "Avg LTV (Pay As You Go)",
-      value: ltvCategories ? formatCurrency(ltvCategories.avgClassesCents ?? 0, activeCurrency) : "—",
-      delta: ltvError ?? "",
-      sparkline: Array(7).fill(ltvCategories?.avgClassesCents ?? 0),
-    },
   ];
 
   const recentPayments = useMemo(() => {
@@ -593,6 +559,34 @@ export default function Home() {
         suggestions: transaction.personName ? [transaction.personName] : ["Assign in CRM"],
       }));
   }, [filteredTransactions]);
+
+  const ltvViewMap = {
+    all: {
+      label: "All Clients",
+      description: "Average LTV across all clients with at least one payment.",
+      value: ltvCategories?.avgAllCents ?? 0,
+    },
+    ads: {
+      label: "Ads Sourced",
+      description: "Average LTV for clients tagged as Ads sourced.",
+      value: ltvCategories?.avgAdsCents ?? 0,
+    },
+    pt: {
+      label: "Personal Training",
+      description: "Clients with at least one PT payment.",
+      value: ltvCategories?.avgPtCents ?? 0,
+    },
+    online: {
+      label: "Online Coaching",
+      description: "Clients with at least one Online Coaching payment.",
+      value: ltvCategories?.avgOnlineCoachingCents ?? 0,
+    },
+    classes: {
+      label: "Pay As You Go",
+      description: "Clients with at least one Classes/Pay As You Go payment.",
+      value: ltvCategories?.avgClassesCents ?? 0,
+    },
+  } as const;
 
   useEffect(() => {
     setUnmatchedPayments(derivedUnmatched);
@@ -874,9 +868,67 @@ export default function Home() {
                     .join(" ")}
                 />
               </svg>
-            </div>
           </div>
         </div>
+      </div>
+
+      <div className="glass-panel">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-xs uppercase tracking-[0.35em] text-muted">Lifetime Value</p>
+            <h3 className="text-xl font-semibold text-primary">LTV by Segment</h3>
+            <p className="text-sm text-muted">
+              Switch views to compare LTV across ads, PT, online coaching, and pay-as-you-go.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {Object.entries(ltvViewMap).map(([key, entry]) => (
+              <button
+                key={key}
+                className={`chip text-xs ${
+                  ltvView === key ? "!bg-emerald-600 !text-white" : ""
+                }`}
+                onClick={() => setLtvView(key as typeof ltvView)}
+              >
+                {entry.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-4 md:grid-cols-3">
+          <div className="rounded-3xl border border-white/40 bg-white/70 p-4 shadow-sm">
+            <p className="text-xs uppercase tracking-[0.25em] text-muted">
+              {ltvViewMap[ltvView].label}
+            </p>
+            <p className="mt-2 text-3xl font-semibold text-primary">
+              {ltvCategories
+                ? formatCurrency(ltvViewMap[ltvView].value ?? 0, activeCurrency)
+                : "—"}
+            </p>
+            <p className="mt-1 text-sm text-muted">{ltvViewMap[ltvView].description}</p>
+            {ltvError && <p className="mt-2 text-xs text-amber-700">{ltvError}</p>}
+          </div>
+          <div className="rounded-3xl border border-white/40 bg-white/70 p-4 shadow-sm">
+            <p className="text-xs uppercase tracking-[0.25em] text-muted">ROAS (30d)</p>
+            <p className="mt-2 text-3xl font-semibold text-primary">
+              {adsOverview ? `${(adsOverview.roas ?? 0).toFixed(2)}x` : "—"}
+            </p>
+            <p className="mt-1 text-sm text-muted">
+              Revenue from ads vs spend over the last 30 days.
+            </p>
+            {adsOverviewError && <p className="mt-2 text-xs text-amber-700">{adsOverviewError}</p>}
+          </div>
+          <div className="rounded-3xl border border-white/40 bg-white/70 p-4 shadow-sm">
+            <p className="text-xs uppercase tracking-[0.25em] text-muted">Ads Avg LTV</p>
+            <p className="mt-2 text-3xl font-semibold text-primary">
+              {ltvCategories ? formatCurrency(ltvCategories.avgAdsCents ?? 0, activeCurrency) : "—"}
+            </p>
+            <p className="mt-1 text-sm text-muted">Ads-sourced clients only.</p>
+            {ltvError && <p className="mt-2 text-xs text-amber-700">{ltvError}</p>}
+          </div>
+        </div>
+      </div>
 
         <div className="flex flex-col gap-6">
           <div className="glass-panel">
