@@ -158,6 +158,8 @@ export async function processLeadIntake(rawPayload: unknown) {
     ghlTags: normalized.tags,
   };
 
+  const fullName = normalizeString(normalized.fullName);
+
   const metadataJson: Prisma.JsonValue = {
     ...(existing?.metadata as Prisma.JsonObject | undefined),
     source: normalized.source ?? "ghl",
