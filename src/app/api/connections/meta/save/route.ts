@@ -5,9 +5,10 @@ export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   try {
-    const { accessToken, adAccountId } = (await request.json()) as {
+    const { accessToken, adAccountId, apiVersion } = (await request.json()) as {
       accessToken?: string;
       adAccountId?: string;
+      apiVersion?: string;
     };
 
     if (!accessToken || !accessToken.trim()) {
@@ -29,14 +30,14 @@ export async function POST(request: Request) {
     await prisma.connectionSecret.upsert({
       where: { provider: "meta" },
       update: {
-        secret: { accessToken: token, adAccountId: account },
+        secret: { accessToken: token, adAccountId: account, apiVersion: apiVersion?.trim() || undefined },
         status: "connected",
         accountId: account,
         lastVerifiedAt: new Date(),
       },
       create: {
         provider: "meta",
-        secret: { accessToken: token, adAccountId: account },
+        secret: { accessToken: token, adAccountId: account, apiVersion: apiVersion?.trim() || undefined },
         status: "connected",
         accountId: account,
         lastVerifiedAt: new Date(),

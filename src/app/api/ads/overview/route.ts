@@ -53,7 +53,7 @@ export async function GET(request: Request) {
     const dateFilter = buildDateFilter(start, end);
 
     // IMPORTANT: Leads/clients/revenue are strictly from GHL + payments. Meta spend only.
-    const [leadsCount, conversionEvents, adsSpendAgg, adsRevenueAgg, adsClients] =
+    const [leadsCount, conversionEvents, adsSpendAgg, adsRevenueAgg, adsClients, metaSpendAgg] =
       await Promise.all([
         prisma.lead.count({
           where: {
@@ -90,10 +90,16 @@ export async function GET(request: Request) {
           },
           select: { id: true, ltvAdsCents: true },
         }),
+        prisma.metaDailyInsight.aggregate({
+          _sum: { spend: true },
+          where: start ? { date: { gte: start, lte: end } } : {},
+        }),
       ]);
 
     const conversionsCount = new Set(conversionEvents.map((e) => e.leadId)).size;
-    const spendCents = adsSpendAgg._sum.amountCents ?? 0;
+    const metaSpendCents = Math.round((metaSpendAgg._sum.spend ?? 0) * 100);
+    const manualSpendCents = adsSpendAgg._sum.amountCents ?? 0;
+    const spendCents = metaSpendCents + manualSpendCents;
     const revenueFromAdsCents = adsRevenueAgg._sum.amountCents ?? 0;
 
     const adsClientLtvTotal = adsClients.reduce((sum, lead) => sum + (lead.ltvAdsCents ?? 0), 0);

@@ -9,6 +9,8 @@ import {
   upsertTransactions,
   isIncomingStarling,
 } from "@/lib/transactions";
+import { fetchInsightsRange } from "@/services/meta/metaClient";
+import { ingestInsights } from "@/services/meta/metaIngestService";
 
 export const runtime = "nodejs";
 
@@ -36,6 +38,10 @@ type BackfillPayload = {
   stripe?: StripeBackfillRequest;
   starling?: StarlingBackfillRequest;
   glofox?: GlofoxBackfillRequest;
+  type?: string;
+  range?: string;
+  from?: string;
+  to?: string;
 };
 
 type BackfillSummary = {
@@ -244,7 +250,41 @@ async function runGlofoxBackfill(config: GlofoxBackfillRequest): Promise<Backfil
 
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as BackfillPayload;
+    const body = ((await request.json().catch(() => ({}))) || {}) as BackfillPayload;
+    if (body.type === "meta_ads") {
+      const now = new Date();
+      let fromDate: Date;
+      let toDate: Date;
+
+      if (body.from && body.to) {
+        fromDate = new Date(body.from);
+        toDate = new Date(body.to);
+      } else {
+        const days =
+          body.range === "7d" ? 7 : body.range === "30d" ? 30 : body.range === "90d" ? 90 : 90;
+        toDate = now;
+        fromDate = new Date();
+        fromDate.setDate(toDate.getDate() - days);
+      }
+
+      const rows = await fetchInsightsRange(fromDate, toDate);
+      await ingestInsights(rows);
+      const summary: BackfillSummary = {
+        source: "Meta Ads",
+        status: "success",
+        message: `Synced ${rows.length} Meta Ads insight rows.`,
+        records: rows.length,
+      };
+      await recordSummary(summary);
+      return NextResponse.json({
+        ok: true,
+        summaries: [summary],
+        rows: rows.length,
+        from: fromDate.toISOString(),
+        to: toDate.toISOString(),
+      });
+    }
+
     const summaries: BackfillSummary[] = [];
     const logWrites: Promise<void>[] = [];
 

@@ -129,6 +129,95 @@ model AdsSpend {
   @@index([periodStart, periodEnd])
 }
 
+model MetaAdAccount {
+  id          String            @id
+  name        String?
+  currency    String?
+  timezone    String?
+  insights    MetaDailyInsight[]
+  campaigns   MetaCampaign[]
+  adsets      MetaAdSet[]
+  ads         MetaAd[]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+}
+
+model MetaCampaign {
+  id         String            @id
+  account    MetaAdAccount     @relation(fields: [accountId], references: [id])
+  accountId  String
+  name       String?
+  objective  String?
+  status     String?
+  adsets     MetaAdSet[]
+  ads        MetaAd[]
+  insights   MetaDailyInsight[]
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+}
+
+model MetaAdSet {
+  id               String            @id
+  account          MetaAdAccount     @relation(fields: [accountId], references: [id])
+  accountId        String
+  campaign         MetaCampaign?     @relation(fields: [campaignId], references: [id])
+  campaignId       String?
+  name             String?
+  status           String?
+  optimizationGoal String?
+  billingEvent     String?
+  dailyBudget      Int?
+  lifetimeBudget   Int?
+  insights         MetaDailyInsight[]
+  ads              MetaAd[]
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+}
+
+model MetaAd {
+  id         String            @id
+  account    MetaAdAccount     @relation(fields: [accountId], references: [id])
+  accountId  String
+  campaign   MetaCampaign?     @relation(fields: [campaignId], references: [id])
+  campaignId String?
+  adset      MetaAdSet?        @relation(fields: [adsetId], references: [id])
+  adsetId    String?
+  name       String?
+  status     String?
+  creativeName String?
+  insights   MetaDailyInsight[]
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+}
+
+model MetaDailyInsight {
+  id          String        @id @default(cuid())
+  account     MetaAdAccount @relation(fields: [accountId], references: [id])
+  accountId   String
+  campaign    MetaCampaign? @relation(fields: [campaignId], references: [id])
+  campaignId  String?
+  adset       MetaAdSet?    @relation(fields: [adsetId], references: [id])
+  adsetId     String?
+  ad          MetaAd?       @relation(fields: [adId], references: [id])
+  adId        String?
+  date        DateTime
+  spend       Float         @default(0)
+  impressions Int           @default(0)
+  clicks      Int           @default(0)
+  cpm         Float?
+  cpc         Float?
+  results     Int           @default(0)
+  resultType  String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([accountId, date])
+  @@index([campaignId, date])
+  @@index([adsetId, date])
+  @@index([adId, date])
+  @@unique([accountId, campaignId, adsetId, adId, date])
+}
+
 model UnmatchedPayment {
   id                String   @id @default(cuid())
   externalPaymentId String

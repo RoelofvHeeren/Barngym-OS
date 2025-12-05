@@ -50,6 +50,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const rangeParam = searchParams.get("range") ?? "30d";
     const statusParam = (searchParams.get("status") ?? "all").toLowerCase();
+    const campaignFilter = searchParams.get("campaignId") ?? null;
     const { start, end } = parseRange(rangeParam);
     const dateFilter = buildDateFilter(start, end);
 
@@ -61,6 +62,13 @@ export async function GET(request: Request) {
           ? { isClient: false }
           : statusParam === "client"
           ? { isClient: true }
+          : {}),
+        ...(campaignFilter
+          ? {
+              leadTracking: {
+                some: { campaignId: campaignFilter },
+              },
+            }
           : {}),
       },
       orderBy: { createdAt: "desc" },
@@ -86,11 +94,14 @@ export async function GET(request: Request) {
         where: {
           leadId: { in: leadIds },
         },
-        select: { leadId: true, timestamp: true, productType: true },
-        orderBy: { timestamp: "asc" },
-      }),
+      select: { leadId: true, timestamp: true, productType: true },
+      orderBy: { timestamp: "asc" },
+    }),
       prisma.leadTracking.findMany({
-        where: { leadId: { in: leadIds } },
+        where: {
+          leadId: { in: leadIds },
+          ...(campaignFilter ? { campaignId: campaignFilter } : {}),
+        },
         orderBy: { createdAt: "asc" },
       }),
     ]);
