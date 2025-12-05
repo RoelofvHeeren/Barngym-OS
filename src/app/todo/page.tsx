@@ -18,7 +18,7 @@ type DashboardResponse = {
   message?: string;
 };
 
-type AlertStats = DashboardResponse["data"]["stats"]["alerts"];
+type AlertStats = NonNullable<DashboardResponse["data"]>["stats"]["alerts"];
 
 export default function TodoPage() {
   const router = useRouter();
