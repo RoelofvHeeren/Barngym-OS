@@ -120,9 +120,9 @@ export async function ingestInsights(rows: RawMetaRow[]) {
       where: {
         accountId_campaignId_adsetId_adId_date: {
           accountId: account.id,
-          campaignId: campaignId ?? undefined,
-          adsetId: adsetId ?? undefined,
-          adId: adId ?? undefined,
+          campaignId: campaignId ?? "",
+          adsetId: adsetId ?? "",
+          adId: adId ?? "",
           date,
         },
       },
@@ -137,9 +137,9 @@ export async function ingestInsights(rows: RawMetaRow[]) {
       },
       create: {
         accountId: account.id,
-        campaignId,
-        adsetId,
-        adId,
+        campaignId: campaignId ?? "",
+        adsetId: adsetId ?? "",
+        adId: adId ?? "",
         date,
         spend,
         impressions,
