@@ -799,158 +799,6 @@ export default function Home() {
         ))}
       </section>
 
-      <section className="grid gap-6 lg:grid-cols-[1.5fr,1fr]">
-        <div className="glass-panel">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs uppercase tracking-[0.35em] text-muted">Recent Payments</p>
-              <h3 className="mt-2 text-2xl font-semibold">Latest Activity</h3>
-              <p className="text-sm text-muted">
-                {loadingSnapshot ? "Loading live data..." : `${recentPayments.length} showing · filtered by ${sourceFilter}.`}
-              </p>
-            </div>
-            <button type="button" className="text-sm text-emerald-700" onClick={() => router.push("/transactions")}>
-              View ledger →
-            </button>
-          </div>
-          <div className="mt-4 flex flex-col gap-3">
-            {recentPayments.length === 0 && (
-              <p className="rounded-2xl border border-dashed border-emerald-900/20 bg-white px-4 py-3 text-sm text-muted">
-                {loadingSnapshot ? "Awaiting data from webhooks..." : `No recent payments for ${sourceFilter}.`}
-              </p>
-            )}
-            {recentPayments.map((payment) => (
-              <div key={payment.id} className="flex items-center justify-between rounded-2xl border border-emerald-900/10 bg-white px-4 py-3">
-                <div>
-                  <p className="text-sm font-semibold text-primary">{payment.name}</p>
-                  <p className="text-xs text-muted">{payment.product}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-semibold">
-                    {formatCurrency(payment.amountMinor, payment.currency)}
-                  </p>
-                  <p className="text-xs text-muted">
-                    {payment.source} · {payment.status}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="glass-panel">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs uppercase tracking-[0.35em] text-muted">Manual Match</p>
-              <h3 className="mt-2 text-2xl font-semibold">Unmatched Payments</h3>
-              <p className="text-sm text-muted">{visibleUnmatched.length} items waiting for attribution.</p>
-            </div>
-            <button
-              type="button"
-              className="chip text-xs"
-              onClick={() => router.push("/transactions?status=needs-review")}
-            >
-              Open queue
-            </button>
-          </div>
-          <div className="mt-4 flex flex-col gap-3">
-            {visibleUnmatched.length === 0 && (
-              <p className="rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 text-sm text-primary">
-                Queue clear. Everything is attributed 🎯
-              </p>
-            )}
-            {visibleUnmatched.map((payment) => (
-              <div key={payment.id} className="rounded-2xl border border-emerald-900/15 bg-white/90 p-4">
-                <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <p className="text-sm font-semibold text-primary">{payment.reference}</p>
-                    <p className="text-xs text-muted">
-                      {formatCurrency(payment.amountMinor, payment.currency)} · {payment.source} · {formatRelativeAge(payment.occurredAtMs)}
-                    </p>
-                  </div>
-                  <span className="chip text-xs">{payment.id}</span>
-                </div>
-                <p className="mt-3 text-xs uppercase tracking-[0.25em] text-muted">Suggest</p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {payment.suggestions.map((person) => (
-                    <button
-                      key={person}
-                      type="button"
-                      className="chip text-xs !border-emerald-700/40 !bg-emerald-600/10"
-                      onClick={() => handleMatch(payment.id, person)}
-                    >
-                      Match to {person}
-                    </button>
-                  ))}
-                  <button type="button" className="chip text-xs" onClick={() => router.push(`/people?prefill=${payment.reference}`)}>
-                    Assign manually
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="glass-panel flex flex-col gap-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-xs uppercase tracking-[0.35em] text-muted">Lifetime Value</p>
-              <h3 className="text-xl font-semibold text-primary">LTV by Segment</h3>
-              <p className="text-sm text-muted">View LTV and ROAS across key segments.</p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {Object.entries(ltvViewMap).map(([key, entry]) => (
-                <button
-                  key={key}
-                  className={`chip text-xs ${ltvView === key ? "!bg-emerald-600 !text-white" : ""}`}
-                  onClick={() => setLtvView(key as typeof ltvView)}
-                >
-                  {entry.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="grid gap-3 md:grid-cols-2">
-            <div className="rounded-3xl border border-white/40 bg-white/70 p-4 shadow-sm">
-              <p className="text-xs uppercase tracking-[0.25em] text-muted">
-                {ltvViewMap[ltvView].label}
-              </p>
-              <p className="mt-2 text-3xl font-semibold text-primary">
-                {ltvCategories ? formatCurrency(ltvViewMap[ltvView].value ?? 0, activeCurrency) : "—"}
-              </p>
-              <p className="mt-1 text-sm text-muted">{ltvViewMap[ltvView].description}</p>
-              {ltvError && <p className="mt-2 text-xs text-amber-700">{ltvError}</p>}
-            </div>
-
-            {ltvView === "ads" ? (
-              <div className="grid gap-3 md:grid-cols-2">
-                <div className="rounded-3xl border border-white/40 bg-white/70 p-4 shadow-sm">
-                  <p className="text-xs uppercase tracking-[0.25em] text-muted">ROAS (30d)</p>
-                  <p className="mt-2 text-2xl font-semibold text-primary">
-                    {adsOverview ? `${(adsOverview.roas ?? 0).toFixed(2)}x` : "—"}
-                  </p>
-                  <p className="mt-1 text-xs text-muted">Revenue from ads vs spend over the last 30 days.</p>
-                  {adsOverviewError && <p className="mt-2 text-xs text-amber-700">{adsOverviewError}</p>}
-                </div>
-                <div className="rounded-3xl border border-white/40 bg-white/70 p-4 shadow-sm">
-                  <p className="text-xs uppercase tracking-[0.25em] text-muted">ROAS (All Time)</p>
-                  <p className="mt-2 text-2xl font-semibold text-primary">
-                    {adsOverview ? `${(adsOverview.roas ?? 0).toFixed(2)}x` : "—"}
-                  </p>
-                  <p className="mt-1 text-xs text-muted">All-time revenue from ads vs spend.</p>
-                  {adsOverviewError && <p className="mt-2 text-xs text-amber-700">{adsOverviewError}</p>}
-                </div>
-              </div>
-            ) : (
-              <div className="rounded-3xl border border-dashed border-emerald-900/20 bg-white/50 p-4 text-sm text-muted">
-                LTV shown for this segment only.
-              </div>
-            )}
-          </div>
-        </div>
-      </section>
-
       <section className="glass-panel">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -1096,6 +944,9 @@ export default function Home() {
             ))}
           </div>
         </div>
+
+      </section>
+
       </section>
     </div>
   );
