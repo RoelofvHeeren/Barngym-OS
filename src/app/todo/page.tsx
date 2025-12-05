@@ -18,9 +18,11 @@ type DashboardResponse = {
   message?: string;
 };
 
+type AlertStats = DashboardResponse["data"]["stats"]["alerts"];
+
 export default function TodoPage() {
   const router = useRouter();
-  const [alerts, setAlerts] = useState<DashboardResponse["data"]["stats"]["alerts"] | null>(null);
+  const [alerts, setAlerts] = useState<AlertStats | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
