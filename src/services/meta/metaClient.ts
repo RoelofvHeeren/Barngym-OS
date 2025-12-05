@@ -64,7 +64,7 @@ export async function fetchInsightsRange(from: Date, to: Date): Promise<any[]> {
   let nextUrl: string | null = url;
 
   while (nextUrl) {
-    const res = await fetch(nextUrl);
+    const res: Response = await fetch(nextUrl);
     if (!res.ok) {
       const text = await res.text();
       throw new Error(`Meta insights error: ${res.status} ${text}`);
