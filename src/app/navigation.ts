@@ -7,6 +7,7 @@ import {
   Building2,
   Target,
   Megaphone,
+  ClipboardList,
 } from "lucide-react";
 
 export const navGroups = [
@@ -20,6 +21,7 @@ export const navGroups = [
       { name: "Products & Services", href: "/products", icon: Boxes },
       { name: "Connections", href: "/connections", icon: Cable },
       { name: "Ads Dashboard", href: "/ads", icon: Megaphone },
+      { name: "To Do", href: "/todo", icon: ClipboardList },
     ],
   },
   {

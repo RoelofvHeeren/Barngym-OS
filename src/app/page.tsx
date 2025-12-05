@@ -515,48 +515,107 @@ export default function Home() {
     prevMonthComparisonEnd.getTime()
   );
 
+  const periodStart = useMemo(() => {
+    if (dateFilter === "Today") return startToday.getTime();
+    if (dateFilter === "This Week") return startWeek.getTime();
+    if (dateFilter === "This Month") return startMonth.getTime();
+    return startToday.getTime();
+  }, [dateFilter, startToday, startWeek, startMonth]);
+
+  const periodSum = (category?: RevenueCategory) => {
+    return filteredTransactions.reduce((total, transaction) => {
+      if (transaction.status === "Failed") return total;
+      if (transaction.occurredAtMs < periodStart) return total;
+      if (!category || category === "All") return total + transaction.amountMinor;
+      return transaction.category === category ? total + transaction.amountMinor : total;
+    }, 0);
+  };
+
+  const categorySums = {
+    total: periodSum("All"),
+    pt: periodSum("Personal Training"),
+    classes: periodSum("Classes"),
+    online: periodSum("Online Coaching"),
+    corporate: periodSum("Corporate Retreats"),
+  };
+
+  const activeMembers = useMemo(() => {
+    const cutoff = Date.now() - 60 * 24 * 60 * 60 * 1000;
+    const ids = new Set(
+      filteredTransactions
+        .filter((tx) => tx.leadId && tx.occurredAtMs >= cutoff)
+        .map((tx) => tx.leadId as string)
+    );
+    return ids.size;
+  }, [filteredTransactions]);
+
+  const newMembers = useMemo(() => {
+    const ids = new Set(
+      filteredTransactions
+        .filter((tx) => tx.leadId && tx.occurredAtMs >= periodStart)
+        .map((tx) => tx.leadId as string)
+    );
+    return ids.size;
+  }, [filteredTransactions, periodStart]);
+
   const kpiCards: KpiCard[] = [
     {
-      key: "revToday",
-      label: "Revenue Today",
-      value: formatCurrency(revenueTodayMinor, activeCurrency),
-      delta: `${percentDelta(revenueTodayMinor, revenueYesterdayMinor)} vs yesterday`,
-      sparkline: buildSparkline(filteredTransactions, startToday.getTime(), now.getTime(), 6),
+      key: "revTotal",
+      label: "Total Revenue",
+      value: formatCurrency(categorySums.total, activeCurrency),
+      delta: `${percentDelta(categorySums.total, revenuePrevMonthMinor)} vs last period`,
+      sparkline: buildSparkline(filteredTransactions, periodStart, now.getTime()),
     },
     {
-      key: "revWeek",
-      label: "Revenue This Week",
-      value: formatCurrency(revenueWeekMinor, activeCurrency),
-      delta: `${percentDelta(revenueWeekMinor, revenuePrevWeekMinor)} vs last week`,
-      sparkline: buildSparkline(filteredTransactions, startWeek.getTime(), now.getTime()),
+      key: "revPt",
+      label: "PT Revenue",
+      value: formatCurrency(categorySums.pt, activeCurrency),
+      delta: "Personal Training",
+      sparkline: buildSparkline(
+        filteredTransactions.filter((tx) => tx.category === "Personal Training"),
+        periodStart,
+        now.getTime()
+      ),
     },
     {
-      key: "revMonth",
-      label: "Revenue This Month",
-      value: formatCurrency(revenueMonthMinor, activeCurrency),
-      delta: `${percentDelta(revenueMonthMinor, revenuePrevMonthMinor)} vs last month`,
-      sparkline: buildSparkline(filteredTransactions, startMonth.getTime(), now.getTime()),
+      key: "revClasses",
+      label: "Classes",
+      value: formatCurrency(categorySums.classes, activeCurrency),
+      delta: "Pay-as-you-go",
+      sparkline: buildSparkline(
+        filteredTransactions.filter((tx) => tx.category === "Classes"),
+        periodStart,
+        now.getTime()
+      ),
+    },
+    {
+      key: "revOnline",
+      label: "Online Coaching",
+      value: formatCurrency(categorySums.online, activeCurrency),
+      delta: "Remote programs",
+      sparkline: buildSparkline(
+        filteredTransactions.filter((tx) => tx.category === "Online Coaching"),
+        periodStart,
+        now.getTime()
+      ),
+    },
+    {
+      key: "revCorporate",
+      label: "Corporate",
+      value: formatCurrency(categorySums.corporate, activeCurrency),
+      delta: "Corporate programs",
+      sparkline: buildSparkline(
+        filteredTransactions.filter((tx) => tx.category === "Corporate Retreats"),
+        periodStart,
+        now.getTime()
+      ),
     },
     {
       key: "activeMembers",
       label: "Active Members",
-      value: (snapshot?.stats.members.active ?? 0).toLocaleString(),
-      delta: `${snapshot?.stats.alerts.followUps ?? 0} needing touchpoints`,
-      sparkline: Array(7).fill(snapshot?.stats.members.active ?? 0),
-    },
-    {
-      key: "trialMembers",
-      label: "Trial Members Right Now",
-      value: "—",
-      delta: "Removed",
-      sparkline: Array(7).fill(0),
-    },
-    {
-      key: "adsRoas",
-      label: "Ads ROAS (30d)",
-      value: adsOverview ? `${(adsOverview.roas ?? 0).toFixed(2)}x` : "—",
-      delta: adsOverviewError ? adsOverviewError : `${adsOverview?.conversionsCount ?? 0} conversions`,
-      sparkline: Array(7).fill(adsOverview?.roas ?? 0),
+      value: activeMembers.toLocaleString(),
+      delta: `${newMembers} new in period`,
+      sparkline: Array(7).fill(activeMembers),
     },
   ];
 
@@ -892,166 +951,149 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[1.5fr,1fr]">
-        <div className="glass-panel flex flex-col gap-6">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <p className="text-xs uppercase tracking-[0.35em] text-muted">Revenue Graph</p>
-              <h3 className="mt-2 text-2xl font-semibold">Unified Revenue View</h3>
-              <p className="text-sm text-muted">
-                Filters currently showing: {dateFilter} · {sourceFilter} · {categoryFilter}.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {timeframeFilters.map((frame) => (
-                <button
-                  key={frame}
-                  type="button"
-                  onClick={() => setGraphFrame(frame)}
-                  className={`chip text-xs ${graphFrame === frame ? "!bg-emerald-600 !text-white !border-emerald-600" : ""}`}
-                >
-                  {frame}
-                </button>
-              ))}
-            </div>
+      <section className="glass-panel">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-xs uppercase tracking-[0.35em] text-muted">Lifetime Value</p>
+            <h3 className="text-xl font-semibold text-primary">LTV by Segment</h3>
+            <p className="text-sm text-muted">View LTV and ROAS across key segments.</p>
           </div>
-
-          <div className="rounded-3xl border border-emerald-900/10 bg-white p-6">
-            <div className="flex flex-wrap gap-2">
-              {revenueCategories.map((category) => (
-                <button
-                  key={category}
-                  onClick={() => setCategoryFilter(category)}
-                  className={`chip text-xs ${categoryFilter === category ? "!bg-black !text-white !border-black" : ""}`}
-                >
-                  {category}
-                </button>
-              ))}
-            </div>
-            <div className="mt-8 grid grid-cols-1 gap-4 text-sm text-muted lg:grid-cols-6">
-              {graphSeries.map((point) => (
-                <div key={point.label}>
-                  <p className="text-xs uppercase tracking-[0.2em] text-muted">{point.label}</p>
-                  <p className="mt-1 text-lg font-semibold text-primary">
-                    {formatCurrency(point.value, activeCurrency)}
-                  </p>
-                </div>
-              ))}
-            </div>
-            <div className="mt-6 h-48 rounded-2xl border border-emerald-900/10 bg-gradient-to-b from-emerald-50 to-transparent p-4">
-              <svg width="100%" height="100%" preserveAspectRatio="none">
-                <polyline
-                  fill="none"
-                  stroke="rgba(13,126,98,0.85)"
-                  strokeWidth={4}
-                  strokeLinecap="round"
-                  points={graphSeries
-                    .map((point, index) => {
-                      const x = (index / (graphSeries.length - 1 || 1)) * 100;
-                      const values = graphSeries.map((p) => p.value);
-                      const min = Math.min(...values);
-                      const max = Math.max(...values);
-                      const range = max - min || 1;
-                      const y = 100 - ((point.value - min) / range) * 100;
-                      return `${x},${y}`;
-                    })
-                    .join(" ")}
-                />
-              </svg>
-            </div>
-          </div>
-
-          <div className="glass-panel">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="text-xs uppercase tracking-[0.35em] text-muted">Lifetime Value</p>
-                <h3 className="text-xl font-semibold text-primary">LTV by Segment</h3>
-                <p className="text-sm text-muted">View LTV and ROAS across key segments.</p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {Object.entries(ltvViewMap).map(([key, entry]) => (
-                  <button
-                    key={key}
-                    className={`chip text-xs ${ltvView === key ? "!bg-emerald-600 !text-white" : ""}`}
-                    onClick={() => setLtvView(key as typeof ltvView)}
-                  >
-                    {entry.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="mt-4 grid gap-3 md:grid-cols-2">
-              <div className="rounded-3xl border border-white/40 bg-white/70 p-4 shadow-sm">
-                <p className="text-xs uppercase tracking-[0.25em] text-muted">
-                  {ltvViewMap[ltvView].label}
-                </p>
-                <p className="mt-2 text-3xl font-semibold text-primary">
-                  {ltvCategories ? formatCurrency(ltvViewMap[ltvView].value ?? 0, activeCurrency) : "—"}
-                </p>
-                <p className="mt-1 text-sm text-muted">{ltvViewMap[ltvView].description}</p>
-                {ltvError && <p className="mt-2 text-xs text-amber-700">{ltvError}</p>}
-              </div>
-
-              {ltvView === "ads" ? (
-                <div className="grid gap-3 md:grid-cols-2">
-                  <div className="rounded-3xl border border-white/40 bg-white/70 p-4 shadow-sm">
-                    <p className="text-xs uppercase tracking-[0.25em] text-muted">ROAS (30d)</p>
-                    <p className="mt-2 text-2xl font-semibold text-primary">
-                      {adsOverview ? `${(adsOverview.roas ?? 0).toFixed(2)}x` : "—"}
-                    </p>
-                    <p className="mt-1 text-xs text-muted">Revenue from ads vs spend over the last 30 days.</p>
-                    {adsOverviewError && <p className="mt-2 text-xs text-amber-700">{adsOverviewError}</p>}
-                  </div>
-                  <div className="rounded-3xl border border-white/40 bg-white/70 p-4 shadow-sm">
-                    <p className="text-xs uppercase tracking-[0.25em] text-muted">ROAS (All Time)</p>
-                    <p className="mt-2 text-2xl font-semibold text-primary">
-                      {adsOverviewAll ? `${(adsOverviewAll.roas ?? 0).toFixed(2)}x` : "—"}
-                    </p>
-                    <p className="mt-1 text-xs text-muted">All-time revenue from ads vs spend.</p>
-                    {adsOverviewAllError && <p className="mt-2 text-xs text-amber-700">{adsOverviewAllError}</p>}
-                  </div>
-                </div>
-              ) : null}
-            </div>
+          <div className="flex flex-wrap gap-2">
+            {Object.entries(ltvViewMap).map(([key, entry]) => (
+              <button
+                key={key}
+                className={`chip text-xs ${ltvView === key ? "!bg-emerald-600 !text-white" : ""}`}
+                onClick={() => setLtvView(key as typeof ltvView)}
+              >
+                {entry.label}
+              </button>
+            ))}
           </div>
         </div>
 
-        <div className="flex flex-col gap-6">
-          <div className="glass-panel">
-            <p className="text-xs uppercase tracking-[0.35em] text-muted">Quick Alerts</p>
-            <h3 className="mt-2 text-2xl font-semibold">Attention Needed</h3>
-            <div className="mt-4 flex flex-col gap-4">
-              {alerts.map((alert) => (
-                <button
-                  key={alert.key}
-                  type="button"
-                  onClick={() => setSelectedAlertKey(alert.key)}
-                  className={`rounded-2xl border px-4 py-3 text-left ${
-                    activeAlert.key === alert.key
-                      ? "border-amber-500/70 bg-gradient-to-br from-amber-50 via-white to-amber-50/40"
-                      : "border-amber-200/40 bg-amber-50/40 hover:border-amber-300"
-                  }`}
-                >
-                  <p className="text-sm text-muted">{alert.title}</p>
-                  <p className="mt-1 text-xl font-semibold text-primary">
-                    {alert.value} {alert.unit}
-                  </p>
-                  <p className="text-sm text-amber-700">{alert.detail}</p>
-                </button>
-              ))}
-            </div>
-            {activeAlert && (
-              <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4">
-                <p className="text-xs uppercase tracking-[0.3em] text-muted">Next Step</p>
-                <p className="mt-2 text-sm text-muted">
-                  {activeAlert.action} to resolve {activeAlert.title.toLowerCase()}.
+        <div className="mt-4 grid gap-3 md:grid-cols-3">
+          <div className="rounded-3xl border border-white/40 bg-white/70 p-4 shadow-sm">
+            <p className="text-xs uppercase tracking-[0.25em] text-muted">
+              {ltvViewMap[ltvView].label}
+            </p>
+            <p className="mt-2 text-3xl font-semibold text-primary">
+              {ltvCategories ? formatCurrency(ltvViewMap[ltvView].value ?? 0, activeCurrency) : "—"}
+            </p>
+            <p className="mt-1 text-sm text-muted">{ltvViewMap[ltvView].description}</p>
+            {ltvError && <p className="mt-2 text-xs text-amber-700">{ltvError}</p>}
+          </div>
+          {ltvView === "ads" && (
+            <>
+              <div className="rounded-3xl border border-white/40 bg-white/70 p-4 shadow-sm">
+                <p className="text-xs uppercase tracking-[0.25em] text-muted">ROAS (30d)</p>
+                <p className="mt-2 text-2xl font-semibold text-primary">
+                  {adsOverview ? `${(adsOverview.roas ?? 0).toFixed(2)}x` : "—"}
                 </p>
-                <button type="button" className="btn-primary mt-3 text-sm" onClick={() => router.push(activeAlert.href)}>
-                  Go to {activeAlert.action}
-                </button>
+                <p className="mt-1 text-xs text-muted">Revenue from ads vs spend over the last 30 days.</p>
+                {adsOverviewError && <p className="mt-2 text-xs text-amber-700">{adsOverviewError}</p>}
               </div>
+              <div className="rounded-3xl border border-white/40 bg-white/70 p-4 shadow-sm">
+                <p className="text-xs uppercase tracking-[0.25em] text-muted">ROAS (All Time)</p>
+                <p className="mt-2 text-2xl font-semibold text-primary">
+                  {adsOverviewAll ? `${(adsOverviewAll.roas ?? 0).toFixed(2)}x` : "—"}
+                </p>
+                <p className="mt-1 text-xs text-muted">All-time revenue from ads vs spend.</p>
+                {adsOverviewAllError && <p className="mt-2 text-xs text-amber-700">{adsOverviewAllError}</p>}
+              </div>
+            </>
+          )}
+        </div>
+      </section>
+
+      <section className="grid gap-6 lg:grid-cols-[1.5fr,1fr]">
+        <div className="glass-panel">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-[0.35em] text-muted">Recent Payments</p>
+              <h3 className="mt-2 text-2xl font-semibold">Latest Activity</h3>
+              <p className="text-sm text-muted">
+                {loadingSnapshot ? "Loading live data..." : `${recentPayments.length} showing · filtered by ${sourceFilter}.`}
+              </p>
+            </div>
+            <button type="button" className="text-sm text-emerald-700" onClick={() => router.push("/transactions")}>
+              View ledger →
+            </button>
+          </div>
+          <div className="mt-4 flex flex-col gap-3">
+            {recentPayments.length === 0 && (
+              <p className="rounded-2xl border border-dashed border-emerald-900/20 bg-white px-4 py-3 text-sm text-muted">
+                {loadingSnapshot ? "Awaiting data from webhooks..." : `No recent payments for ${sourceFilter}.`}
+              </p>
             )}
+            {recentPayments.map((payment) => (
+              <div key={payment.id} className="flex items-center justify-between rounded-2xl border border-emerald-900/10 bg-white px-4 py-3">
+                <div>
+                  <p className="text-sm font-semibold text-primary">{payment.name}</p>
+                  <p className="text-xs text-muted">{payment.product}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-semibold">
+                    {formatCurrency(payment.amountMinor, payment.currency)}
+                  </p>
+                  <p className="text-xs text-muted">
+                    {payment.source} · {payment.status}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="glass-panel">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-[0.35em] text-muted">Manual Match</p>
+              <h3 className="mt-2 text-2xl font-semibold">Unmatched Payments</h3>
+              <p className="text-sm text-muted">{visibleUnmatched.length} items waiting for attribution.</p>
+            </div>
+            <button
+              type="button"
+              className="chip text-xs"
+              onClick={() => router.push("/transactions?status=needs-review")}
+            >
+              Open queue
+            </button>
+          </div>
+          <div className="mt-4 flex flex-col gap-3">
+            {visibleUnmatched.length === 0 && (
+              <p className="rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 text-sm text-primary">
+                Queue clear. Everything is attributed 🎯
+              </p>
+            )}
+            {visibleUnmatched.map((payment) => (
+              <div key={payment.id} className="rounded-2xl border border-emerald-900/15 bg-white/90 p-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-semibold text-primary">{payment.reference}</p>
+                    <p className="text-xs text-muted">
+                      {formatCurrency(payment.amountMinor, payment.currency)} · {payment.source} · {formatRelativeAge(payment.occurredAtMs)}
+                    </p>
+                  </div>
+                  <span className="chip text-xs">{payment.id}</span>
+                </div>
+                <p className="mt-3 text-xs uppercase tracking-[0.25em] text-muted">Suggest</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {payment.suggestions.map((person) => (
+                    <button
+                      key={person}
+                      type="button"
+                      className="chip text-xs !border-emerald-700/40 !bg-emerald-600/10"
+                      onClick={() => handleMatch(payment.id, person)}
+                    >
+                      Match to {person}
+                    </button>
+                  ))}
+                  <button type="button" className="chip text-xs" onClick={() => router.push(`/people?prefill=${payment.reference}`)}>
+                    Assign manually
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </section>
