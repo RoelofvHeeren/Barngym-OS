@@ -61,6 +61,8 @@ function normalizePayload(rawPayload: Record<string, any>): NormalizedPayload {
   const contact = rawPayload.contact ?? {};
   const root = rawPayload ?? {};
 
+  // IMPORTANT: GHL webhook is the sole source of leads and conversions.
+  // Meta Ads data must NEVER be used to create or update leads.
   const fullName =
     normalizeString(root.fullName) ||
     normalizeString(contact.full_name) ||
@@ -162,7 +164,7 @@ export async function processLeadIntake(rawPayload: unknown) {
 
   const metadataJson: Prisma.JsonValue = {
     ...(existing?.metadata as Prisma.JsonObject | undefined),
-    source: normalized.source ?? "ghl",
+    source: "ghl_ads",
     ghlTags: normalized.tags,
     fullName: fullName ?? undefined,
     raw: normalized.raw as unknown as Prisma.JsonValue,
@@ -177,8 +179,8 @@ export async function processLeadIntake(rawPayload: unknown) {
     email: normalized.email ?? undefined,
     phone: normalized.phone ?? undefined,
     goal: normalized.goal ?? undefined,
-    source: normalized.source ?? "ads",
-    status: (normalized.source ?? "ads") === "ads" ? ("LEAD" as any) : undefined,
+    source: "ghl_ads",
+    status: "LEAD" as any,
     ghlContactId: normalized.contactId ?? undefined,
     tags: tagsJson as Prisma.InputJsonValue,
     metadata: metadataJson as Prisma.InputJsonValue,

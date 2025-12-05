@@ -35,7 +35,7 @@ const parseRange = (range?: string): { start: Date | null; end: Date } => {
 };
 
 const isAdsLeadFilter = {
-  source: { contains: "ads", mode: "insensitive" as const },
+  source: { contains: "ghl_ads", mode: "insensitive" as const },
 };
 
 const buildDateFilter = (start: Date | null, end: Date) => {
@@ -52,6 +52,7 @@ export async function GET(request: Request) {
     const { start, end } = parseRange(rangeParam);
     const dateFilter = buildDateFilter(start, end);
 
+    // IMPORTANT: Leads/clients/revenue are strictly from GHL + payments. Meta spend only.
     const [leadsCount, conversionEvents, adsSpendAgg, adsRevenueAgg, adsClients] =
       await Promise.all([
         prisma.lead.count({
