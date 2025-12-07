@@ -23,79 +23,22 @@ type LeadPayload = {
   metadata?: Record<string, unknown>;
 };
 
-const computeDisplayName = (
-  lead: {
-    firstName: string | null;
-    lastName: string | null;
-    fullName?: string | null;
-    email: string | null;
-  }
-) => {
-  const fullName =
-    lead.fullName ||
-    [lead.firstName ?? "", lead.lastName ?? ""]
-      .map((part) => part.trim())
-      .filter(Boolean)
-      .join(" ");
 
-  return fullName || lead.email || "Unnamed Lead";
-};
-
-const getStatusInfo = (status?: string | null, source?: string | null, hasPurchases?: boolean) => {
-  const normalizedStatus = status ? status.toUpperCase() : null;
-  const sourceLower = (source ?? "").toLowerCase();
-  const fromAds = sourceLower === "ads" || sourceLower.startsWith("ads ");
-  const fromGhl = fromAds || sourceLower.includes("ghl");
-
-  if (normalizedStatus === "CLIENT") {
-    return { label: "Client", tone: "client" as const, sourceLabel: source ?? "Converted" };
-  }
-
-  // Only treat as ads-lead when the source explicitly indicates ads/GHL and the lead has not purchased yet
-  if (!hasPurchases && ((normalizedStatus === "LEAD" && fromGhl) || fromGhl)) {
-    return { label: "Lead (from Ads)", tone: "lead" as const, sourceLabel: source ?? "Ads (GHL Webhook)" };
-  }
-
-  return null;
-};
 
 export async function GET() {
   try {
-    const leads = await prisma.lead.findMany({
+    // Fetch contacts from the new Contact table (Phase 3)
+    const contacts = await prisma.contact.findMany({
       orderBy: { createdAt: "desc" },
+      include: {
+        transactions: true, // Include transactions for history and value calculation
+      },
+      take: 200, // Limit for performance until pagination is fully optimized
     });
 
-    if (!leads.length) {
+    if (!contacts.length) {
       return NextResponse.json({ ok: true, data: [] });
     }
-
-    const leadIds = leads.map((lead) => lead.id);
-    const transactions = await prisma.transaction.findMany({
-      where: { leadId: { in: leadIds } },
-      orderBy: { occurredAt: "desc" },
-    });
-
-    const statsMap = new Map<
-      string,
-      {
-        lifetimeMinor: number;
-        payments: typeof transactions;
-      }
-    >();
-
-    transactions.forEach((transaction) => {
-      if (!transaction.leadId) return;
-      const bucket =
-        statsMap.get(transaction.leadId) ?? {
-          lifetimeMinor: 0,
-          payments: [],
-        };
-      if (transaction.status !== "Failed") {
-        bucket.lifetimeMinor += transaction.amountMinor ?? 0;
-      }
-      bucket.payments.push(transaction);
-      statsMap.set(transaction.leadId, bucket);
-    });
 
     const formatCurrency = (minor: number, currency = "EUR") =>
       new Intl.NumberFormat("en-GB", {
@@ -115,93 +58,106 @@ export async function GET() {
         timeStyle: "short",
       }).format(date);
 
-    const enriched = leads.map((lead) => {
-      const stats = statsMap.get(lead.id) ?? {
-        lifetimeMinor: 0,
-        payments: [],
-      };
-      const hasPurchases = stats.payments.some((payment) => payment.status !== "Failed");
-      const recentPayments = stats.payments.slice(0, 5);
-      const historyPayments = stats.payments.slice(0, 50);
-      const lastPayment = recentPayments[0];
-      const displayName = computeDisplayName({
-        firstName: lead.firstName,
-        lastName: lead.lastName,
-        fullName: lead.fullName,
-        email: lead.email,
-      });
-      const statusInfo = getStatusInfo(lead.isClient ? "CLIENT" : lead.status, lead.source, hasPurchases);
+    const enriched = contacts.map((contact) => {
+      // Calculate stats from transactions
+      const transactions = contact.transactions ?? [];
+      const successfulTransactions = transactions.filter((t) => t.status !== "Failed");
 
+      const lifetimeMinor = successfulTransactions.reduce(
+        (sum, t) => sum + (t.amountMinor ?? 0),
+        0
+      );
+
+      const hasPurchases = successfulTransactions.length > 0;
+      const recentPayments = transactions
+        .sort((a, b) => b.occurredAt.getTime() - a.occurredAt.getTime())
+        .slice(0, 5);
+
+      const lastPayment = recentPayments[0];
+
+      // Determine display fields
+      const displayName = contact.fullName || contact.email || "Unnamed Contact";
+
+      // Map tags and source
+      const source = contact.sourceTags?.[0] || "Imported";
+      const channel = contact.sourceTags?.[0] || "Unknown";
+
+      // Determine status tone/label
+      let statusLabel = "Lead";
+      let statusTone: "lead" | "client" = "lead";
+
+      if (contact.status?.toLowerCase() === "client") {
+        statusLabel = "Client";
+        statusTone = "client";
+      }
+
+      // Construct the Profile object required by the frontend
       const profile = {
         name: displayName,
-        initials: (
-          ((lead.firstName ?? "").charAt(0) + (lead.lastName ?? "").charAt(0)) ||
-          (lead.email ?? "BG").slice(0, 2)
-        ).toUpperCase(),
-        title: lead.membershipName ?? lead.channel ?? "Lead",
-        email: lead.email ?? "",
-        phone: lead.phone ?? "",
-        status: statusInfo?.label,
-        statusTone: statusInfo?.tone,
-        source: statusInfo?.sourceLabel,
-        tags: [lead.channel, lead.stage, lead.membershipName, statusInfo?.label].filter(
-          (tag): tag is string => Boolean(tag && tag.trim())
-        ),
+        initials: (displayName.slice(0, 2)).toUpperCase(),
+        title: contact.membershipType ?? "Lead",
+        email: contact.email ?? "",
+        phone: contact.phone ?? "",
+        status: statusLabel,
+        statusTone: statusTone,
+        source: source,
+        tags: [...(contact.sourceTags ?? []), ...(contact.segmentTags ?? [])],
         identities: [
-          lead.email ? { label: "Email", value: lead.email } : null,
-          lead.phone ? { label: "Phone", value: lead.phone } : null,
-          lead.metadata && typeof lead.metadata === "object" && (lead.metadata as Record<string, unknown>).reference
-            ? {
-                label: "Reference",
-                value: (lead.metadata as Record<string, unknown>).reference as string,
-              }
-            : null,
-          lead.membershipName ? { label: "Membership", value: lead.membershipName } : null,
+          contact.email ? { label: "Email", value: contact.email } : null,
+          contact.phone ? { label: "Phone", value: contact.phone } : null,
+          contact.trainerizeId ? { label: "Trainerize ID", value: contact.trainerizeId } : null,
+          contact.membershipType ? { label: "Membership", value: contact.membershipType } : null,
         ].filter(Boolean),
         stats: {
-          lifetimeSpend: formatCurrency(stats.lifetimeMinor || 0),
-          memberships: lead.membershipName ?? "Unassigned",
+          lifetimeSpend: formatCurrency(lifetimeMinor),
+          memberships: contact.membershipType ?? "Unassigned",
           lastPayment: lastPayment
             ? `${formatCurrency(lastPayment.amountMinor, lastPayment.currency)} · ${formatTimestamp(
-                lastPayment.occurredAt
-              )}`
+              lastPayment.occurredAt
+            )}`
             : "—",
           lastAttendance: "—",
         },
         payments: recentPayments.map((payment) => ({
           date: formatDate(payment.occurredAt),
-          source: payment.provider,
+          source: payment.provider ?? payment.source,
           amount: formatCurrency(payment.amountMinor, payment.currency),
           product: payment.productType ?? "Uncategorized",
-          status: payment.status,
+          status: payment.status ?? "Completed",
         })),
-        history: historyPayments.map((payment) => ({
+        history: transactions.slice(0, 20).map((payment) => ({
           date: formatDate(payment.occurredAt),
           timestamp: formatTimestamp(payment.occurredAt),
-          source: payment.provider,
+          source: payment.provider ?? payment.source,
           amount: formatCurrency(payment.amountMinor, payment.currency),
           product: payment.productType ?? "Uncategorized",
-          status: payment.status,
+          status: payment.status ?? "Completed",
           reference: payment.reference,
         })),
         manualMatches: [],
-        notes: [
-          {
-            author: "System",
-            content: `Lifetime value recalculated at ${formatCurrency(stats.lifetimeMinor || 0)}.`,
-            timestamp: formatTimestamp(new Date()),
-          },
-        ],
+        notes: [],
       };
 
-      const metadataValue = lead.metadata && typeof lead.metadata === "object" ? lead.metadata : {};
-
+      // Map to the flat ApiLead structure
       return {
-        ...lead,
-        valueMinor: lead.valueMinor ?? stats.lifetimeMinor,
+        id: contact.id,
+        externalId: contact.id, // Use internal ID as external ID for UI consistency
+        firstName: displayName.split(" ")[0] ?? "",
+        lastName: displayName.split(" ").slice(1).join(" ") ?? "",
+        fullName: displayName,
+        email: contact.email,
+        phone: contact.phone,
+        channel: channel,
+        stage: "New", // Default for now
+        owner: "Unassigned",
+        nextStep: "",
+        valueMinor: lifetimeMinor,
+        membershipName: contact.membershipType,
+        source: source,
+        status: contact.status,
         hasPurchases,
+        isClient: contact.status === "client",
         metadata: {
-          ...metadataValue,
           profile,
         },
       };
@@ -209,13 +165,14 @@ export async function GET() {
 
     return NextResponse.json({ ok: true, data: enriched });
   } catch (error) {
+    console.error("Error fetching contacts:", error);
     return NextResponse.json(
       {
         ok: false,
         message:
           error instanceof Error
             ? error.message
-            : "Unable to load leads from the database.",
+            : "Unable to load contacts from the database.",
       },
       { status: 500 }
     );
@@ -288,9 +245,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       ok: true,
-      message: `Imported ${leads.length} lead${
-        leads.length === 1 ? "" : "s"
-      } (${created} new).`,
+      message: `Imported ${leads.length} lead${leads.length === 1 ? "" : "s"
+        } (${created} new).`,
     });
   } catch (error) {
     return NextResponse.json(

@@ -252,7 +252,7 @@ model Transaction {
   leadId       String?
   lead         Lead?    @relation(fields: [leadId], references: [id])
 
-  transactionType String?
+
   grossAmount     Float?
   feeAmount       Float?  @default(0)
   netAmount       Float?
