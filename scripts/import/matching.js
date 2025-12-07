@@ -1,10 +1,10 @@
-const { PrismaClient } = require("../../src/generated/prisma");
+const { PrismaClient } = require("@prisma/client");
 
 let prisma = new PrismaClient();
 
 function resetPrisma() {
   if (prisma) {
-    prisma.$disconnect().catch(() => {});
+    prisma.$disconnect().catch(() => { });
   }
   prisma = new PrismaClient();
 }
@@ -137,11 +137,11 @@ async function matchTransactionToMember(input) {
       const leadFullName =
         normalizeName(
           `${lead.firstName ?? ""} ${lead.lastName ?? ""}`.trim() ||
-            (lead.metadata &&
-              typeof lead.metadata === "object" &&
-              "fullName" in lead.metadata
-              ? (lead.metadata).fullName?.toString() ?? ""
-              : "")
+          (lead.metadata &&
+            typeof lead.metadata === "object" &&
+            "fullName" in lead.metadata
+            ? (lead.metadata).fullName?.toString() ?? ""
+            : "")
         ) ?? "";
       if (!leadFullName) continue;
       const score = jaroWinkler(fullName, leadFullName);

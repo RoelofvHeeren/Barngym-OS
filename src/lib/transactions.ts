@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { Prisma } from "@/generated/prisma";
+import { Prisma } from "@prisma/client";
 import type Stripe from "stripe";
 import { prisma } from "./prisma";
 import { attachLeadBatch } from "./transactionMatcher";
@@ -105,67 +105,67 @@ export async function listTransactions() {
 type StripeChargePayload =
   | Stripe.Charge
   | {
-      id?: string;
-      payment_intent?: string | Stripe.PaymentIntent | null;
-      created?: number;
-      amount?: number;
-      currency?: string;
-      status?: string | null;
-      paid?: boolean;
-      customer?: string | Stripe.Customer | Stripe.DeletedCustomer | null;
-      description?: string | null;
-      statement_descriptor?: string | null;
-      metadata?: Record<string, unknown>;
-      billing_details?: Stripe.Charge.BillingDetails;
-      receipt_email?: string | null;
-      invoice?: string | Stripe.Invoice | null;
-    };
+    id?: string;
+    payment_intent?: string | Stripe.PaymentIntent | null;
+    created?: number;
+    amount?: number;
+    currency?: string;
+    status?: string | null;
+    paid?: boolean;
+    customer?: string | Stripe.Customer | Stripe.DeletedCustomer | null;
+    description?: string | null;
+    statement_descriptor?: string | null;
+    metadata?: Record<string, unknown>;
+    billing_details?: Stripe.Charge.BillingDetails;
+    receipt_email?: string | null;
+    invoice?: string | Stripe.Invoice | null;
+  };
 
 type StripePaymentIntentPayload =
   | Stripe.PaymentIntent
   | (StripeChargePayload & {
-      amount_received?: number;
-      amount_capturable?: number;
-      amount_details?: Stripe.PaymentIntent.AmountDetails;
-      charges?: { data?: Array<StripeChargePayload | Stripe.Charge> };
-      invoice?: string | StripeInvoicePayload | null;
-    });
+    amount_received?: number;
+    amount_capturable?: number;
+    amount_details?: Stripe.PaymentIntent.AmountDetails;
+    charges?: { data?: Array<StripeChargePayload | Stripe.Charge> };
+    invoice?: string | StripeInvoicePayload | null;
+  });
 
 type StripeInvoicePayload =
   | Stripe.Invoice
   | {
-      id?: string;
-      payment_intent?: string | Stripe.PaymentIntent | null;
-      created?: number;
-      amount_paid?: number;
-      currency?: string;
-      status?: string | null;
-      number?: string | null;
-      customer_email?: string | null;
-      customer_name?: string | null;
-      metadata?: Record<string, unknown>;
-      customer?: string;
-      hosted_invoice_url?: string | null;
-    };
+    id?: string;
+    payment_intent?: string | Stripe.PaymentIntent | null;
+    created?: number;
+    amount_paid?: number;
+    currency?: string;
+    status?: string | null;
+    number?: string | null;
+    customer_email?: string | null;
+    customer_name?: string | null;
+    metadata?: Record<string, unknown>;
+    customer?: string;
+    hosted_invoice_url?: string | null;
+  };
 
 type StripeCheckoutSessionPayload =
   | Stripe.Checkout.Session
   | {
-      id?: string;
-      created?: number;
-      amount_total?: number;
-      currency?: string;
-      status?: string;
-      customer_details?: {
-        name?: string;
-        email?: string;
-      };
-      metadata?: Record<string, unknown>;
-      payment_intent?: string | StripePaymentIntentPayload;
-      customer?: string;
-      payment_status?: string;
-      mode?: string;
+    id?: string;
+    created?: number;
+    amount_total?: number;
+    currency?: string;
+    status?: string;
+    customer_details?: {
+      name?: string;
+      email?: string;
     };
+    metadata?: Record<string, unknown>;
+    payment_intent?: string | StripePaymentIntentPayload;
+    customer?: string;
+    payment_status?: string;
+    mode?: string;
+  };
 
 export type StarlingFeedItem = {
   feedItemUid?: string;
@@ -342,8 +342,8 @@ export function mapStripePaymentIntent(intent: StripePaymentIntentPayload): Norm
     typeof intent?.amount_received === "number"
       ? intent.amount_received
       : typeof intent?.amount === "number"
-      ? intent.amount
-      : 0;
+        ? intent.amount
+        : 0;
 
   const metadata = intent?.metadata ?? {};
   const paymentIntentId =
@@ -475,8 +475,8 @@ export function mapStarlingFeedItem(item: StarlingFeedItem): NormalizedTransacti
     item?.status === "SETTLED"
       ? "Completed"
       : item?.status === "DECLINED"
-      ? "Failed"
-      : "Needs Review";
+        ? "Failed"
+        : "Needs Review";
 
   return {
     externalId: `starling_${feedItemUid}`,
@@ -526,8 +526,8 @@ export function mapGlofoxPayment(payload: GlofoxPaymentPayload): NormalizedTrans
     statusValue === "paid" || statusValue === "completed"
       ? "Completed"
       : statusValue === "failed"
-      ? "Failed"
-      : "Needs Review";
+        ? "Failed"
+        : "Needs Review";
 
   const amountMinor = toMinorUnits(payload.amount ?? payload.total);
 

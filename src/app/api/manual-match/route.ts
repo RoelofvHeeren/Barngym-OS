@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { Prisma } from "@/generated/prisma";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
@@ -21,19 +21,19 @@ export async function GET() {
       createdAt: item.createdAt.toISOString(),
       transaction: item.transaction
         ? {
-            id: item.transaction.id,
-            occurredAt: item.transaction.occurredAt.toISOString(),
-            amountMinor: item.transaction.amountMinor,
-            currency: item.transaction.currency,
-            provider: item.transaction.provider,
-            productType: item.transaction.productType,
-            personName: item.transaction.personName,
-            reference: item.transaction.reference,
-            status: item.transaction.status,
-            confidence: item.transaction.confidence,
-            metadata: item.transaction.metadata,
-            raw: item.transaction.raw,
-          }
+          id: item.transaction.id,
+          occurredAt: item.transaction.occurredAt.toISOString(),
+          amountMinor: item.transaction.amountMinor,
+          currency: item.transaction.currency,
+          provider: item.transaction.provider,
+          productType: item.transaction.productType,
+          personName: item.transaction.personName,
+          reference: item.transaction.reference,
+          status: item.transaction.status,
+          confidence: item.transaction.confidence,
+          metadata: item.transaction.metadata,
+          raw: item.transaction.raw,
+        }
         : null,
     }));
 

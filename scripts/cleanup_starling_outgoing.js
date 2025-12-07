@@ -2,8 +2,7 @@
  * One-off helper to remove outgoing Starling feed items from the DB.
  * Keeps only incoming (credits). Safe to run multiple times.
  */
-// Use the generated client at src/generated/prisma (output is set in prisma/schema.prisma)
-const { PrismaClient } = require("../src/generated/prisma");
+const { PrismaClient } = require("@prisma/client");
 
 async function main() {
   const prisma = new PrismaClient();
