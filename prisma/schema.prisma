@@ -231,7 +231,32 @@ model UnmatchedPayment {
   @@index([externalPaymentId, sourceSystem])
 }
 
+model Contact {
+  id                String    @id @default(cuid())
+  fullName          String?
+  email             String?
+  phone             String?
+  status            String    @default("lead")
+  sourceTags        String[]  @default([])
+  segmentTags       String[]  @default([])
+  isActive          Boolean   @default(false)
+  firstSeenAt       DateTime?
+  lastPaymentAt     DateTime?
+  renewalDate       DateTime?
+  membershipType    String?
+  membershipEndDate DateTime?
+  trainerizeId      String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  transactions      Transaction[]
+
+  @@unique([email])
+  @@index([phone])
+}
+
 model Transaction {
+  contactId      String?
+  contact        Contact? @relation(fields: [contactId], references: [id])
   id           String   @id @default(cuid())
   provider     String
   externalId   String   @unique
