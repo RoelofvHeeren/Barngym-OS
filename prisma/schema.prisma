@@ -258,6 +258,7 @@ model Transaction {
   contactId      String?
   contact        Contact? @relation(fields: [contactId], references: [id])
   id           String   @id @default(cuid())
+  source       String
   provider     String
   externalId   String   @unique
   transactionUid String? @unique
