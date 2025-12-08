@@ -43,7 +43,7 @@ async function main() {
   loadEnv();
   const filePath = path.resolve(
     __dirname,
-    "../../../Barn Gym Transaction : Member Data/Starling Payment - Stripe & Zappy - starling_incoming_transactions.csv"
+    "../../../Barn Gym Transaction : Member Data/Starling Transcations. Finalcsv.csv"
   );
   const rows = parse(fs.readFileSync(filePath, "utf8"), { columns: true, skip_empty_lines: true, trim: true });
 
@@ -151,4 +151,4 @@ main()
     console.error(err);
     process.exitCode = 1;
   })
-  .finally(() => prisma.$disconnect());
+  .finally(() => getPrisma().$disconnect());
