@@ -395,8 +395,9 @@ export default function ManualMatchPage() {
                             typeof item.transaction.raw === "object"
                           ) {
                             const raw = item.transaction.raw as Record<string, unknown>;
-                            if (typeof raw.counterPartyName === "string" && raw.counterPartyName) {
-                              return raw.counterPartyName;
+                            const name = (raw.counterPartyName || raw.counterpartyName) as string | undefined;
+                            if (typeof name === "string" && name) {
+                              return name;
                             }
                           }
                           return item.transaction?.reference ?? "—";
@@ -448,13 +449,20 @@ export default function ManualMatchPage() {
                           className="rounded-full bg-white/10 px-4 py-2 text-xs font-semibold text-primary"
                           onClick={() => {
                             const { email, phone } = extractContactHint(item.transaction?.metadata);
+                            const raw = (item.transaction?.raw as Record<string, unknown>) ?? {};
+                            const rawName = (raw.counterPartyName || raw.counterpartyName) as string | undefined;
+                            const starlingRef =
+                              item.transaction?.provider === "Starling" &&
+                                typeof rawName === "string"
+                                ? rawName
+                                : undefined;
                             setCreatePayload({
                               queueId: item.id,
                               email: email ?? "",
                               phone: phone ?? "",
                               firstName: "",
                               lastName: "",
-                              reference: item.transaction?.reference ?? "",
+                              reference: starlingRef ?? item.transaction?.reference ?? "",
                             });
                           }}
                         >

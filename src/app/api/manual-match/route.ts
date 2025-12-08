@@ -93,12 +93,17 @@ export async function POST(request: Request) {
       });
 
       if (
-        queueItem.transaction.provider === "Starling" &&
-        (queueItem.transaction.personName || queueItem.transaction.reference)
+        queueItem.transaction.provider === "Starling"
       ) {
+        const raw = (queueItem.transaction.raw as Record<string, unknown>) ?? {};
+        const rawName = (raw.counterPartyName || raw.counterpartyName) as string | undefined;
+        const counterPartyName = typeof rawName === "string" ? rawName : undefined;
+
         const refKey = (queueItem.transaction.reference || "").trim().toLowerCase();
         const nameKey = (queueItem.transaction.personName || "").trim().toLowerCase();
-        const key = refKey || nameKey;
+        const rawNameKey = (counterPartyName || "").trim().toLowerCase();
+
+        const key = refKey || nameKey || rawNameKey;
         if (key.trim().length) {
           await prisma.counterpartyMapping.upsert({
             where: { provider_key: { provider: "Starling", key } },
