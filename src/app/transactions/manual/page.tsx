@@ -385,34 +385,39 @@ export default function ManualMatchPage() {
                       {item.transaction?.productType ? ` · ${item.transaction.productType}` : ""}
                     </td>
                     <td className="pr-4 text-muted">
-                      {item.transaction?.personName ?? "Unassigned"}
-                      <div className="text-xs text-muted">
-                        Ref:{" "}
-                        {(() => {
-                          if (
-                            item.transaction?.provider?.toLowerCase() === "starling" &&
-                            item.transaction.raw &&
-                            typeof item.transaction.raw === "object"
-                          ) {
-                            const raw = item.transaction.raw as Record<string, unknown>;
-                            const name = (raw.counterPartyName || raw.counterpartyName) as string | undefined;
-                            if (typeof name === "string" && name) {
-                              return name;
-                            }
-                          }
-                          return item.transaction?.reference ?? "—";
-                        })()}{" "}
-                        · Reason: {item.reason}
-                        {(() => {
-                          const { email, phone } = extractContactHint(item.transaction?.metadata);
-                          if (!email && !phone) return null;
+                      {(() => {
+                        if (item.transaction?.provider?.toLowerCase() === "starling") {
+                          const raw = (item.transaction.raw as Record<string, unknown>) ?? {};
+                          const counterPartyName = (raw.counterPartyName || raw.counterpartyName) as string | undefined;
+                          const name = counterPartyName || item.transaction?.personName || "Unknown";
+                          const ref = item.transaction?.reference || "—";
+
                           return (
-                            <div className="text-xs text-muted">
-                              {email ? ` · Email: ${email}` : ""} {phone ? ` · Phone: ${phone}` : ""}
-                            </div>
+                            <>
+                              <div className="font-medium">{name}</div>
+                              <div className="text-xs text-muted">Ref: {ref}</div>
+                            </>
                           );
-                        })()}
-                      </div>
+                        }
+
+                        return (
+                          <>
+                            {item.transaction?.personName ?? "Unassigned"}
+                            <div className="text-xs text-muted">
+                              Ref: {item.transaction?.reference ?? "—"} · Reason: {item.reason}
+                              {(() => {
+                                const { email, phone } = extractContactHint(item.transaction?.metadata);
+                                if (!email && !phone) return null;
+                                return (
+                                  <div className="text-xs text-muted">
+                                    {email ? ` · Email: ${email}` : ""} {phone ? ` · Phone: ${phone}` : ""}
+                                  </div>
+                                );
+                              })()}
+                            </div>
+                          </>
+                        );
+                      })()}
                     </td>
                     <td className="pr-4 text-xs text-muted">
                       {item.suggestedMemberIds?.length ? item.suggestedMemberIds.join(", ") : "None"}
