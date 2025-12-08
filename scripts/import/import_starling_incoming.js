@@ -43,7 +43,7 @@ async function main() {
   loadEnv();
   const filePath = path.resolve(
     __dirname,
-    "../../../Barn Gym Dashboard/transactions/Final Starling.csv"
+    "../../../Transactions/Final Starling.csv"
   );
   const rows = parse(fs.readFileSync(filePath, "utf8"), { columns: true, skip_empty_lines: true, trim: true });
 
