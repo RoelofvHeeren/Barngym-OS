@@ -93,7 +93,7 @@ export async function POST(request: Request) {
       });
 
       if (
-        queueItem.transaction.provider === "Starling"
+        queueItem.transaction.provider?.toLowerCase() === "starling"
       ) {
         const raw = (queueItem.transaction.raw as Record<string, unknown>) ?? {};
         const rawName = (raw.counterPartyName || raw.counterpartyName) as string | undefined;

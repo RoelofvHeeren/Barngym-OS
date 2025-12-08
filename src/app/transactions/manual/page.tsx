@@ -390,7 +390,7 @@ export default function ManualMatchPage() {
                         Ref:{" "}
                         {(() => {
                           if (
-                            item.transaction?.provider === "Starling" &&
+                            item.transaction?.provider?.toLowerCase() === "starling" &&
                             item.transaction.raw &&
                             typeof item.transaction.raw === "object"
                           ) {
@@ -452,7 +452,7 @@ export default function ManualMatchPage() {
                             const raw = (item.transaction?.raw as Record<string, unknown>) ?? {};
                             const rawName = (raw.counterPartyName || raw.counterpartyName) as string | undefined;
                             const starlingRef =
-                              item.transaction?.provider === "Starling" &&
+                              item.transaction?.provider?.toLowerCase() === "starling" &&
                                 typeof rawName === "string"
                                 ? rawName
                                 : undefined;
