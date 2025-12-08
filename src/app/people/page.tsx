@@ -337,8 +337,8 @@ function normalizeApiLead(lead: ApiLead): NormalizedLead {
   const displayName = computeDisplayName(
     lead,
     metadataContact as
-      | { first_name?: string; firstName?: string; last_name?: string; lastName?: string }
-      | undefined
+    | { first_name?: string; firstName?: string; last_name?: string; lastName?: string }
+    | undefined
   );
   const storedProfile = isLeadProfile(metadataProfile) ? metadataProfile : null;
   const statusInfo = getStatusInfo(lead.isClient ? "CLIENT" : lead.status, lead.source, lead.hasPurchases);
@@ -377,6 +377,7 @@ function normalizeApiLead(lead: ApiLead): NormalizedLead {
 export default function PeoplePage() {
   const [search, setSearch] = useState("");
   const [leadFilter, setLeadFilter] = useState<LeadStage>("All");
+  const [viewMode, setViewMode] = useState<"all" | "leads" | "members">("all");
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [csvHeaders, setCsvHeaders] = useState<string[]>(csvColumns);
@@ -407,7 +408,7 @@ export default function PeoplePage() {
     setLoadingLeads(true);
     setLeadError(null);
     try {
-      const response = await fetch("/api/leads");
+      const response = await fetch(`/api/leads?view=${viewMode}`);
       const payload = await response.json();
       if (!response.ok || !payload.ok) {
         throw new Error(payload.message || "Unable to load leads.");
@@ -437,7 +438,7 @@ export default function PeoplePage() {
     } finally {
       setLoadingLeads(false);
     }
-  }, []);
+  }, [viewMode]);
 
   useEffect(() => {
     loadImportedLeads();
@@ -454,7 +455,7 @@ export default function PeoplePage() {
       const matchesStage = leadFilter === "All" || lead.stage === leadFilter;
       const matchesSearch = search
         ? lead.name.toLowerCase().includes(search.toLowerCase()) ||
-          lead.channel.toLowerCase().includes(search.toLowerCase())
+        lead.channel.toLowerCase().includes(search.toLowerCase())
         : true;
       return matchesStage && matchesSearch;
     });
@@ -607,9 +608,8 @@ export default function PeoplePage() {
 
       const template = createProfileTemplate(displayName);
       const initials =
-        `${((firstName || displayName).charAt(0)) ?? ""}${
-          ((lastName || displayName.split(" ").slice(-1)[0] || "").charAt(0)) ?? ""
-        }`.toUpperCase() || template.initials;
+        `${((firstName || displayName).charAt(0)) ?? ""}${((lastName || displayName.split(" ").slice(-1)[0] || "").charAt(0)) ?? ""
+          }`.toUpperCase() || template.initials;
 
       const profile: LeadProfile = {
         ...template,
@@ -705,17 +705,34 @@ export default function PeoplePage() {
               Lead sheet first. Search anything, filter stages, and open full profiles.
             </p>
           </div>
-          <button
-            className="btn-primary text-sm"
-            type="button"
-            onClick={() => {
-              setShowImportWorkspace((prev) => !prev);
-              setImportMessage(null);
-              setFormState({ name: "", email: "", membership: "", note: "" });
-            }}
-          >
-            {showImportWorkspace ? "Import Workspace Open" : "Open Import Workspace"}
-          </button>
+
+          <div className="flex gap-4 items-center">
+            <div className="flex items-center rounded-xl bg-white/5 p-1 gap-1 border border-white/10">
+              {(['all', 'members', 'leads'] as const).map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => setViewMode(mode)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${viewMode === mode
+                      ? "bg-emerald-600 text-white shadow-sm"
+                      : "text-muted hover:text-white hover:bg-white/5"
+                    }`}
+                >
+                  {mode.charAt(0).toUpperCase() + mode.slice(1)}
+                </button>
+              ))}
+            </div>
+            <button
+              className="btn-primary text-sm"
+              type="button"
+              onClick={() => {
+                setShowImportWorkspace((prev) => !prev);
+                setImportMessage(null);
+                setFormState({ name: "", email: "", membership: "", note: "" });
+              }}
+            >
+              {showImportWorkspace ? "Import Workspace Open" : "Open Import Workspace"}
+            </button>
+          </div>
         </div>
 
         <div className="rounded-3xl border border-white/20 bg-white/80 px-5 py-3">
@@ -741,13 +758,17 @@ export default function PeoplePage() {
             {showImportWorkspace ? "Hide import workspace" : "Open import workspace"}
           </button>
         </div>
-        {loadingLeads && (
-          <p className="text-xs text-muted">Refreshing server leads…</p>
-        )}
-        {leadError && (
-          <p className="text-xs text-amber-600">{leadError}</p>
-        )}
-      </section>
+        {
+          loadingLeads && (
+            <p className="text-xs text-muted">Refreshing server leads…</p>
+          )
+        }
+        {
+          leadError && (
+            <p className="text-xs text-amber-600">{leadError}</p>
+          )
+        }
+      </section >
 
       {showImportWorkspace && (
         <section className="grid gap-6 lg:grid-cols-2">
@@ -946,7 +967,8 @@ export default function PeoplePage() {
             </div>
           </div>
         </section>
-      )}
+      )
+      }
 
       <section className="glass-panel">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -965,9 +987,8 @@ export default function PeoplePage() {
                 key={stage}
                 type="button"
                 onClick={() => setLeadFilter(stage)}
-                className={`chip text-xs ${
-                  stage === leadFilter ? "!bg-emerald-600 !text-white !border-emerald-600" : ""
-                }`}
+                className={`chip text-xs ${stage === leadFilter ? "!bg-emerald-600 !text-white !border-emerald-600" : ""
+                  }`}
               >
                 {stage}
               </button>
@@ -975,63 +996,61 @@ export default function PeoplePage() {
           </div>
         </div>
 
-          <div className="mt-4 overflow-x-auto">
-            <table className="w-full min-w-[720px] text-left text-sm">
-              <thead className="text-muted">
-                <tr>
-                  {["Lead", "Channel", "Stage", "Owner", "Next Step", "Value"].map((column) => (
-                    <th key={column} className="pb-3 pr-4 font-medium">
-                      {column}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-emerald-900/10">
-                {pagedLeads.map((lead) => (
-                  <tr
-                    key={lead.id}
-                    className={`cursor-pointer rounded-2xl ${
-                      lead.id === selectedLeadId ? "bg-emerald-50/80" : ""
-                    }`}
-                    onClick={() => {
-                      setSelectedLeadId(lead.id);
-                      setModalOpen(true);
-                    }}
-                  >
-                    <td className="py-3 pr-4">
-                      <p className="font-semibold text-primary">{lead.name}</p>
-                      <div className="flex flex-wrap items-center gap-2">
-                        {lead.statusLabel && (
-                          <span
-                            className={`chip text-[10px] ${
-                              lead.statusTone === "client"
-                                ? "!bg-emerald-100 !text-emerald-800 !border-emerald-200"
-                                : "!bg-amber-100 !text-amber-800 !border-amber-200"
-                            }`}
-                          >
-                            {lead.statusLabel}
-                          </span>
-                        )}
-                        {lead.source && (
-                          <span className="chip text-[10px] !bg-white/70 !text-primary !border-white/30">
-                            Source: {lead.source}
-                          </span>
-                        )}
-                        <span className="text-[11px] text-muted">{lead.id}</span>
-                      </div>
-                    </td>
-                    <td className="pr-4 text-muted">{lead.channel}</td>
-                    <td className="pr-4">
-                      <span className="chip text-xs">{lead.stage}</span>
-                    </td>
-                    <td className="pr-4 text-muted">{lead.owner}</td>
-                    <td className="pr-4 text-muted">{lead.next}</td>
-                    <td className="pr-4 font-semibold text-primary">{lead.value}</td>
-                  </tr>
+        <div className="mt-4 overflow-x-auto">
+          <table className="w-full min-w-[720px] text-left text-sm">
+            <thead className="text-muted">
+              <tr>
+                {["Lead", "Channel", "Stage", "Owner", "Next Step", "Value"].map((column) => (
+                  <th key={column} className="pb-3 pr-4 font-medium">
+                    {column}
+                  </th>
                 ))}
-              </tbody>
-            </table>
-          </div>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-emerald-900/10">
+              {pagedLeads.map((lead) => (
+                <tr
+                  key={lead.id}
+                  className={`cursor-pointer rounded-2xl ${lead.id === selectedLeadId ? "bg-emerald-50/80" : ""
+                    }`}
+                  onClick={() => {
+                    setSelectedLeadId(lead.id);
+                    setModalOpen(true);
+                  }}
+                >
+                  <td className="py-3 pr-4">
+                    <p className="font-semibold text-primary">{lead.name}</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {lead.statusLabel && (
+                        <span
+                          className={`chip text-[10px] ${lead.statusTone === "client"
+                            ? "!bg-emerald-100 !text-emerald-800 !border-emerald-200"
+                            : "!bg-amber-100 !text-amber-800 !border-amber-200"
+                            }`}
+                        >
+                          {lead.statusLabel}
+                        </span>
+                      )}
+                      {lead.source && (
+                        <span className="chip text-[10px] !bg-white/70 !text-primary !border-white/30">
+                          Source: {lead.source}
+                        </span>
+                      )}
+                      <span className="text-[11px] text-muted">{lead.id}</span>
+                    </div>
+                  </td>
+                  <td className="pr-4 text-muted">{lead.channel}</td>
+                  <td className="pr-4">
+                    <span className="chip text-xs">{lead.stage}</span>
+                  </td>
+                  <td className="pr-4 text-muted">{lead.owner}</td>
+                  <td className="pr-4 text-muted">{lead.next}</td>
+                  <td className="pr-4 font-semibold text-primary">{lead.value}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
         <div className="mt-6 flex flex-wrap items-center justify-between gap-3 text-sm">
           <div className="flex items-center gap-2">
             <span className="text-muted">Rows per page</span>
@@ -1050,12 +1069,12 @@ export default function PeoplePage() {
               ))}
             </select>
           </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            className="chip text-xs"
-            disabled={page === 1}
-            onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              className="chip text-xs"
+              disabled={page === 1}
+              onClick={() => setPage((prev) => Math.max(1, prev - 1))}
             >
               Previous
             </button>
@@ -1074,166 +1093,167 @@ export default function PeoplePage() {
         </div>
       </section>
 
-      {modalOpen && selectedLeadProfile && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-8">
-          <div className="glass-panel max-h-[90vh] w-full max-w-4xl overflow-y-auto">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-[0.35em] text-muted">
-                  Lead Profile
-                </p>
-                <h3 className="mt-2 text-2xl font-semibold">{selectedLeadProfile.name}</h3>
-                <p className="text-sm text-muted">{selectedLeadProfile.title}</p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {selectedLeadProfile.status && (
-                    <span
-                      className={`chip text-xs ${
-                        selectedLeadProfile.statusTone === "client"
+      {
+        modalOpen && selectedLeadProfile && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-8">
+            <div className="glass-panel max-h-[90vh] w-full max-w-4xl overflow-y-auto">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.35em] text-muted">
+                    Lead Profile
+                  </p>
+                  <h3 className="mt-2 text-2xl font-semibold">{selectedLeadProfile.name}</h3>
+                  <p className="text-sm text-muted">{selectedLeadProfile.title}</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {selectedLeadProfile.status && (
+                      <span
+                        className={`chip text-xs ${selectedLeadProfile.statusTone === "client"
                           ? "!bg-emerald-100 !text-emerald-800 !border-emerald-200"
                           : "!bg-amber-100 !text-amber-800 !border-amber-200"
-                      }`}
-                    >
-                      {selectedLeadProfile.status}
-                    </span>
-                  )}
-                  {selectedLeadProfile.source && (
-                    <span className="chip text-xs !bg-white/80 !text-primary !border-white/40">
-                      Source: {selectedLeadProfile.source}
-                    </span>
-                  )}
-                </div>
-              </div>
-              <button
-                type="button"
-                className="chip text-xs"
-                onClick={() => setModalOpen(false)}
-              >
-                Close
-              </button>
-            </div>
-            <div className="mt-5 space-y-3 text-sm text-muted">
-              <p>Phone · {selectedLeadProfile.phone}</p>
-              <p>Email · {selectedLeadProfile.email}</p>
-              <div className="flex flex-wrap gap-2">
-                {selectedLeadProfile.tags.map((tag) => (
-                  <span key={tag} className="chip text-xs">
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            </div>
-            <div className="mt-4 grid gap-3 md:grid-cols-2">
-              <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                <p className="text-xs uppercase tracking-[0.35em] text-muted">
-                  Lifetime Value
-                </p>
-                <p className="mt-2 text-lg font-semibold">
-                  {selectedLeadProfile.stats.lifetimeSpend}
-                </p>
-              </div>
-              <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                <p className="text-xs uppercase tracking-[0.35em] text-muted">
-                  Membership
-                </p>
-                <p className="mt-2 text-lg font-semibold">
-                  {selectedLeadProfile.stats.memberships}
-                </p>
-              </div>
-              <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                <p className="text-xs uppercase tracking-[0.35em] text-muted">
-                  Recent Payment
-                </p>
-                <p className="mt-2 text-lg font-semibold">
-                  {selectedLeadProfile.stats.lastPayment}
-                </p>
-              </div>
-              <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                <p className="text-xs uppercase tracking-[0.35em] text-muted">
-                  Attendance
-                </p>
-                <p className="mt-2 text-lg font-semibold">
-                  {selectedLeadProfile.stats.lastAttendance}
-                </p>
-              </div>
-            </div>
-            <div className="mt-6 grid gap-4 md:grid-cols-2">
-              <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                <p className="text-xs uppercase tracking-[0.35em] text-muted">
-                  Contact Info
-                </p>
-                <ul className="mt-3 space-y-2 text-primary">
-                  {matchingIdentities.map((identity) => (
-                    <li key={identity.value} className="flex justify-between gap-4">
-                      <span className="text-muted">{identity.label}</span>
-                      <span className="font-medium text-primary">{identity.value}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                <p className="text-xs uppercase tracking-[0.35em] text-muted">Recent Payments</p>
-                <div className="mt-3 space-y-3">
-                  {selectedLeadProfile.payments.map((entry) => (
-                    <div
-                      key={`${entry.date}-${entry.product}`}
-                      className="rounded-2xl border border-white/10 bg-white/5 p-3"
-                    >
-                      <p className="text-sm font-semibold text-primary">{entry.product}</p>
-                      <p className="text-xs text-muted">
-                        {entry.date} · {entry.source}
-                      </p>
-                      <p className="text-sm text-primary">{entry.amount}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-            <div className="mt-4 rounded-3xl border border-white/10 bg-white/5 p-4">
-              <div className="flex items-center justify-between">
-                <p className="text-xs uppercase tracking-[0.35em] text-muted">Transaction History</p>
-                <span className="text-xs text-muted">
-                  Showing up to {selectedLeadProfile.history.length} records
-                </span>
-              </div>
-              <div className="mt-3 space-y-2 max-h-72 overflow-y-auto pr-2">
-                {selectedLeadProfile.history.length === 0 ? (
-                  <p className="text-sm text-muted">No transactions yet.</p>
-                ) : (
-                  selectedLeadProfile.history.map((entry, idx) => (
-                    <div
-                      key={`${entry.timestamp}-${idx}`}
-                      className="rounded-2xl border border-white/10 bg-white/5 p-3"
-                    >
-                      <div className="flex items-center justify-between text-sm text-primary">
-                        <span className="font-semibold">{entry.amount}</span>
-                        <span className="text-muted">{entry.source}</span>
-                      </div>
-                      <div className="text-xs text-muted">
-                        {entry.timestamp} · {entry.product}
-                        {entry.reference ? ` · Ref: ${entry.reference}` : ""}
-                        {entry.status ? ` · ${entry.status}` : ""}
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-            <div className="mt-4 rounded-3xl border border-white/10 bg-white/5 p-4">
-              <p className="text-xs uppercase tracking-[0.35em] text-muted">Notes</p>
-              <div className="mt-3 space-y-3 text-sm">
-                {selectedLeadProfile.notes.map((note) => (
-                  <div key={note.timestamp} className="rounded-2xl border border-white/10 bg-white/5 p-3">
-                    <p className="text-xs text-muted">{note.timestamp}</p>
-                    <p className="text-primary">{note.content}</p>
-                    <p className="text-xs text-muted">— {note.author}</p>
+                          }`}
+                      >
+                        {selectedLeadProfile.status}
+                      </span>
+                    )}
+                    {selectedLeadProfile.source && (
+                      <span className="chip text-xs !bg-white/80 !text-primary !border-white/40">
+                        Source: {selectedLeadProfile.source}
+                      </span>
+                    )}
                   </div>
-                ))}
+                </div>
+                <button
+                  type="button"
+                  className="chip text-xs"
+                  onClick={() => setModalOpen(false)}
+                >
+                  Close
+                </button>
+              </div>
+              <div className="mt-5 space-y-3 text-sm text-muted">
+                <p>Phone · {selectedLeadProfile.phone}</p>
+                <p>Email · {selectedLeadProfile.email}</p>
+                <div className="flex flex-wrap gap-2">
+                  {selectedLeadProfile.tags.map((tag) => (
+                    <span key={tag} className="chip text-xs">
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <div className="mt-4 grid gap-3 md:grid-cols-2">
+                <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                  <p className="text-xs uppercase tracking-[0.35em] text-muted">
+                    Lifetime Value
+                  </p>
+                  <p className="mt-2 text-lg font-semibold">
+                    {selectedLeadProfile.stats.lifetimeSpend}
+                  </p>
+                </div>
+                <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                  <p className="text-xs uppercase tracking-[0.35em] text-muted">
+                    Membership
+                  </p>
+                  <p className="mt-2 text-lg font-semibold">
+                    {selectedLeadProfile.stats.memberships}
+                  </p>
+                </div>
+                <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                  <p className="text-xs uppercase tracking-[0.35em] text-muted">
+                    Recent Payment
+                  </p>
+                  <p className="mt-2 text-lg font-semibold">
+                    {selectedLeadProfile.stats.lastPayment}
+                  </p>
+                </div>
+                <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                  <p className="text-xs uppercase tracking-[0.35em] text-muted">
+                    Attendance
+                  </p>
+                  <p className="mt-2 text-lg font-semibold">
+                    {selectedLeadProfile.stats.lastAttendance}
+                  </p>
+                </div>
+              </div>
+              <div className="mt-6 grid gap-4 md:grid-cols-2">
+                <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                  <p className="text-xs uppercase tracking-[0.35em] text-muted">
+                    Contact Info
+                  </p>
+                  <ul className="mt-3 space-y-2 text-primary">
+                    {matchingIdentities.map((identity) => (
+                      <li key={identity.value} className="flex justify-between gap-4">
+                        <span className="text-muted">{identity.label}</span>
+                        <span className="font-medium text-primary">{identity.value}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                  <p className="text-xs uppercase tracking-[0.35em] text-muted">Recent Payments</p>
+                  <div className="mt-3 space-y-3">
+                    {selectedLeadProfile.payments.map((entry) => (
+                      <div
+                        key={`${entry.date}-${entry.product}`}
+                        className="rounded-2xl border border-white/10 bg-white/5 p-3"
+                      >
+                        <p className="text-sm font-semibold text-primary">{entry.product}</p>
+                        <p className="text-xs text-muted">
+                          {entry.date} · {entry.source}
+                        </p>
+                        <p className="text-sm text-primary">{entry.amount}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div className="mt-4 rounded-3xl border border-white/10 bg-white/5 p-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs uppercase tracking-[0.35em] text-muted">Transaction History</p>
+                  <span className="text-xs text-muted">
+                    Showing up to {selectedLeadProfile.history.length} records
+                  </span>
+                </div>
+                <div className="mt-3 space-y-2 max-h-72 overflow-y-auto pr-2">
+                  {selectedLeadProfile.history.length === 0 ? (
+                    <p className="text-sm text-muted">No transactions yet.</p>
+                  ) : (
+                    selectedLeadProfile.history.map((entry, idx) => (
+                      <div
+                        key={`${entry.timestamp}-${idx}`}
+                        className="rounded-2xl border border-white/10 bg-white/5 p-3"
+                      >
+                        <div className="flex items-center justify-between text-sm text-primary">
+                          <span className="font-semibold">{entry.amount}</span>
+                          <span className="text-muted">{entry.source}</span>
+                        </div>
+                        <div className="text-xs text-muted">
+                          {entry.timestamp} · {entry.product}
+                          {entry.reference ? ` · Ref: ${entry.reference}` : ""}
+                          {entry.status ? ` · ${entry.status}` : ""}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+              <div className="mt-4 rounded-3xl border border-white/10 bg-white/5 p-4">
+                <p className="text-xs uppercase tracking-[0.35em] text-muted">Notes</p>
+                <div className="mt-3 space-y-3 text-sm">
+                  {selectedLeadProfile.notes.map((note) => (
+                    <div key={note.timestamp} className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                      <p className="text-xs text-muted">{note.timestamp}</p>
+                      <p className="text-primary">{note.content}</p>
+                      <p className="text-xs text-muted">— {note.author}</p>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
-    </div>
+    </div >
   );
 }

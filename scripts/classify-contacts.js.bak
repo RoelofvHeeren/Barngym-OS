@@ -1,0 +1,88 @@
+const { PrismaClient } = require('@prisma/client');
+
+async function classifyContacts() {
+    const prisma = new PrismaClient();
+
+    try {
+        console.log('Starting Contact classification...');
+
+        // Step 1: Get all contacts with their transactions
+        console.log('Fetching all contacts with transactions...');
+        const contacts = await prisma.contact.findMany({
+            include: {
+                transactions: {
+                    orderBy: { occurredAt: 'asc' },
+                    take: 1, // Get first transaction for source determination
+                },
+            },
+        });
+        console.log(`✓ Found ${contacts.length} contacts to classify`);
+
+        // Step 2: Classify each contact
+        console.log('Classifying contacts...');
+        let leadsCount = 0;
+        let membersCount = 0;
+
+        for (const contact of contacts) {
+            const hasTransactions = contact.transactions.length > 0;
+            const firstTransaction = contact.transactions[0];
+
+            // Determine status
+            const status = hasTransactions ? 'client' : 'lead';
+
+            // Determine sourceTags
+            let sourceTags = [];
+            if (hasTransactions && firstTransaction) {
+                // Member - use first transaction provider as source
+                const provider = firstTransaction.provider.toLowerCase();
+                if (provider.includes('glofox')) {
+                    sourceTags = ['glofox'];
+                } else if (provider.includes('stripe')) {
+                    sourceTags = ['stripe'];
+                } else if (provider.includes('starling')) {
+                    sourceTags = ['starling'];
+                } else {
+                    sourceTags = [provider];
+                }
+            } else {
+                // Lead - check if from GHL/ads or imported
+                // Note: We'll need to check if there's a way to identify GHL leads
+                // For now, if they have no transactions, mark as 'imported'
+                // You can update this logic based on how GHL leads are identified
+                sourceTags = ['imported'];
+            }
+
+            // Update the contact
+            await prisma.contact.update({
+                where: { id: contact.id },
+                data: {
+                    status,
+                    sourceTags,
+                },
+            });
+
+            if (status === 'lead') {
+                leadsCount++;
+            } else {
+                membersCount++;
+            }
+
+            if ((leadsCount + membersCount) % 50 === 0) {
+                console.log(`  Processed ${leadsCount + membersCount}/${contacts.length} contacts...`);
+            }
+        }
+
+        console.log(`✓ Classification complete:`);
+        console.log(`  - Leads: ${leadsCount}`);
+        console.log(`  - Members: ${membersCount}`);
+        console.log('Contact classification completed successfully!');
+
+    } catch (error) {
+        console.error('Contact classification failed:', error);
+        // Don't throw - allow build to continue
+    } finally {
+        await prisma.$disconnect();
+    }
+}
+
+classifyContacts();

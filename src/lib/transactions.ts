@@ -51,6 +51,7 @@ export async function upsertTransactions(records: NormalizedTransaction[]) {
       .upsert({
         where: { externalId: record.externalId },
         update: {
+          source: record.provider,
           provider: record.provider,
           amountMinor: record.amountMinor,
           currency: record.currency,
@@ -63,10 +64,11 @@ export async function upsertTransactions(records: NormalizedTransaction[]) {
           reference: record.reference,
           raw: rawPayload as Prisma.TransactionUncheckedUpdateInput["raw"],
           metadata: metadataPayload as Prisma.TransactionUncheckedUpdateInput["metadata"],
-          leadId: record.leadId ?? undefined,
+          leadId: record.leadId ?? null,
         },
         create: {
           externalId: record.externalId,
+          source: record.provider,
           provider: record.provider,
           amountMinor: record.amountMinor,
           currency: record.currency,
@@ -79,7 +81,7 @@ export async function upsertTransactions(records: NormalizedTransaction[]) {
           reference: record.reference,
           raw: rawPayload as Prisma.TransactionUncheckedCreateInput["raw"],
           metadata: metadataPayload as Prisma.TransactionUncheckedCreateInput["metadata"],
-          leadId: record.leadId ?? undefined,
+          leadId: record.leadId ?? null,
         },
       })
       .then(() => {

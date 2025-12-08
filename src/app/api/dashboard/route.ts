@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
 
-const WINDOW_DAYS = 120;
+const WINDOW_DAYS = 1095; // 3 years to cover historic import
 
 export async function GET() {
   try {
@@ -110,13 +110,13 @@ export async function GET() {
       leadId: transaction.leadId,
       lead: transaction.lead
         ? {
-            id: transaction.lead.id,
-            firstName: transaction.lead.firstName,
-            lastName: transaction.lead.lastName,
-            membershipName: transaction.lead.membershipName,
-            channel: transaction.lead.channel,
-            stage: transaction.lead.stage,
-          }
+          id: transaction.lead.id,
+          firstName: transaction.lead.firstName,
+          lastName: transaction.lead.lastName,
+          membershipName: transaction.lead.membershipName,
+          channel: transaction.lead.channel,
+          stage: transaction.lead.stage,
+        }
         : null,
     }));
 

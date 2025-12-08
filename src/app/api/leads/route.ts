@@ -25,15 +25,28 @@ type LeadPayload = {
 
 
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    // Get view filter from query params
+    const { searchParams } = new URL(request.url);
+    const view = searchParams.get('view'); // 'leads', 'members', or null for all
+
+    // Build where clause based on view
+    const whereClause: any = {};
+    if (view === 'leads') {
+      whereClause.status = 'lead';
+    } else if (view === 'members') {
+      whereClause.status = 'client';
+    }
+
     // Fetch contacts from the new Contact table (Phase 3)
     const contacts = await prisma.contact.findMany({
+      where: whereClause,
       orderBy: { createdAt: "desc" },
       include: {
-        transactions: true, // Include transactions for history and value calculation
+        transactions: true, // Include transactions for history
       },
-      take: 200, // Limit for performance until pagination is fully optimized
+      take: 5000, // Increased limit to show all members
     });
 
     if (!contacts.length) {
@@ -63,7 +76,7 @@ export async function GET() {
       const transactions = contact.transactions ?? [];
       const successfulTransactions = transactions.filter((t) => t.status !== "Failed");
 
-      const lifetimeMinor = successfulTransactions.reduce(
+      const lifetimeMinor = contact.ltvAllCents ?? successfulTransactions.reduce(
         (sum, t) => sum + (t.amountMinor ?? 0),
         0
       );
@@ -151,7 +164,7 @@ export async function GET() {
         stage: "New", // Default for now
         owner: "Unassigned",
         nextStep: "",
-        valueMinor: lifetimeMinor,
+        valueMinor: contact.ltvAllCents, // Use LTV from Contact model
         membershipName: contact.membershipType,
         source: source,
         status: contact.status,
@@ -218,7 +231,9 @@ export async function POST(request: Request) {
               nextStep: lead.nextStep,
               valueMinor: lead.valueMinor ?? null,
               membershipName: lead.membershipName,
-              metadata: (lead.metadata as Prisma.InputJsonValue | undefined) ?? undefined,
+              source: lead.source,
+              status: lead.status as any,
+              metadata: lead.metadata as any,
             },
             create: {
               externalId: externalIds[index],
@@ -232,7 +247,9 @@ export async function POST(request: Request) {
               nextStep: lead.nextStep,
               valueMinor: lead.valueMinor ?? null,
               membershipName: lead.membershipName,
-              metadata: (lead.metadata as Prisma.InputJsonValue | undefined) ?? undefined,
+              source: lead.source,
+              status: lead.status as any,
+              metadata: lead.metadata as any,
             },
           })
           .then(() => {

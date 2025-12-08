@@ -13,7 +13,7 @@ import {
   subMonths,
 } from "date-fns";
 
-type TimeBucket = "Today" | "This Week" | "This Month" | "Custom";
+type TimeBucket = "Today" | "This Week" | "This Month" | "All Time" | "Custom";
 type SourceFilter = "All Sources" | "Stripe" | "Glofox" | "Starling";
 type TimeframeFilter = "Day" | "Week" | "Month" | "Year";
 type RevenueCategory =
@@ -120,7 +120,7 @@ type LtvCategorySnapshot = {
   avgClassesCents: number;
 };
 
-const timeBuckets: TimeBucket[] = ["Today", "This Week", "This Month", "Custom"];
+const timeBuckets: TimeBucket[] = ["Today", "This Week", "This Month", "All Time", "Custom"];
 const sourceFilters: SourceFilter[] = ["All Sources", "Stripe", "Glofox", "Starling"];
 const timeframeFilters: TimeframeFilter[] = ["Day", "Week", "Month", "Year"];
 const revenueCategories: RevenueCategory[] = [
@@ -519,6 +519,7 @@ export default function Home() {
     if (dateFilter === "Today") return startToday.getTime();
     if (dateFilter === "This Week") return startWeek.getTime();
     if (dateFilter === "This Month") return startMonth.getTime();
+    if (dateFilter === "All Time") return 0;
     return startToday.getTime();
   }, [dateFilter, startToday, startWeek, startMonth]);
 
@@ -692,9 +693,9 @@ export default function Home() {
       items.map((item) =>
         item.id === id
           ? {
-              ...item,
-              suggestions: [person],
-            }
+            ...item,
+            suggestions: [person],
+          }
           : item
       )
     );
