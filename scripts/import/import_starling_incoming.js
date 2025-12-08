@@ -56,7 +56,12 @@ async function main() {
       const transactionUid = buildUid(row);
       const amount = toAmount(row.amount_gbp ?? row.amount);
       const occurredAt = new Date(row.timestamp || row.transaction_timestamp || Date.now());
-      const counterparty = row.counterparty || row.reference || "";
+      const counterparty =
+        row.counterPartyName ||
+        row.counterpartyName ||
+        row.counterparty ||
+        row.reference ||
+        "";
 
       const match = await matchTransactionToMember({
         fullName: counterparty,
@@ -77,11 +82,12 @@ async function main() {
         status: row.status || "Completed",
         confidence: match.kind === "single_confident" ? "Matched" : "Needs Review",
         description: row.description || row.category,
-        reference: counterparty,
+        reference: row.reference || counterparty, // prioritzie actual reference col if exists
         metadata: {
           category: row.category,
           source: row.source,
         },
+        raw: row,
         grossAmount: amount,
         netAmount: amount,
         feeAmount: 0,
