@@ -34,8 +34,8 @@ function toAmount(value) {
 }
 
 function buildUid(row) {
-  if (row.feed_item_uid) return `starling:${row.feed_item_uid}`;
-  const hash = crypto.createHash("sha1").update(`${row.timestamp}-${row.counterparty}`).digest("hex");
+  if (row.feedItemUid || row.feed_item_uid) return `starling:${row.feedItemUid || row.feed_item_uid}`;
+  const hash = crypto.createHash("sha1").update(`${row.transactionTime || row.timestamp}-${row.counterPartyName || row.counterparty}`).digest("hex");
   return `starling:${hash.slice(0, 10)}`;
 }
 
@@ -54,8 +54,8 @@ async function main() {
   for (const row of rows) {
     try {
       const transactionUid = buildUid(row);
-      const amount = toAmount(row.amount_gbp ?? row.amount);
-      const occurredAt = new Date(row.timestamp || row.transaction_timestamp || Date.now());
+      const amount = toAmount(row.amountGBP ?? row.amount);
+      const occurredAt = new Date(row.transactionTime || row.timestamp || row.transaction_timestamp || Date.now());
       const counterparty =
         row.counterPartyName ||
         row.counterpartyName ||
@@ -91,7 +91,7 @@ async function main() {
         grossAmount: amount,
         netAmount: amount,
         feeAmount: 0,
-        starlingFeedItemId: row.feed_item_uid || null,
+        starlingFeedItemId: row.feedItemUid || row.feed_item_uid || null,
         leadId: null,
         sourceFile: path.basename(filePath),
       };
