@@ -73,6 +73,7 @@ async function main() {
         provider: "Starling",
         source: "Starling",
         externalId: transactionUid,
+        transactionUid,
         amountMinor: Math.round(amount * 100),
         currency: "GBP",
         occurredAt,
@@ -101,7 +102,7 @@ async function main() {
       }
 
       const tx = await getPrisma().transaction.upsert({
-        where: { externalId: transactionUid },
+        where: { transactionUid },
         update: data,
         create: data,
       });
