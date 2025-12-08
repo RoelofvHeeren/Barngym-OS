@@ -71,6 +71,7 @@ async function main() {
 
       const data = {
         provider: "Starling",
+        source: "Starling",
         externalId: transactionUid,
         transactionUid,
         transactionType: "payment",
