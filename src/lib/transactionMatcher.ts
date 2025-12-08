@@ -18,7 +18,7 @@ export async function attachLead(record: NormalizedTransaction) {
     if (!record.confidence || record.confidence.toLowerCase().includes("review")) {
       record.confidence = "Matched";
     }
-  } else if (record.provider === "Starling") {
+  } else if (record.provider?.toLowerCase() === "starling") {
     // Attempt to match via CounterpartyMapping
     const raw = (record.raw as Record<string, unknown>) ?? {};
     const rawName = (raw.counterPartyName || raw.counterpartyName) as string | undefined;

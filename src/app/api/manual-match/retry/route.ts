@@ -24,10 +24,10 @@ export async function POST(request: Request) {
       source === "all"
         ? { in: ["Stripe", "Glofox", "Starling"] }
         : source === "stripe"
-        ? { equals: "Stripe" }
-        : source === "glofox"
-        ? { equals: "Glofox" }
-        : { equals: "Starling" };
+          ? { equals: "Stripe" }
+          : source === "glofox"
+            ? { equals: "Glofox" }
+            : { equals: "Starling" };
 
     const unmatched = await prisma.manualMatchQueue.findMany({
       where: {
@@ -47,7 +47,7 @@ export async function POST(request: Request) {
       if (!item.transaction) continue;
       const tx = item.transaction;
 
-      if (tx.provider === "Starling") {
+      if (tx.provider?.toLowerCase() === "starling") {
         const counterparty = tx.personName || tx.reference || "";
         if (counterparty.trim().length) {
           const mapping = await prisma.counterpartyMapping.findFirst({
