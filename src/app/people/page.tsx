@@ -5,6 +5,9 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 const leadStages = ["All", "New", "Follow Up", "Proposal", "Won", "Lost"] as const;
 type LeadStage = (typeof leadStages)[number];
 
+const sourceFilters = ["All Sources", "Glofox", "Trainerize", "Stripe", "Starling", "Ads"] as const;
+type SourceFilter = (typeof sourceFilters)[number];
+
 const defaultCsvColumns = [
   "first_name",
   "last_name",
@@ -373,11 +376,12 @@ function normalizeApiLead(lead: ApiLead): NormalizedLead {
   return { row, profile };
 }
 
-
+// Duplicate type removed
 export default function PeoplePage() {
   const [search, setSearch] = useState("");
   const [leadFilter, setLeadFilter] = useState<LeadStage>("All");
   const [viewMode, setViewMode] = useState<"all" | "leads" | "members">("all");
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>("All Sources");
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [csvHeaders, setCsvHeaders] = useState<string[]>(csvColumns);
@@ -408,7 +412,7 @@ export default function PeoplePage() {
     setLoadingLeads(true);
     setLeadError(null);
     try {
-      const response = await fetch(`/api/leads?view=${viewMode}`);
+      const response = await fetch(`/api/leads?view=${viewMode}&source=${encodeURIComponent(sourceFilter)}`);
       const payload = await response.json();
       if (!response.ok || !payload.ok) {
         throw new Error(payload.message || "Unable to load leads.");
@@ -438,7 +442,7 @@ export default function PeoplePage() {
     } finally {
       setLoadingLeads(false);
     }
-  }, [viewMode]);
+  }, [viewMode, sourceFilter]);
 
   useEffect(() => {
     loadImportedLeads();
@@ -713,11 +717,26 @@ export default function PeoplePage() {
                   key={mode}
                   onClick={() => setViewMode(mode)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${viewMode === mode
-                      ? "bg-emerald-600 text-white shadow-sm"
-                      : "text-muted hover:text-white hover:bg-white/5"
+                    ? "bg-emerald-600 text-white shadow-sm"
+                    : "text-muted hover:text-white hover:bg-white/5"
                     }`}
                 >
                   {mode.charAt(0).toUpperCase() + mode.slice(1)}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex items-center rounded-xl bg-white/5 p-1 gap-1 border border-white/10">
+              {sourceFilters.map((filter) => (
+                <button
+                  key={filter}
+                  onClick={() => setSourceFilter(filter)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap ${sourceFilter === filter
+                    ? "bg-emerald-600 text-white shadow-sm"
+                    : "text-muted hover:text-white hover:bg-white/5"
+                    }`}
+                >
+                  {filter}
                 </button>
               ))}
             </div>

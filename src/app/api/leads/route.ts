@@ -30,6 +30,7 @@ export async function GET(request: Request) {
     // Get view filter from query params
     const { searchParams } = new URL(request.url);
     const view = searchParams.get('view'); // 'leads', 'members', or null for all
+    const source = searchParams.get('source');
 
     // Build where clause based on view
     const whereClause: any = {};
@@ -37,6 +38,10 @@ export async function GET(request: Request) {
       whereClause.status = 'lead';
     } else if (view === 'members') {
       whereClause.status = 'client';
+    }
+
+    if (source && source !== 'All' && source !== 'All Sources') {
+      whereClause.sourceTags = { has: source.toLowerCase() };
     }
 
     // Fetch contacts from the new Contact table (Phase 3)

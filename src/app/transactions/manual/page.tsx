@@ -179,12 +179,12 @@ export default function ManualMatchPage() {
     const payload =
       createPayload.queueId === queueId
         ? {
-            email: createPayload.email,
-            phone: createPayload.phone,
-            firstName: createPayload.firstName,
-            lastName: createPayload.lastName,
-            reference: createPayload.reference,
-          }
+          email: createPayload.email,
+          phone: createPayload.phone,
+          firstName: createPayload.firstName,
+          lastName: createPayload.lastName,
+          reference: createPayload.reference,
+        }
         : undefined;
     setCreating((prev) => ({ ...prev, [queueId]: true }));
     const response = await fetch("/api/manual-match", {
@@ -213,40 +213,40 @@ export default function ManualMatchPage() {
   const floatingBar =
     mounted && selectedIds.size >= 2
       ? createPortal(
-          <div className="fixed inset-x-0 top-auto bottom-4 z-[200] flex justify-center pointer-events-none">
-            <div className="pointer-events-auto flex w-[90%] max-w-3xl flex-wrap items-center justify-center gap-3 rounded-full border border-emerald-200/70 bg-white/95 px-4 py-3 shadow-xl shadow-emerald-900/10 backdrop-blur">
-              <input
-                type="text"
-                placeholder="Search name/email or paste Lead ID"
-                className="min-w-[220px] flex-1 rounded-full border border-emerald-200/60 bg-white px-3 py-2 text-xs text-primary"
-                list="lead-options-floating"
-                value={leadIdInput.__bulk ?? ""}
-                onChange={(e) => setLeadIdInput((prev) => ({ ...prev, __bulk: e.target.value }))}
-              />
-              <datalist id="lead-options-floating">
-                {leads.map((lead) => (
-                  <option key={lead.id} value={lead.id}>
-                    {lead.label}
-                  </option>
-                ))}
-              </datalist>
-              <button
-                className="rounded-full bg-black px-4 py-2 text-xs font-semibold text-white disabled:opacity-50"
-                onClick={() => handleBulkAttach(leadIdInput.__bulk)}
-                disabled={!leadIdInput.__bulk}
-              >
-                Attach selected ({selectedIds.size})
-              </button>
-              <button
-                className="text-xs text-muted underline"
-                onClick={() => setSelectedIds(new Set())}
-              >
-                Clear
-              </button>
-            </div>
-          </div>,
-          document.body
-        )
+        <div className="fixed inset-x-0 top-auto bottom-4 z-[200] flex justify-center pointer-events-none">
+          <div className="pointer-events-auto flex w-[90%] max-w-3xl flex-wrap items-center justify-center gap-3 rounded-full border border-emerald-200/70 bg-white/95 px-4 py-3 shadow-xl shadow-emerald-900/10 backdrop-blur">
+            <input
+              type="text"
+              placeholder="Search name/email or paste Lead ID"
+              className="min-w-[220px] flex-1 rounded-full border border-emerald-200/60 bg-white px-3 py-2 text-xs text-primary"
+              list="lead-options-floating"
+              value={leadIdInput.__bulk ?? ""}
+              onChange={(e) => setLeadIdInput((prev) => ({ ...prev, __bulk: e.target.value }))}
+            />
+            <datalist id="lead-options-floating">
+              {leads.map((lead) => (
+                <option key={lead.id} value={lead.id}>
+                  {lead.label}
+                </option>
+              ))}
+            </datalist>
+            <button
+              className="rounded-full bg-black px-4 py-2 text-xs font-semibold text-white disabled:opacity-50"
+              onClick={() => handleBulkAttach(leadIdInput.__bulk)}
+              disabled={!leadIdInput.__bulk}
+            >
+              Attach selected ({selectedIds.size})
+            </button>
+            <button
+              className="text-xs text-muted underline"
+              onClick={() => setSelectedIds(new Set())}
+            >
+              Clear
+            </button>
+          </div>
+        </div>,
+        document.body
+      )
       : null;
 
   return (
@@ -387,7 +387,21 @@ export default function ManualMatchPage() {
                     <td className="pr-4 text-muted">
                       {item.transaction?.personName ?? "Unassigned"}
                       <div className="text-xs text-muted">
-                        Ref: {item.transaction?.reference ?? "—"} · Reason: {item.reason}
+                        Ref:{" "}
+                        {(() => {
+                          if (
+                            item.transaction?.provider === "Starling" &&
+                            item.transaction.raw &&
+                            typeof item.transaction.raw === "object"
+                          ) {
+                            const raw = item.transaction.raw as Record<string, unknown>;
+                            if (typeof raw.counterPartyName === "string" && raw.counterPartyName) {
+                              return raw.counterPartyName;
+                            }
+                          }
+                          return item.transaction?.reference ?? "—";
+                        })()}{" "}
+                        · Reason: {item.reason}
                         {(() => {
                           const { email, phone } = extractContactHint(item.transaction?.metadata);
                           if (!email && !phone) return null;
