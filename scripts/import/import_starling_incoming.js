@@ -73,8 +73,6 @@ async function main() {
         provider: "Starling",
         source: "Starling",
         externalId: transactionUid,
-        transactionUid,
-        transactionType: "payment",
         amountMinor: Math.round(amount * 100),
         currency: "GBP",
         occurredAt,
