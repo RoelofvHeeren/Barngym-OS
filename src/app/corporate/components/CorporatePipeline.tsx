@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus } from "lucide-react";
 import {
     DndContext,
@@ -148,6 +148,12 @@ export default function CorporatePipeline({ initialData }: { initialData: any })
         setSelectedLeadId(id);
     }
 
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
     return (
         <DndContext
             sensors={sensors}
@@ -199,7 +205,7 @@ export default function CorporatePipeline({ initialData }: { initialData: any })
                     })}
                 </div>
 
-                {createPortal(
+                {mounted && createPortal(
                     <DragOverlay>
                         {activeId ? <PipelineCardItem lead={getActiveItem()} /> : null}
                     </DragOverlay>,
