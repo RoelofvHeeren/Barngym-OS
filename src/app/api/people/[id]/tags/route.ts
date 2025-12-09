@@ -38,6 +38,7 @@ export async function POST(
             return NextResponse.json({ ok: true, message: "Tag already exists" });
         }
 
+        // ... existing POST logic ...
         await prisma.contact.update({
             where: { id },
             data: {
@@ -46,6 +47,27 @@ export async function POST(
                 },
             },
         });
+
+        // SYNC TO LEAD (Ads Dashboard Visibility)
+        if (tag.toLowerCase().includes("ads") && contact.email) {
+            const lead = await prisma.lead.findFirst({
+                where: { email: contact.email },
+            });
+
+            if (lead) {
+                let newSource = lead.source || "Manual Ads Tag";
+                if (!newSource.toLowerCase().includes("ads")) {
+                    newSource = `${newSource} (Manual Ads)`;
+                }
+                // If it was previously marked Organic, switch it back
+                newSource = newSource.replace(/organic/gi, "Ads");
+
+                await prisma.lead.update({
+                    where: { id: lead.id },
+                    data: { source: newSource },
+                });
+            }
+        }
 
         return NextResponse.json({ ok: true, message: "Tag added" });
     } catch (error) {
@@ -75,7 +97,7 @@ export async function DELETE(
 
         const contact = await prisma.contact.findUnique({
             where: { id },
-            select: { segmentTags: true },
+            select: { segmentTags: true, email: true }, // Select email too
         });
 
         if (!contact) {
@@ -94,6 +116,24 @@ export async function DELETE(
                 segmentTags: newTags,
             },
         });
+
+        // SYNC TO LEAD (Ads Dashboard Visibility)
+        if (tag.toLowerCase().includes("ads") && contact.email) {
+            const lead = await prisma.lead.findFirst({
+                where: { email: contact.email },
+            });
+
+            if (lead && lead.source?.toLowerCase().includes("ads")) {
+                // Replace "Ads" with "Organic" to remove from dashboard views
+                // e.g. "Facebook Ads" -> "Facebook Organic"
+                const newSource = lead.source.replace(/ads/gi, "Organic").trim();
+
+                await prisma.lead.update({
+                    where: { id: lead.id },
+                    data: { source: newSource },
+                });
+            }
+        }
 
         return NextResponse.json({ ok: true, message: "Tag removed" });
     } catch (error) {
