@@ -3,18 +3,31 @@
 import { MoreHorizontal, ArrowUpRight } from "lucide-react";
 import { format } from "date-fns";
 
+import CreateCorporateClientDialog from "./CreateCorporateClientDialog";
+import { useState } from "react";
+
 export default function CorporateClients({ clients }: { clients: any[] }) {
+    const [isCreateOpen, setIsCreateOpen] = useState(false);
 
     return (
         <div className="glass-panel min-h-[400px]">
+            <CreateCorporateClientDialog open={isCreateOpen} onOpenChange={setIsCreateOpen} />
             <div className="mb-6 flex items-center justify-between">
                 <div>
                     <h2 className="text-xl font-semibold">Corporate Clients</h2>
                     <p className="text-sm text-muted">Active clients, renewals, and account insights.</p>
                 </div>
-                <button className="btn-primary text-sm shadow-md hover:shadow-lg">
-                    View All Clients
-                </button>
+                <div className="flex gap-2">
+                    <button
+                        onClick={() => setIsCreateOpen(true)}
+                        className="btn-primary text-sm shadow-md hover:shadow-lg"
+                    >
+                        New Client
+                    </button>
+                    <button className="rounded-xl border border-emerald-900/10 bg-white/40 px-4 py-2 text-sm font-medium text-primary hover:bg-white/60 shadow-sm transition-all">
+                        View All
+                    </button>
+                </div>
             </div>
 
             <div className="overflow-hidden rounded-2xl border border-white/20 bg-white/5">

@@ -3,15 +3,14 @@
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
-import { createCorporateLead } from "../actions";
+import { createCorporateClient } from "../actions";
 
-export default function CreateCorporateLeadDialog({
-    open,
-    onOpenChange,
-}: {
+type Props = {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-}) {
+};
+
+export default function CreateCorporateClientDialog({ open, onOpenChange }: Props) {
     const [loading, setLoading] = useState(false);
     const [formData, setFormData] = useState({
         companyName: "",
@@ -19,24 +18,22 @@ export default function CreateCorporateLeadDialog({
         pocEmail: "",
         type: "Coaching",
         value: "",
-        duration: "6 months",
-        employees: "10",
+        employees: "",
+        duration: "",
     });
 
-
-
-    async function handleSubmit(e: React.FormEvent) {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
         try {
-            await createCorporateLead({
+            await createCorporateClient({
                 companyName: formData.companyName,
                 pocName: formData.pocName,
                 pocEmail: formData.pocEmail,
                 activities: [formData.type],
                 employeeCount: parseInt(formData.employees) || 0,
                 contractDuration: formData.duration,
-                valueMinor: parseFloat(formData.value) * 100 || 0,
+                valueMinor: Math.round((parseFloat(formData.value) || 0) * 100),
             });
             onOpenChange(false);
             setFormData({
@@ -45,16 +42,15 @@ export default function CreateCorporateLeadDialog({
                 pocEmail: "",
                 type: "Coaching",
                 value: "",
-                duration: "6 months",
-                employees: "10",
+                employees: "",
+                duration: "",
             });
         } catch (error) {
-            console.error(error);
-            alert("Failed to create lead");
+            console.error("Failed to create client:", error);
         } finally {
             setLoading(false);
         }
-    }
+    };
 
     const [mounted, setMounted] = useState(false);
 
@@ -68,7 +64,7 @@ export default function CreateCorporateLeadDialog({
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/20 backdrop-blur-sm p-4">
             <div className="glass-panel w-full max-w-md p-6 shadow-2xl relative">
                 <div className="mb-6 flex items-center justify-between">
-                    <h2 className="text-xl font-semibold text-primary">New Corporate Lead</h2>
+                    <h2 className="text-xl font-semibold text-primary">New Corporate Client</h2>
                     <button
                         onClick={() => onOpenChange(false)}
                         className="rounded-full p-2 text-muted hover:bg-emerald-900/5 hover:text-primary transition-colors"
@@ -201,7 +197,7 @@ export default function CreateCorporateLeadDialog({
                             disabled={loading}
                             className="btn-primary rounded-lg px-6 py-2 text-sm shadow-md"
                         >
-                            {loading ? "Creating..." : "Create Lead"}
+                            {loading ? "Creating..." : "Create Client"}
                         </button>
                     </div>
                 </form>

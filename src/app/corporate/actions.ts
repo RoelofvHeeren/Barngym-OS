@@ -78,6 +78,37 @@ export async function createCorporateLead(data: {
     revalidatePath("/corporate");
 }
 
+export async function createCorporateClient(data: {
+    companyName: string;
+    pocName: string;
+    pocEmail: string;
+    activities: string[];
+    employeeCount: number;
+    contractDuration: string;
+    valueMinor: number;
+}) {
+    await prisma.lead.create({
+        data: {
+            isCorporate: true,
+            status: "CLIENT",
+            stage: "Closed Won",
+            companyName: data.companyName,
+            pocName: data.pocName,
+            pocEmail: data.pocEmail,
+            activities: data.activities,
+            employeeCount: data.employeeCount,
+            contractDuration: data.contractDuration,
+            valueMinor: data.valueMinor,
+            // Default fields
+            email: data.pocEmail,
+            firstName: data.pocName.split(" ")[0],
+            lastName: data.pocName.split(" ").slice(1).join(" "),
+            fullName: data.pocName,
+        },
+    });
+    revalidatePath("/corporate");
+}
+
 export async function updateCorporateLead(
     id: string,
     data: {

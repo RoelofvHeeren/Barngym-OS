@@ -58,59 +58,85 @@ export async function GET(request: Request) {
     const { start, end } = parseRange(rangeParam);
     const dateFilter = buildDateFilter(start, end);
 
-    // IMPORTANT: Leads/clients/revenue are strictly from GHL + payments. Meta spend only.
-    const [leadsCount, conversionEvents, adsSpendAgg, adsRevenueAgg, adsClients, metaSpendAgg] =
-      await Promise.all([
-        prisma.lead.count({
-          where: {
-            ...isAdsLeadFilter,
-            createdAt: start ? { gte: start, lte: end } : { lte: end },
-          },
-        }),
-        prisma.leadEvent.findMany({
-          where: {
-            eventType: "client_conversion",
-            createdAt: dateFilter,
-            lead: isAdsLeadFilter as any,
-          },
-          select: { leadId: true },
-        }),
-        prisma.adsSpend.aggregate({
-          _sum: { amountCents: true },
-          where: start
-            ? {
-              periodStart: { lte: end },
-              periodEnd: { gte: start },
-            }
-            : {},
-        }),
-        prisma.adsRevenue.aggregate({
-          _sum: { amountCents: true },
-          where: start ? { timestamp: dateFilter } : {},
-        }),
-        prisma.lead.findMany({
-          where: {
-            ...isAdsLeadFilter,
-            isClient: true,
-            ...(start ? { updatedAt: dateFilter } : {}),
-          },
-          select: { id: true, ltvAdsCents: true },
-        }),
-        prisma.metaDailyInsight.aggregate({
-          _sum: { spend: true },
-          where: start ? { date: { gte: start, lte: end } } : {},
-        }),
-      ]);
+    // 1. Leads Count: Created in period + source is ads
+    const leadsCount = await prisma.lead.count({
+      where: {
+        ...isAdsLeadFilter,
+        createdAt: dateFilter,
+      },
+    });
 
-    const conversionsCount = new Set(conversionEvents.map((e) => e.leadId)).size;
-    const metaSpendCents = Math.round((metaSpendAgg._sum.spend ?? 0) * 100);
+    // 2. New Clients (Cohort): Converted in period + source is ads
+    // We look for client_conversion events in the period for ads leads.
+    const conversionEvents = await prisma.leadEvent.findMany({
+      where: {
+        eventType: "client_conversion",
+        createdAt: dateFilter,
+        lead: isAdsLeadFilter as any,
+      },
+      select: { leadId: true },
+    });
+
+    // Get unique converted lead IDs
+    const newClientIds = Array.from(new Set(conversionEvents.map((e) => e.leadId)));
+    const conversionsCount = newClientIds.length;
+
+    // 3. Cohort Revenue & LTV: Sum LTV of these specific new clients
+    let revenueFromAdsCents = 0;
+    let avgLtvAdsCents = 0;
+
+    if (conversionsCount > 0) {
+      const newClients = await prisma.lead.findMany({
+        where: { id: { in: newClientIds } },
+        select: { ltvAllCents: true }
+      });
+      revenueFromAdsCents = newClients.reduce((sum, c) => sum + (c.ltvAllCents ?? 0), 0);
+      avgLtvAdsCents = Math.round(revenueFromAdsCents / conversionsCount);
+    }
+
+    // 4. Spend: Real data OR Default Budget
+    const adsSpendAgg = await prisma.adsSpend.aggregate({
+      _sum: { amountCents: true },
+      where: start ? { periodStart: { lte: end }, periodEnd: { gte: start } } : {},
+    });
+    const metaSpendAgg = await prisma.metaDailyInsight.aggregate({
+      _sum: { spend: true },
+      where: start ? { date: { gte: start, lte: end } } : {}, // Approx filter
+    });
+
     const manualSpendCents = adsSpendAgg._sum.amountCents ?? 0;
-    const spendCents = metaSpendCents + manualSpendCents;
-    const revenueFromAdsCents = adsRevenueAgg._sum.amountCents ?? 0;
+    const metaSpendCents = Math.round((metaSpendAgg._sum.spend ?? 0) * 100);
+    let spendCents = manualSpendCents + metaSpendCents;
 
-    const adsClientLtvTotal = adsClients.reduce((sum, lead) => sum + (lead.ltvAdsCents ?? 0), 0);
-    const adsClientCount = adsClients.length || conversionsCount;
-    const avgLtvAdsCents = adsClientCount ? Math.round(adsClientLtvTotal / adsClientCount) : 0;
+    // Default Budget Logic if no real data
+    if (spendCents === 0) {
+      const MONTHLY_BUDGET_CENTS = 750 * 100;
+      const DAILY_BUDGET_CENTS = Math.round(MONTHLY_BUDGET_CENTS / 30);
+
+      switch (rangeParam as RangeKey) {
+        case "today":
+          spendCents = DAILY_BUDGET_CENTS;
+          break;
+        case "7d":
+          spendCents = DAILY_BUDGET_CENTS * 7;
+          break;
+        case "30d":
+        case "month":
+          spendCents = MONTHLY_BUDGET_CENTS;
+          break;
+        case "all":
+          // For 'all time', maybe default to 3 months estimate or KEEP 0 to avoid confusion?
+          // User said "219 leads", likely over longer period.
+          // Let's assume 0 for all time if empty, or maybe iterate if reasonable.
+          // Given user request "Expect 750 a month", let's apply it if the range is defined.
+          // Since 'all' doesn't have a specific duration, let's leave it as 0 or 
+          // calculate duration between first lead and now? 
+          // Let's safe-bet on 0 for ALL TIME if no data, to prompt data entry, 
+          // BUT for specific ranges we use the budget.
+          spendCents = 0;
+          break;
+      }
+    }
 
     const cplCents = leadsCount ? Math.round(spendCents / leadsCount) : 0;
     const cpaCents = conversionsCount ? Math.round(spendCents / conversionsCount) : 0;
