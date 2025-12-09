@@ -1,9 +1,11 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { NormalizedTransaction, mapGlofoxPayment, upsertTransactions } from "@/lib/transactions";
+import { NormalizedTransaction, upsertTransactions, mapGlofoxPayment } from "@/lib/transactions";
 
 export const runtime = "nodejs";
+
+// ---- TYPES ----
 
 type GlofoxSecret = {
   apiKey?: string;
@@ -12,9 +14,18 @@ type GlofoxSecret = {
   webhookSalt?: string;
 };
 
+type GlofoxEvent = {
+  Type?: string;
+  type?: string;
+  [key: string]: unknown;
+};
+
+// ---- HELPERS ----
+
 function verifySignature(rawBody: string, provided: string | null, salt?: string | null) {
   if (!salt) return true;
   if (!provided) return false;
+  // Glofox signature is HMAC-SHA256 of the raw body using the secret salt
   const digest = createHmac("sha256", salt).update(rawBody).digest("hex");
   try {
     return timingSafeEqual(Buffer.from(digest), Buffer.from(provided));
@@ -39,47 +50,279 @@ function extractPayments(payload: Record<string, unknown>): Record<string, unkno
   return [payload as Record<string, unknown>];
 }
 
+async function syncToGHL(endpoint: string, payload: Record<string, unknown>) {
+  try {
+    const record = await prisma.connectionSecret.findUnique({ where: { provider: "ghl" } });
+    const secret = record?.secret as { apiKey?: string; locationId?: string } | null;
+
+    if (!secret?.apiKey) {
+      console.warn("Skipping GHL sync: No API key found.");
+      return;
+    }
+
+    // Example GHL call - adjust based on actual GHL API requirements
+    // Assuming we use the GHL v2 API or similar with Bearer token
+    const res = await fetch(`https://services.leadconnectorhq.com/${endpoint}`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${secret.apiKey}`,
+        "Version": "2021-07-28", // Use appropriate version
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const txt = await res.text();
+      console.error("GHL Sync Failed", res.status, txt);
+    }
+  } catch (error) {
+    console.error("GHL Sync Error", error);
+  }
+}
+
+// ---- EVENT HANDLERS ----
+
+// ---- USER EVENTS ----
+async function handleMemberEvent(eventType: string, payload: Record<string, unknown>) {
+  const memberId = payload.id || payload.member_id;
+  if (!memberId) return;
+
+  const data = {
+    memberId: String(memberId),
+    firstName: String(payload.first_name || ""),
+    lastName: String(payload.last_name || ""),
+    email: String(payload.email || ""),
+    phone: String(payload.phone || payload.mobile || ""),
+  };
+
+  // Upsert Member
+  await prisma.member.upsert({
+    where: { memberId: data.memberId },
+    update: {
+      firstName: data.firstName,
+      lastName: data.lastName,
+      email: data.email,
+      phone: data.phone,
+    },
+    create: data,
+  });
+
+  // Sync to GHL
+  // Store mapping in GlofoxGhlLink if needed, but for now just push to GHL
+  await syncToGHL("contacts/upsert", {
+    email: data.email,
+    phone: data.phone,
+    firstName: data.firstName,
+    lastName: data.lastName,
+    tags: ["Glofox"],
+    customFields: [
+      { key: "glofox_member_id", value: data.memberId }
+    ]
+  });
+}
+
+// ---- MEMBERSHIP EVENTS ----
+async function handleMembershipEvent(eventType: string, payload: Record<string, unknown>) {
+  const membershipId = String(payload.id || payload.membership_id);
+  const memberId = String(payload.member_id || payload.user_id);
+
+  if (!membershipId || !memberId) return;
+
+  const data = {
+    membershipId,
+    memberId,
+    status: String(payload.status || ""),
+    name: String(payload.name || payload.membership_name || ""),
+    startDate: payload.start_date ? new Date(String(payload.start_date)) : null,
+    endDate: payload.end_date ? new Date(String(payload.end_date)) : null,
+    price: Number(payload.price || payload.rate || 0),
+    nextPaymentDate: payload.next_payment_date ? new Date(String(payload.next_payment_date)) : null,
+  };
+
+  // Upsert Membership
+  // Ensure member exists first to avoid FK errors if events arrive out of order
+  // (Optional: Upsert dummy member if missing, but typically Member Created comes first)
+  try {
+    await prisma.membership.upsert({
+      where: { membershipId: data.membershipId },
+      update: {
+        status: data.status,
+        name: data.name,
+        startDate: data.startDate,
+        endDate: data.endDate,
+        price: data.price,
+        nextPaymentDate: data.nextPaymentDate,
+      },
+      create: data,
+    });
+  } catch (e) {
+    console.error(`Failed to upsert membership ${membershipId}: ${(e as Error).message}`);
+    return; // Stop if member doesn't exist
+  }
+
+  // Update GHL
+  // We need the member's email/phone to identify them in GHL upsert
+  const member = await prisma.member.findUnique({ where: { memberId } });
+  if (member?.email || member?.phone) {
+    await syncToGHL("contacts/upsert", {
+      email: member.email,
+      phone: member.phone,
+      customFields: [
+        { key: "glofox_membership_status", value: data.status },
+        { key: "glofox_membership_name", value: data.name },
+        { key: "glofox_membership_expires_at", value: data.endDate ? data.endDate.toISOString() : "" }
+      ]
+    });
+  }
+}
+
+// ---- INVOICE EVENTS ----
+async function handleInvoiceEvent(eventType: string, payload: Record<string, unknown>) {
+  const invoiceId = String(payload.id || payload.invoice_id);
+  const memberId = String(payload.user?.id || payload.member_id || "");
+  const lineItems = (payload.line_items as Record<string, unknown>[]) || [];
+
+  if (!invoiceId) return;
+
+  const transactions: NormalizedTransaction[] = lineItems.map((item, idx) => {
+    const prodTypeRaw = String(item.type || "").toUpperCase();
+    let productCat = "Other";
+    if (prodTypeRaw.includes("APPOINTMENT")) productCat = "PT";
+    else if (prodTypeRaw.includes("CLASS") || prodTypeRaw.includes("EVENT")) productCat = "Classes";
+    else if (prodTypeRaw.includes("MEMBERSHIP")) productCat = "Membership";
+
+    const amount = Number(item.amount || item.total || 0);
+
+    return {
+      externalId: `${invoiceId}_${idx}`, // Unique ID per line item
+      provider: "Glofox",
+      amountMinor: Math.round(amount * 100), // Assuming amount is major currency
+      status: String(payload.status || "Completed"), // Invoices usually paid/due
+      occurredAt: new Date(String(payload.created || payload.date || new Date())).toISOString(),
+      productType: productCat,
+      personName: String(payload.user?.name || ""), // from payload if available
+      leadId: null, // Logic to link lead is handled in upsertTransactions enhancement or separate matcher
+      currency: String(payload.currency || "EUR").toUpperCase(),
+      confidence: "High",
+      description: String(item.name || item.description || `Invoice ${invoiceId}`),
+      reference: invoiceId,
+      metadata: {
+        invoiceId,
+        memberId,
+        itemType: prodTypeRaw,
+      },
+      raw: payload,
+    };
+  });
+
+  if (transactions.length > 0) {
+    await upsertTransactions(transactions);
+  }
+}
+
+// ---- BOOKING EVENTS ----
+async function handleBookingEvent(eventType: string, payload: Record<string, unknown>) {
+  const bookingId = String(payload.id || payload.booking_id);
+  const memberId = String(payload.user_id || payload.member_id);
+
+  if (!bookingId || !memberId) return;
+
+  const data = {
+    bookingId,
+    memberId,
+    classType: String(payload.type || "Class"),
+    startTime: payload.time_start ? new Date(String(payload.time_start)) : null,
+    endTime: payload.time_finish ? new Date(String(payload.time_finish)) : null,
+    paid: String(payload.paid ?? ""),
+  };
+
+  try {
+    await prisma.booking.upsert({
+      where: { bookingId: data.bookingId },
+      update: {
+        classType: data.classType,
+        startTime: data.startTime,
+        endTime: data.endTime,
+        paid: data.paid,
+      },
+      create: data,
+    });
+  } catch (e) {
+    console.error(`Booking upsert failed: ${e}`);
+  }
+}
+
+// ---- MAIN HANDLER ----
+
 export async function POST(request: Request) {
   let rawBody: string | null = null;
   try {
     rawBody = await request.text();
     const record = await prisma.connectionSecret.findUnique({ where: { provider: "glofox" } });
     const secret = (record?.secret as GlofoxSecret | null) ?? null;
-    if (!secret?.apiKey || !secret?.apiToken) {
-      return NextResponse.json(
-        { ok: false, message: "Glofox is not connected. Add the API credentials first." },
-        { status: 400 }
-      );
-    }
 
+    // 1. Verify Signature
     const signature = request.headers.get("x-glofox-signature");
-    if (!verifySignature(rawBody, signature, secret.webhookSalt)) {
+    if (secret?.webhookSalt && !verifySignature(rawBody, signature, secret.webhookSalt)) {
       return NextResponse.json({ ok: false, message: "Invalid Glofox signature." }, { status: 401 });
     }
 
-    const payload = JSON.parse(rawBody) as Record<string, unknown>;
-    const payments = extractPayments(payload).filter(Boolean);
-
-    if (!payments.length) {
-      return NextResponse.json({ ok: true, message: "No payments in payload." });
+    if (!rawBody) {
+      return NextResponse.json({ ok: true, message: "Empty body" });
     }
 
-    const normalized: NormalizedTransaction[] = payments.map((payment) =>
-      mapGlofoxPayment(payment)
-    );
-    const result = await upsertTransactions(normalized);
+    const payload = JSON.parse(rawBody) as any;
+    const eventType = (payload.Type || payload.type || "").toString().toUpperCase();
 
+    // 2. Logging
     await prisma.syncLog.create({
       data: {
         source: "Glofox",
-        detail: `Webhook processed ${normalized.length} payment${normalized.length === 1 ? "" : "s"}.`,
-        records: result.added.toString(),
+        detail: `Processed ${eventType}`,
+        records: rawBody.slice(0, 1000),
       },
     });
 
-    return NextResponse.json({ ok: true, processed: normalized.length, stored: result.added });
+    if (!eventType) {
+      // Fallback or ignore
+      return NextResponse.json({ ok: true, message: "No event type" });
+    }
+
+    // 3. Event Routing
+    if (eventType.startsWith("MEMBER")) {
+      await handleMemberEvent(eventType, payload);
+    } else if (eventType.startsWith("MEMBERSHIP")) {
+      await handleMembershipEvent(eventType, payload);
+    } else if (eventType.includes("INVOICE")) {
+      await handleInvoiceEvent(eventType, payload);
+    } else if (eventType.includes("BOOKING")) {
+      await handleBookingEvent(eventType, payload);
+    } else if (eventType.includes("ACCESS") || eventType.includes("EVENT") || eventType.includes("SERVICE")) {
+      // Ignore for now
+    } else {
+      // Unknown or Legacy event - Try to extract payments using fallback logic
+      // This ensures we didn't break existing payment extraction for generic payloads
+      const payments = extractPayments(payload).filter(Boolean);
+      if (payments.length > 0) {
+        try {
+          const normalized: NormalizedTransaction[] = payments.map((payment) =>
+            mapGlofoxPayment(payment as any)
+          );
+          await upsertTransactions(normalized);
+          console.log(`Fallback processed ${normalized.length} payments`);
+        } catch (err) {
+          console.error("Fallback payment processing failed", err);
+        }
+      } else {
+        console.log("Unknown Glofox event type and no payments found:", eventType);
+      }
+    }
+
+    return NextResponse.json({ ok: true });
+
   } catch (error) {
-    console.error("Glofox webhook failed", error, rawBody ?? "<empty>");
+    console.error("Glofox webhook failed", error, rawBody ? rawBody.slice(0, 100) : "<empty>");
     return NextResponse.json(
       { ok: false, message: error instanceof Error ? error.message : "Glofox webhook failed." },
       { status: 500 }

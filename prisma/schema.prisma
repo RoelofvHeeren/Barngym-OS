@@ -389,5 +389,61 @@ model CounterpartyMapping {
 
   lead Lead @relation(fields: [leadId], references: [id])
 
+
   @@unique([provider, key])
 }
+
+model Member {
+  id        String   @id @default(cuid())
+  memberId  String   @unique // Glofox Member ID
+  firstName String?
+  lastName  String?
+  email     String?
+  phone     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  memberships Membership[]
+  bookings    Booking[]
+}
+
+model Membership {
+  id              String   @id @default(cuid())
+  membershipId    String   @unique
+  memberId        String
+  member          Member   @relation(fields: [memberId], references: [memberId])
+  status          String?
+  name            String?
+  startDate       DateTime?
+  endDate         DateTime?
+  price           Float?
+  nextPaymentDate DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([memberId])
+}
+
+model Booking {
+  id          String   @id @default(cuid())
+  bookingId   String   @unique
+  memberId    String
+  member      Member   @relation(fields: [memberId], references: [memberId])
+  classType   String?
+  startTime   DateTime?
+  endTime     DateTime?
+  paid        String?   // Store as string "true"/"false" or whatever Glofox sends, or map to boolean
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([memberId])
+}
+
+model GlofoxGhlLink {
+  id           String   @id @default(cuid())
+  glofoxId     String   @unique
+  ghlContactId String   @unique
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
