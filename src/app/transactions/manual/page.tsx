@@ -116,7 +116,7 @@ export default function ManualMatchPage() {
   useEffect(() => {
     const loadLeads = async () => {
       try {
-        const response = await fetch("/api/leads");
+        const response = await fetch("/api/leads/options");
         const payload = await response.json();
         if (!payload.ok) return;
         const options: LeadOption[] = (payload.data || []).map((lead: any) => {

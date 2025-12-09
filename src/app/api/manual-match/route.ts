@@ -73,6 +73,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, message: "Queue item not found." }, { status: 404 });
     }
 
+    // Validate lead existence if attaching
+    if (action === "attach" && leadId) {
+      const exists = await prisma.lead.findUnique({
+        where: { id: leadId },
+        select: { id: true },
+      });
+      if (!exists) {
+        return NextResponse.json(
+          { ok: false, message: "Invalid lead ID. The lead may have been deleted or does not exist." },
+          { status: 400 }
+        );
+      }
+    }
+
     let responseMessage: string | undefined;
 
     if (action === "attach") {
@@ -83,12 +97,22 @@ export async function POST(request: Request) {
         );
       }
 
-      await prisma.transaction.update({
+      const updatedTx = await prisma.transaction.update({
         where: { id: queueItem.transactionId },
         data: {
           leadId,
           status: queueItem.transaction.status === "Needs Review" ? "Completed" : queueItem.transaction.status,
           confidence: "Matched",
+        },
+      });
+
+      // Update lead status to Client
+      await prisma.lead.update({
+        where: { id: leadId },
+        data: {
+          isClient: true,
+          status: "CLIENT",
+          stage: "Won",
         },
       });
 
