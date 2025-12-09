@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { createCorporateLead } from "../actions";
 
@@ -55,8 +56,16 @@ export default function CreateCorporateLeadDialog({
         }
     }
 
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm p-4">
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
+    if (!open || !mounted) return null;
+
+    return createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/20 backdrop-blur-sm p-4">
             <div className="glass-panel w-full max-w-md p-6 shadow-2xl relative">
                 <div className="mb-6 flex items-center justify-between">
                     <h2 className="text-xl font-semibold text-primary">New Corporate Lead</h2>
@@ -197,6 +206,7 @@ export default function CreateCorporateLeadDialog({
                     </div>
                 </form>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }

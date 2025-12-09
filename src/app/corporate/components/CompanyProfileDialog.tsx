@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { X, Save, Building2, User, Mail, Users, Clock, Activity } from "lucide-react";
 import { getLead, updateCorporateLead } from "../actions";
 
@@ -58,10 +59,16 @@ export default function CompanyProfileDialog({
         }
     }
 
-    if (!open) return null;
+    const [mounted, setMounted] = useState(false);
 
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm p-4">
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
+    if (!open || !mounted) return null;
+
+    return createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/20 backdrop-blur-sm p-4">
             <div className="glass-panel w-full max-w-2xl p-6 shadow-2xl relative">
                 <div className="mb-6 flex items-center justify-between">
                     <h2 className="text-xl font-semibold text-primary">Company Profile</h2>
@@ -196,6 +203,7 @@ export default function CompanyProfileDialog({
                     </div>
                 )}
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }
