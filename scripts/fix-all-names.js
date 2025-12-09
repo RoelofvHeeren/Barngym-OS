@@ -23,7 +23,8 @@ async function fixAllNames() {
             // e.g. "clare.staplehurst" == "clare.staplehurst"
 
             const isUsername = currentName.toLowerCase() === emailUser.toLowerCase();
-            const needsFix = !currentName || isUsername;
+            const isEmail = currentName.toLowerCase() === c.email.toLowerCase();
+            const needsFix = !currentName || isUsername || isEmail;
 
             if (needsFix) {
                 // Formatting Logic

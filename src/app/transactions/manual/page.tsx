@@ -67,6 +67,18 @@ function extractContactHint(metadata?: unknown) {
   return { email, phone };
 }
 
+return { email, phone };
+}
+
+const getDisplayName = (item: QueueItem) => {
+  if (item.transaction?.provider?.toLowerCase() === "starling") {
+    const raw = (item.transaction.raw as Record<string, unknown>) ?? {};
+    const counterPartyName = (raw.counterPartyName || raw.counterpartyName) as string | undefined;
+    return counterPartyName || item.transaction?.personName || "Unknown";
+  }
+  return item.transaction?.personName || "Unassigned";
+};
+
 export default function ManualMatchPage() {
   const [loading, setLoading] = useState(true);
   const [queue, setQueue] = useState<QueueItem[]>([]);
@@ -75,7 +87,7 @@ export default function ManualMatchPage() {
   const [creating, setCreating] = useState<Record<string, boolean>>({});
   const [leads, setLeads] = useState<LeadOption[]>([]);
   const [sourceFilter, setSourceFilter] = useState<string>("All");
-  const [sortBy, setSortBy] = useState<"date-desc" | "date-asc" | "amount-desc" | "amount-asc">("date-desc");
+  const [sortBy, setSortBy] = useState<"date-desc" | "date-asc" | "amount-desc" | "amount-asc" | "name-asc" | "name-desc">("date-desc");
   const [createPayload, setCreatePayload] = useState<{
     queueId: string | null;
     email: string;
@@ -228,6 +240,12 @@ export default function ManualMatchPage() {
           if (sortBy === "amount-asc") {
             return (a.transaction?.amountMinor ?? 0) - (b.transaction?.amountMinor ?? 0);
           }
+          if (sortBy === "name-asc") {
+            return getDisplayName(a).localeCompare(getDisplayName(b));
+          }
+          if (sortBy === "name-desc") {
+            return getDisplayName(b).localeCompare(getDisplayName(a));
+          }
           return 0;
         }),
     [queue, sourceFilter, sortBy]
@@ -315,6 +333,8 @@ export default function ManualMatchPage() {
               <option value="date-asc">Oldest to Recent</option>
               <option value="amount-desc">Highest Amount</option>
               <option value="amount-asc">Lowest Amount</option>
+              <option value="name-asc">Name (A-Z)</option>
+              <option value="name-desc">Name (Z-A)</option>
             </select>
           </div>
           <button

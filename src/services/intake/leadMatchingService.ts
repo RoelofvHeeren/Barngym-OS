@@ -58,22 +58,22 @@ export async function matchPaymentToLead(
   const findLeadByEmail = async () =>
     email
       ? await prisma.lead.findFirst({
-          where: { email: { equals: email, mode: "insensitive" } },
-        })
+        where: { email: { equals: email, mode: "insensitive" } },
+      })
       : null;
 
   const findLeadByPhone = async () =>
     phone
       ? await prisma.lead.findFirst({
-          where: { phone },
-        })
+        where: { phone },
+      })
       : null;
 
   const findLeadByGhl = async () =>
     ghlContactId
       ? await prisma.lead.findFirst({
-          where: { ghlContactId },
-        })
+        where: { ghlContactId },
+      })
       : null;
 
   let lead = await findLeadByEmail();
@@ -98,9 +98,14 @@ export async function matchPaymentToLead(
   const category = ltvCategories.has(providedType)
     ? providedType
     : classifyProduct(
-        context?.productName ?? payment.productName ?? providedType ?? ""
-      );
-  const fromAds = tagsIncludeAds(lead.tags);
+      context?.productName ?? payment.productName ?? providedType ?? ""
+    );
+
+  const sourceIsAds = ["ads", "facebook", "instagram", "meta", "tiktok"].some((k) =>
+    (lead.source ?? "").toLowerCase().includes(k)
+  );
+  const tagsHasAds = tagsIncludeAds(lead.tags);
+  const fromAds = sourceIsAds || tagsHasAds;
 
   await prisma.$transaction([
     prisma.payment.update({

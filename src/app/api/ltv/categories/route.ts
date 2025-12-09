@@ -6,7 +6,7 @@ export const runtime = "nodejs";
 
 const isAdsLead = (lead: { source: string | null; tags: unknown }) => {
   const src = (lead.source ?? "").toLowerCase();
-  if (src.includes("ads")) return true;
+  if (src.includes("ads") || src.includes("facebook") || src.includes("instagram") || src.includes("meta") || src.includes("tiktok")) return true;
   const tags = lead.tags;
   if (!tags) return false;
   if (Array.isArray(tags)) {
