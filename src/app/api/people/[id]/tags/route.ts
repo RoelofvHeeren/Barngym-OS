@@ -22,7 +22,7 @@ export async function POST(
 
         const contact = await prisma.contact.findUnique({
             where: { id },
-            select: { segmentTags: true },
+            select: { segmentTags: true, email: true },
         });
 
         if (!contact) {
