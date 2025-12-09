@@ -54,7 +54,7 @@ export default function RootLayout({
             </div>
           </div>
 
-          <div className="flex flex-1 flex-col rounded-[36px] border border-emerald-900/10 bg-white/80 text-primary backdrop-blur-xl">
+          <div className="flex flex-1 flex-col rounded-[36px] border border-emerald-900/10 bg-white/80 text-primary backdrop-blur-xl min-w-0 overflow-x-hidden">
             <TopBar />
             <main className="flex-1 overflow-y-auto px-6 pb-10 pt-6 sm:px-8">
               {children}
