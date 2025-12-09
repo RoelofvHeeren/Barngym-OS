@@ -84,14 +84,29 @@ export async function GET(request: Request) {
       const transactions = contact.transactions ?? [];
       const successfulTransactions = transactions.filter((t) => t.status !== "Failed");
 
-      const lifetimeMinor = contact.ltvAllCents ?? successfulTransactions.reduce(
+      // Deduplicate transactions for display purposes
+      // We group by (date, amount, product) and strictly keep distinct ones.
+      // This handles cases where double-imports or sync issues create "unique" transactions (diff IDs) for the same event.
+      const uniqueTransactionKeys = new Set<string>();
+      const distinctTransactions = successfulTransactions.filter((t) => {
+        const dateKey = new Date(t.occurredAt).toISOString().split('T')[0]; // YYYY-MM-DD
+        const key = `${dateKey}|${t.amountMinor}|${t.productType ?? 'unknown'}`;
+
+        if (uniqueTransactionKeys.has(key)) {
+          return false;
+        }
+        uniqueTransactionKeys.add(key);
+        return true;
+      });
+
+      const lifetimeMinor = contact.ltvAllCents ?? distinctTransactions.reduce(
         (sum, t) => sum + (t.amountMinor ?? 0),
         0
       );
 
-      const hasPurchases = successfulTransactions.length > 0;
+      const hasPurchases = distinctTransactions.length > 0;
       // Transactions are already sorted by occurredAt desc from the query
-      const recentPayments = transactions.slice(0, 5);
+      const recentPayments = distinctTransactions.slice(0, 5);
 
       const lastPayment = recentPayments[0];
 
@@ -145,7 +160,7 @@ export async function GET(request: Request) {
           product: payment.productType ?? "Uncategorized",
           status: payment.status ?? "Completed",
         })),
-        history: transactions.slice(0, 50).map((payment) => ({
+        history: distinctTransactions.slice(0, 50).map((payment) => ({
           date: formatDate(payment.occurredAt),
           timestamp: formatTimestamp(payment.occurredAt),
           source: payment.provider ?? payment.source,

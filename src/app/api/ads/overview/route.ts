@@ -35,13 +35,7 @@ const parseRange = (range?: string): { start: Date | null; end: Date } => {
 };
 
 const isAdsLeadFilter = {
-  OR: [
-    { source: { contains: "ads", mode: "insensitive" as const } },
-    { source: { contains: "facebook", mode: "insensitive" as const } },
-    { source: { contains: "instagram", mode: "insensitive" as const } },
-    { source: { contains: "meta", mode: "insensitive" as const } },
-    { source: { contains: "tiktok", mode: "insensitive" as const } },
-  ],
+  source: { contains: "ads", mode: "insensitive" as const },
 };
 
 const buildDateFilter = (start: Date | null, end: Date) => {
@@ -95,9 +89,18 @@ export async function GET(request: Request) {
     }
 
     // 4. Spend: Real data OR Default Budget
+    // Exclude "Historical Manual Import" from specific ranges (like 7d, 30d) because it's a lump sum spanning a year.
+    // It should only show up in "All Time" (where start is null).
+    const isHistoricalIncluded = !start;
+
     const adsSpendAgg = await prisma.adsSpend.aggregate({
       _sum: { amountCents: true },
-      where: start ? { periodStart: { lte: end }, periodEnd: { gte: start } } : {},
+      where: {
+        AND: [
+          start ? { periodStart: { lte: end }, periodEnd: { gte: start } } : {},
+          isHistoricalIncluded ? {} : { source: { not: "Historical Manual Import" } }
+        ]
+      }
     });
     const metaSpendAgg = await prisma.metaDailyInsight.aggregate({
       _sum: { spend: true },
@@ -125,15 +128,23 @@ export async function GET(request: Request) {
           spendCents = MONTHLY_BUDGET_CENTS;
           break;
         case "all":
-          // For 'all time', maybe default to 3 months estimate or KEEP 0 to avoid confusion?
-          // User said "219 leads", likely over longer period.
-          // Let's assume 0 for all time if empty, or maybe iterate if reasonable.
-          // Given user request "Expect 750 a month", let's apply it if the range is defined.
-          // Since 'all' doesn't have a specific duration, let's leave it as 0 or 
-          // calculate duration between first lead and now? 
-          // Let's safe-bet on 0 for ALL TIME if no data, to prompt data entry, 
-          // BUT for specific ranges we use the budget.
-          spendCents = 0;
+          // Estimate duration based on first ever ad lead
+          const firstLead = await prisma.lead.findFirst({
+            where: isAdsLeadFilter,
+            orderBy: { createdAt: "asc" },
+            select: { createdAt: true },
+          });
+
+          if (firstLead) {
+            const now = new Date();
+            const start = firstLead.createdAt;
+            const diffTime = Math.abs(now.getTime() - start.getTime());
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            // Prorate based on days to be more precise than just months
+            spendCents = Math.round(diffDays * DAILY_BUDGET_CENTS);
+          } else {
+            spendCents = 0;
+          }
           break;
       }
     }

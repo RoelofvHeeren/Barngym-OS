@@ -80,7 +80,7 @@ function AdsDashboardContent() {
   const [leads, setLeads] = useState<LeadRow[]>([]);
   const [leadsLoading, setLeadsLoading] = useState(false);
   const [leadsError, setLeadsError] = useState<string | null>(null);
-  const [leadStatusFilter, setLeadStatusFilter] = useState<"all" | "lead" | "client">("all");
+  const [leadStatusFilter, setLeadStatusFilter] = useState<"all" | "lead" | "client">("lead");
   const [leadSearch, setLeadSearch] = useState("");
 
   const [funnel, setFunnel] = useState<FunnelData | null>(null);
@@ -263,100 +263,152 @@ function AdsDashboardContent() {
       </div>
 
       <div className="glass-panel">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <div>
-            <h3 className="text-lg font-semibold">Ad Leads</h3>
-            <p className="text-sm text-muted">Ads sourced leads with attribution and LTV.</p>
+            <h3 className="text-lg font-semibold">Ads CRM</h3>
+            <p className="text-sm text-muted">Manage your ads leads and clients.</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <select
-              className="rounded-2xl border border-emerald-900/20 bg-white/60 px-3 py-2 text-sm"
-              value={leadStatusFilter}
-              onChange={(event) =>
-                setLeadStatusFilter(event.target.value as "all" | "lead" | "client")
-              }
-            >
-              <option value="all">All</option>
-              <option value="lead">Leads only</option>
-              <option value="client">Clients only</option>
-            </select>
+            <div className="flex bg-emerald-900/5 rounded-lg p-1">
+              <button
+                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${leadStatusFilter === "lead"
+                  ? "bg-white text-emerald-800 shadow-sm"
+                  : "text-muted hover:text-primary"
+                  }`}
+                onClick={() => setLeadStatusFilter("lead")}
+              >
+                Active Leads
+              </button>
+              <button
+                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${leadStatusFilter === "client"
+                  ? "bg-white text-emerald-800 shadow-sm"
+                  : "text-muted hover:text-primary"
+                  }`}
+                onClick={() => setLeadStatusFilter("client")}
+              >
+                Acquired Clients
+              </button>
+            </div>
             <input
               type="search"
-              placeholder="Search name or email"
+              placeholder="Search..."
               value={leadSearch}
               onChange={(event) => setLeadSearch(event.target.value)}
-              className="rounded-2xl border border-emerald-900/20 bg-white/60 px-3 py-2 text-sm"
+              className="rounded-2xl border border-emerald-900/20 bg-white/60 px-3 py-2 text-sm w-64"
             />
           </div>
         </div>
         {leadsError && <p className="mt-2 text-sm text-amber-700">{leadsError}</p>}
         <div className="mt-4 overflow-x-auto">
           <table className="w-full min-w-[900px] text-left text-sm">
-            <thead className="text-muted">
+            <thead className="text-muted border-b border-emerald-900/10">
               <tr>
-                {[
-                  "Lead",
-                  "Status",
-                  "UTM Campaign",
-                  "UTM Source",
-                  "UTM Medium",
-                  "LTV (ads)",
-                  "Created",
-                  "First Payment",
-                ].map((column) => (
-                  <th key={column} className="pb-3 pr-4 font-medium">
-                    {column}
-                  </th>
-                ))}
+                <th className="pb-3 pr-4 font-medium pl-2">Name & Contact</th>
+                {leadStatusFilter === "client" ? (
+                  <>
+                    <th className="pb-3 pr-4 font-medium">Ads LTV</th>
+                    <th className="pb-3 pr-4 font-medium">Total LTV</th>
+                    <th className="pb-3 pr-4 font-medium">First Payment</th>
+                    <th className="pb-3 pr-4 font-medium">Categories</th>
+                  </>
+                ) : (
+                  <>
+                    <th className="pb-3 pr-4 font-medium">Status</th>
+                    <th className="pb-3 pr-4 font-medium">Campaign</th>
+                    <th className="pb-3 pr-4 font-medium">Source / Medium</th>
+                    <th className="pb-3 pr-4 font-medium">Created</th>
+                  </>
+                )}
+                <th className="pb-3 pr-4 font-medium text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-emerald-900/10">
               {leadsLoading ? (
                 <tr>
-                  <td colSpan={8} className="py-4 text-center text-muted">
-                    Loading leads...
+                  <td colSpan={6} className="py-8 text-center text-muted">
+                    Loading data...
                   </td>
                 </tr>
               ) : filteredLeads.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-4 text-center text-muted">
-                    No leads found for this range.
+                  <td colSpan={6} className="py-8 text-center text-muted">
+                    No {leadStatusFilter}s found for this period.
                   </td>
                 </tr>
               ) : (
                 filteredLeads.map((lead) => (
                   <tr
                     key={lead.id}
-                    className={`hover:bg-emerald-50/50 ${lead.linkedContactId ? "cursor-pointer" : ""
+                    className={`group hover:bg-emerald-50/50 transition-colors ${lead.linkedContactId ? "cursor-pointer" : ""
                       }`}
                     onClick={() => {
+                      // Only navigate if clicking row, buttons can override
                       if (lead.linkedContactId) {
                         router.push(`/people?id=${lead.linkedContactId}`);
                       }
                     }}
                   >
-                    <td className="py-3 pr-4">
-                      <p className="font-semibold text-primary">{lead.fullName}</p>
-                      <p className="text-xs text-muted font-normal">{lead.email}</p>
+                    <td className="py-3 pr-4 pl-2">
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 text-xs font-bold">
+                          {lead.fullName.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <p className="font-semibold text-primary">{lead.fullName}</p>
+                          <p className="text-xs text-muted font-normal">{lead.email}</p>
+                        </div>
+                      </div>
                     </td>
-                    <td className="pr-4">
-                      <span
-                        className={`chip text-[11px] ${lead.status === "CLIENT"
-                            ? "!bg-emerald-100 !text-emerald-800"
-                            : "!bg-amber-100 !text-amber-800"
-                          }`}
-                      >
-                        {lead.status}
-                      </span>
+
+                    {leadStatusFilter === "client" ? (
+                      <>
+                        <td className="pr-4 font-mono font-medium text-emerald-700">
+                          {formatCurrency(lead.ltvAdsCents)}
+                        </td>
+                        <td className="pr-4 font-mono text-muted">
+                          {formatCurrency(lead.ltvCents)}
+                        </td>
+                        <td className="pr-4 text-muted">{formatDate(lead.firstPaymentAt)}</td>
+                        <td className="pr-4">
+                          <div className="flex gap-1 flex-wrap">
+                            {lead.productCategories.slice(0, 2).map(cat => (
+                              <span key={cat} className="text-[10px] uppercase px-1.5 py-0.5 bg-slate-100 rounded text-slate-600 border border-slate-200">
+                                {cat}
+                              </span>
+                            ))}
+                            {lead.productCategories.length > 2 && (
+                              <span className="text-[10px] px-1.5 py-0.5 bg-slate-100 rounded text-slate-600">+{(lead.productCategories.length - 2)}</span>
+                            )}
+                          </div>
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        <td className="pr-4">
+                          <span className="chip text-[11px] !bg-amber-100 !text-amber-800 uppercase tracking-wider">
+                            {lead.status}
+                          </span>
+                        </td>
+                        <td className="pr-4 text-muted max-w-[120px] truncate" title={lead.tracking.utm_campaign ?? ""}>
+                          {lead.tracking.utm_campaign ?? "—"}
+                        </td>
+                        <td className="pr-4 text-muted">
+                          <div className="flex flex-col text-xs">
+                            <span>{lead.tracking.utm_source ?? "—"}</span>
+                            <span className="opacity-60">{lead.tracking.utm_medium}</span>
+                          </div>
+                        </td>
+                        <td className="pr-4 text-muted">{formatDate(lead.createdAt)}</td>
+                      </>
+                    )}
+
+                    <td className="pr-4 text-right">
+                      {lead.linkedContactId && (
+                        <button className="text-xs font-medium text-emerald-600 hover:text-emerald-800 opacity-0 group-hover:opacity-100 transition-opacity">
+                          View Profile →
+                        </button>
+                      )}
                     </td>
-                    <td className="pr-4 text-muted">{lead.tracking.utm_campaign ?? "—"}</td>
-                    <td className="pr-4 text-muted">{lead.tracking.utm_source ?? "—"}</td>
-                    <td className="pr-4 text-muted">{lead.tracking.utm_medium ?? "—"}</td>
-                    <td className="pr-4 font-semibold text-primary">
-                      {formatCurrency(lead.ltvAdsCents)}
-                    </td>
-                    <td className="pr-4 text-muted">{formatDate(lead.createdAt)}</td>
-                    <td className="pr-4 text-muted">{formatDate(lead.firstPaymentAt)}</td>
                   </tr>
                 ))
               )}

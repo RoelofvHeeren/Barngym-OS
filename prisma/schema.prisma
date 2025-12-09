@@ -130,6 +130,7 @@ model AdsSpend {
   periodStart DateTime
   periodEnd   DateTime
   amountCents Int
+  currency    String   @default("GBP")
   source      String
   createdAt   DateTime @default(now())
 

@@ -27,6 +27,7 @@ type NormalizedPayload = {
     adsetId?: string | null;
     platform?: string | null;
   };
+  dateCreated?: Date;
   raw: Record<string, unknown>;
 };
 
@@ -112,6 +113,10 @@ function normalizePayload(rawPayload: Record<string, any>): NormalizedPayload {
     normalizeString(root.contactId) ||
     normalizeString(contact.id) ||
     normalizeString(contact.contactId);
+
+  const dateCreatedRaw = root.date_created ?? root.dateCreated ?? contact.date_created ?? contact.dateCreated;
+  const dateCreated = dateCreatedRaw ? new Date(dateCreatedRaw) : undefined;
+
   const composedFullName =
     fullName ||
     [firstName ?? "", lastName ?? ""]
@@ -132,6 +137,7 @@ function normalizePayload(rawPayload: Record<string, any>): NormalizedPayload {
     tags,
     utm,
     trackingIds,
+    dateCreated,
     raw: rawPayload as Record<string, unknown>,
   };
 }
@@ -184,6 +190,7 @@ export async function processLeadIntake(rawPayload: unknown) {
     ghlContactId: normalized.contactId ?? undefined,
     tags: tagsJson as Prisma.InputJsonValue,
     metadata: metadataJson as Prisma.InputJsonValue,
+    createdAt: normalized.dateCreated ?? undefined,
   };
 
   let leadId = existing?.id;
@@ -197,11 +204,14 @@ export async function processLeadIntake(rawPayload: unknown) {
     if (!existing.email && baseData.email) updateData.email = baseData.email;
     if (!existing.phone && baseData.phone) updateData.phone = baseData.phone;
     if (!existing.goal && baseData.goal) updateData.goal = baseData.goal;
+    // Don't update source if existing
     if (!existing.source && baseData.source) updateData.source = baseData.source;
     if (!existing.status && baseData.status) updateData.status = baseData.status;
     if (!existing.ghlContactId && baseData.ghlContactId) updateData.ghlContactId = baseData.ghlContactId;
     updateData.tags = baseData.tags;
     updateData.metadata = baseData.metadata;
+    // If external date says older, we probably shouldn't update createdAt unless specifically requested.
+    // Keeping existing createdAt is safer for now.
 
     await prisma.lead.update({
       where: { id: existing.id },
@@ -264,6 +274,8 @@ export async function processLeadIntake(rawPayload: unknown) {
       // but for now we rely on email matching.
     };
 
+    const firstSeenAt = normalized.dateCreated ?? new Date();
+
     // Upsert Contact
     // We treat email as the unique key for Contacts in this context.
     await prisma.contact.upsert({
@@ -277,6 +289,8 @@ export async function processLeadIntake(rawPayload: unknown) {
         sourceTags: {
           push: contactData.sourceTags.filter(t => t !== "ads"), // avoid duplicate easy ones, though DB allows arrays
         },
+        // Optionally backdate firstSeenAt if the lead is older?
+        // Let's only set it on creation to avoid moving target
       },
       create: {
         email: contactData.email,
@@ -284,7 +298,8 @@ export async function processLeadIntake(rawPayload: unknown) {
         phone: contactData.phone,
         status: "lead",
         sourceTags: contactData.sourceTags,
-        firstSeenAt: new Date(),
+        firstSeenAt,
+        createdAt: firstSeenAt, // Override system default
       },
     });
   }
