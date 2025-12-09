@@ -97,14 +97,38 @@ export async function POST(request: Request) {
         );
       }
 
+      const lead = await prisma.lead.findUnique({
+        where: { id: leadId },
+      });
+
+      let contactId: string | null = null;
+      if (lead) {
+        // Find corresponding contact
+        const contact = await prisma.contact.findFirst({
+          where: {
+            OR: [
+              lead.email ? { email: { equals: lead.email, mode: "insensitive" } } : undefined,
+              lead.phone ? { phone: { equals: lead.phone, mode: "insensitive" } } : undefined,
+            ].filter(Boolean) as Prisma.ContactWhereInput[],
+          },
+          select: { id: true },
+        });
+        contactId = contact?.id ?? null;
+      }
+
       const updatedTx = await prisma.transaction.update({
         where: { id: queueItem.transactionId },
         data: {
           leadId,
+          contactId, // Link to contact as well
           status: queueItem.transaction.status === "Needs Review" ? "Completed" : queueItem.transaction.status,
           confidence: "Matched",
         },
       });
+
+      if (contactId) {
+        await recalculateContactLtv(contactId);
+      }
 
       // Update lead status to Client
       await prisma.lead.update({
@@ -163,6 +187,7 @@ export async function POST(request: Request) {
               where: { id: { in: unmappedIds } },
               data: {
                 leadId,
+                contactId, // Link to contact
                 confidence: "Matched",
                 status: queueItem.transaction.status === "Needs Review" ? "Completed" : queueItem.transaction.status,
               },
@@ -217,14 +242,49 @@ export async function POST(request: Request) {
         },
       });
 
+      // Sync/Create Contact
+      let contactId: string | null = null;
+      const contactEmail = typeof email === "string" ? email.toLowerCase() : null;
+
+      if (contactEmail) {
+        const contact = await prisma.contact.upsert({
+          where: { email: contactEmail },
+          update: {
+            fullName: personName || undefined,
+            phone: phone || undefined,
+          },
+          create: {
+            email: contactEmail,
+            fullName: personName,
+            phone: phone,
+            sourceTags: ["Manual Match"],
+            status: "client",
+          },
+        });
+        contactId = contact.id;
+      } else if (phone) {
+        // Try to find by phone if no email
+        const contact = await prisma.contact.findFirst({
+          where: { phone: { equals: phone, mode: 'insensitive' } }
+        });
+        if (contact) {
+          contactId = contact.id;
+        }
+      }
+
       await prisma.transaction.update({
         where: { id: queueItem.transactionId },
         data: {
           leadId: newLead.id,
+          contactId, // Link to contact
           status: queueItem.transaction.status === "Needs Review" ? "Completed" : queueItem.transaction.status,
           confidence: "Matched",
         },
       });
+
+      if (contactId) {
+        await recalculateContactLtv(contactId);
+      }
 
       const emailLower = email?.toLowerCase();
       if (emailLower) {
@@ -252,6 +312,7 @@ export async function POST(request: Request) {
           },
           data: {
             leadId: newLead.id,
+            contactId, // Link to contact
             confidence: "Matched",
             status: queueItem.transaction.status === "Needs Review" ? "Completed" : queueItem.transaction.status,
           },
@@ -287,5 +348,28 @@ export async function POST(request: Request) {
       { ok: false, message: error instanceof Error ? error.message : "Failed to update manual queue." },
       { status: 500 }
     );
+  }
+}
+
+async function recalculateContactLtv(contactId: string) {
+  try {
+    const aggregates = await prisma.transaction.aggregate({
+      where: {
+        contactId: contactId,
+        status: 'Completed',
+      },
+      _sum: {
+        amountMinor: true, // Sum amounts in stored currency minor units
+      }
+    });
+
+    const total = aggregates._sum.amountMinor || 0;
+
+    await prisma.contact.update({
+      where: { id: contactId },
+      data: { ltvAllCents: total }
+    });
+  } catch (e) {
+    console.error("Failed to recalculate LTV for contact", contactId, e);
   }
 }

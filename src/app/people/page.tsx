@@ -407,6 +407,8 @@ export default function PeoplePage() {
   const [showImportWorkspace, setShowImportWorkspace] = useState(false);
   const [loadingLeads, setLoadingLeads] = useState(false);
   const [leadError, setLeadError] = useState<string | null>(null);
+  const [newTag, setNewTag] = useState("");
+  const [tagLoading, setTagLoading] = useState(false);
 
   const loadImportedLeads = useCallback(async () => {
     setLoadingLeads(true);
@@ -506,6 +508,73 @@ export default function PeoplePage() {
         idx === index ? { ...mapping, column } : mapping
       )
     );
+  };
+
+  const handleAddTag = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedLeadId || !newTag.trim()) return;
+
+    setTagLoading(true);
+    try {
+      const response = await fetch(`/api/people/${selectedLeadId}/tags`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tag: newTag }),
+      });
+      const data = await response.json();
+      if (!data.ok) throw new Error(data.message);
+
+      // Optimistic update
+      setProfiles((prev) => {
+        const profile = prev[selectedLeadId];
+        if (!profile) return prev;
+        return {
+          ...prev,
+          [selectedLeadId]: {
+            ...profile,
+            tags: [...profile.tags, newTag],
+          },
+        };
+      });
+      setNewTag("");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to add tag");
+    } finally {
+      setTagLoading(false);
+    }
+  };
+
+  const handleRemoveTag = async (tag: string) => {
+    if (!selectedLeadId) return;
+    if (!confirm(`Remove tag "${tag}"?`)) return;
+
+    setTagLoading(true);
+    try {
+      const response = await fetch(`/api/people/${selectedLeadId}/tags`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tag }),
+      });
+      const data = await response.json();
+      if (!data.ok) throw new Error(data.message);
+
+      // Optimistic update
+      setProfiles((prev) => {
+        const profile = prev[selectedLeadId];
+        if (!profile) return prev;
+        return {
+          ...prev,
+          [selectedLeadId]: {
+            ...profile,
+            tags: profile.tags.filter((t) => t !== tag),
+          },
+        };
+      });
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to remove tag");
+    } finally {
+      setTagLoading(false);
+    }
   };
 
   const addCustomField = () => {
@@ -1152,12 +1221,28 @@ export default function PeoplePage() {
               <div className="mt-5 space-y-3 text-sm text-muted">
                 <p>Phone · {selectedLeadProfile.phone}</p>
                 <p>Email · {selectedLeadProfile.email}</p>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2 items-center">
                   {selectedLeadProfile.tags.map((tag) => (
-                    <span key={tag} className="chip text-xs">
+                    <span key={tag} className="chip text-xs group flex items-center gap-1">
                       {tag}
+                      <button
+                        onClick={() => handleRemoveTag(tag)}
+                        className="ml-1 opacity-50 hover:opacity-100 hover:text-rose-500"
+                        title="Remove tag"
+                      >
+                        ×
+                      </button>
                     </span>
                   ))}
+                  <form onSubmit={handleAddTag} className="flex items-center">
+                    <input
+                      className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-xs text-primary placeholder:text-muted focus:outline-none focus:border-emerald-500/50 w-24"
+                      placeholder="+ Tag"
+                      value={newTag}
+                      onChange={(e) => setNewTag(e.target.value)}
+                      disabled={tagLoading}
+                    />
+                  </form>
                 </div>
               </div>
               <div className="mt-4 grid gap-3 md:grid-cols-2">

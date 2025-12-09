@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 type LeadPayload = {
   externalId?: string;
@@ -49,7 +50,9 @@ export async function GET(request: Request) {
       where: whereClause,
       orderBy: { createdAt: "desc" },
       include: {
-        transactions: true, // Include transactions for history
+        transactions: {
+          orderBy: { occurredAt: "desc" },
+        }, // Include transactions for history
       },
       take: 5000, // Increased limit to show all members
     });
@@ -87,9 +90,8 @@ export async function GET(request: Request) {
       );
 
       const hasPurchases = successfulTransactions.length > 0;
-      const recentPayments = transactions
-        .sort((a, b) => b.occurredAt.getTime() - a.occurredAt.getTime())
-        .slice(0, 5);
+      // Transactions are already sorted by occurredAt desc from the query
+      const recentPayments = transactions.slice(0, 5);
 
       const lastPayment = recentPayments[0];
 
@@ -143,7 +145,7 @@ export async function GET(request: Request) {
           product: payment.productType ?? "Uncategorized",
           status: payment.status ?? "Completed",
         })),
-        history: transactions.slice(0, 20).map((payment) => ({
+        history: transactions.slice(0, 50).map((payment) => ({
           date: formatDate(payment.occurredAt),
           timestamp: formatTimestamp(payment.occurredAt),
           source: payment.provider ?? payment.source,
