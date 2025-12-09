@@ -403,11 +403,47 @@ function AdsDashboardContent() {
                     )}
 
                     <td className="pr-4 text-right">
-                      {lead.linkedContactId && (
-                        <button className="text-xs font-medium text-emerald-600 hover:text-emerald-800 opacity-0 group-hover:opacity-100 transition-opacity">
-                          View Profile →
+                      <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {lead.linkedContactId && (
+                          <button
+                            className="text-xs font-medium text-emerald-600 hover:text-emerald-800"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              router.push(`/people?id=${lead.linkedContactId}`);
+                            }}
+                          >
+                            View
+                          </button>
+                        )}
+                        <button
+                          className="text-xs font-medium text-red-600 hover:text-red-800"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            if (!window.confirm("Are you sure you want to delete this contact? This will remove all their data permanently.")) return;
+
+                            try {
+                              // If linked contact exists, delete that. Otherwise delete lead? 
+                              // Our API expects Contact ID.
+                              const targetId = lead.linkedContactId;
+                              if (!targetId) {
+                                alert("Cannot delete lead without linked contact (yet).");
+                                return;
+                              }
+
+                              const res = await fetch(`/api/people/${targetId}`, { method: "DELETE" });
+                              const json = await res.json();
+                              if (!res.ok) throw new Error(json.message);
+
+                              // Optimistic remove or reload
+                              setLeads(prev => prev.filter(l => l.id !== lead.id));
+                            } catch (err) {
+                              alert(err instanceof Error ? err.message : "Failed to delete");
+                            }
+                          }}
+                        >
+                          Delete
                         </button>
-                      )}
+                      </div>
                     </td>
                   </tr>
                 ))
