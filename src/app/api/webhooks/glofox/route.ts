@@ -180,7 +180,7 @@ async function handleMembershipEvent(eventType: string, payload: Record<string, 
 // ---- INVOICE EVENTS ----
 async function handleInvoiceEvent(eventType: string, payload: Record<string, unknown>) {
   const invoiceId = String(payload.id || payload.invoice_id);
-  const memberId = String(payload.user?.id || payload.member_id || "");
+  const memberId = String((payload.user as any)?.id || payload.member_id || "");
   const lineItems = (payload.line_items as Record<string, unknown>[]) || [];
 
   if (!invoiceId) return;
@@ -201,7 +201,7 @@ async function handleInvoiceEvent(eventType: string, payload: Record<string, unk
       status: String(payload.status || "Completed"), // Invoices usually paid/due
       occurredAt: new Date(String(payload.created || payload.date || new Date())).toISOString(),
       productType: productCat,
-      personName: String(payload.user?.name || ""), // from payload if available
+      personName: String((payload.user as any)?.name || ""), // from payload if available
       leadId: null, // Logic to link lead is handled in upsertTransactions enhancement or separate matcher
       currency: String(payload.currency || "EUR").toUpperCase(),
       confidence: "High",
