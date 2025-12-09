@@ -19,6 +19,7 @@ type Overview = {
 
 type LeadRow = {
   id: string;
+  linkedContactId?: string | null;
   fullName: string;
   email: string;
   phone: string;
@@ -226,9 +227,8 @@ function AdsDashboardContent() {
             {rangeOptions.map((option) => (
               <button
                 key={option.value}
-                className={`chip text-xs ${
-                  range === option.value ? "!bg-emerald-600 !text-white" : ""
-                }`}
+                className={`chip text-xs ${range === option.value ? "!bg-emerald-600 !text-white" : ""
+                  }`}
                 onClick={() => updateRange(option.value)}
               >
                 {option.label}
@@ -325,18 +325,26 @@ function AdsDashboardContent() {
                 </tr>
               ) : (
                 filteredLeads.map((lead) => (
-                  <tr key={lead.id} className="hover:bg-emerald-50/50">
+                  <tr
+                    key={lead.id}
+                    className={`hover:bg-emerald-50/50 ${lead.linkedContactId ? "cursor-pointer" : ""
+                      }`}
+                    onClick={() => {
+                      if (lead.linkedContactId) {
+                        router.push(`/people?id=${lead.linkedContactId}`);
+                      }
+                    }}
+                  >
                     <td className="py-3 pr-4">
                       <p className="font-semibold text-primary">{lead.fullName}</p>
-                      <p className="text-xs text-muted">{lead.email}</p>
+                      <p className="text-xs text-muted font-normal">{lead.email}</p>
                     </td>
                     <td className="pr-4">
                       <span
-                        className={`chip text-[11px] ${
-                          lead.status === "CLIENT"
+                        className={`chip text-[11px] ${lead.status === "CLIENT"
                             ? "!bg-emerald-100 !text-emerald-800"
                             : "!bg-amber-100 !text-amber-800"
-                        }`}
+                          }`}
                       >
                         {lead.status}
                       </span>

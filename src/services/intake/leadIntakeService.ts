@@ -238,6 +238,8 @@ export async function processLeadIntake(rawPayload: unknown) {
     },
   });
 
+  // ... existing code ...
+
   await prisma.leadEvent.create({
     data: {
       leadId,
@@ -250,6 +252,42 @@ export async function processLeadIntake(rawPayload: unknown) {
       } as Prisma.InputJsonValue,
     },
   });
+
+  // --- SYNC TO CONTACT TABLE (Phase 3) ---
+  if (normalized.email) {
+    const contactData = {
+      email: normalized.email,
+      fullName: normalized.fullName || undefined,
+      phone: normalized.phone || undefined,
+      sourceTags: ["ghl", normalized.source].filter(Boolean),
+      // If we have a ghlContactId, we could store it in a new field if Contact had one, 
+      // but for now we rely on email matching.
+    };
+
+    // Upsert Contact
+    // We treat email as the unique key for Contacts in this context.
+    await prisma.contact.upsert({
+      where: { email: normalized.email },
+      update: {
+        // Only update fields if they are missing or if we want to overwrite.
+        // For now, let's update name and phone if provided.
+        fullName: contactData.fullName,
+        phone: contactData.phone,
+        // Merge tags
+        sourceTags: {
+          push: contactData.sourceTags.filter(t => t !== "ads"), // avoid duplicate easy ones, though DB allows arrays
+        },
+      },
+      create: {
+        email: contactData.email,
+        fullName: contactData.fullName,
+        phone: contactData.phone,
+        status: "lead",
+        sourceTags: contactData.sourceTags,
+        firstSeenAt: new Date(),
+      },
+    });
+  }
 
   return {
     success: true,

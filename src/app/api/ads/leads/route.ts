@@ -61,14 +61,14 @@ export async function GET(request: Request) {
         ...(statusParam === "lead"
           ? { isClient: false }
           : statusParam === "client"
-          ? { isClient: true }
-          : {}),
+            ? { isClient: true }
+            : {}),
         ...(campaignFilter
           ? {
-              leadTracking: {
-                some: { campaignId: campaignFilter },
-              },
-            }
+            leadTracking: {
+              some: { campaignId: campaignFilter },
+            },
+          }
           : {}),
       },
       orderBy: { createdAt: "desc" },
@@ -94,9 +94,9 @@ export async function GET(request: Request) {
         where: {
           leadId: { in: leadIds },
         },
-      select: { leadId: true, timestamp: true, productType: true },
-      orderBy: { timestamp: "asc" },
-    }),
+        select: { leadId: true, timestamp: true, productType: true },
+        orderBy: { timestamp: "asc" },
+      }),
       prisma.leadTracking.findMany({
         where: {
           leadId: { in: leadIds },
@@ -124,6 +124,16 @@ export async function GET(request: Request) {
       trackingMap.get(t.leadId)!.push(t);
     });
 
+    const leadEmails = leads.map((l) => l.email).filter(Boolean) as string[];
+    const contacts = await prisma.contact.findMany({
+      where: { email: { in: leadEmails } },
+      select: { id: true, email: true },
+    });
+    const contactMap = new Map<string, string>();
+    contacts.forEach((c) => {
+      if (c.email) contactMap.set(c.email.toLowerCase(), c.id);
+    });
+
     const result = leads.map((lead) => {
       const paymentInfo = paymentsMap.get(lead.id);
       const firstPaymentAt = paymentInfo?.first ?? null;
@@ -137,8 +147,11 @@ export async function GET(request: Request) {
         lead.email ||
         "Unnamed Lead";
 
+      const linkedContactId = lead.email ? contactMap.get(lead.email.toLowerCase()) : null;
+
       return {
         id: lead.id,
+        linkedContactId,
         fullName,
         email: lead.email ?? "",
         phone: lead.phone ?? "",

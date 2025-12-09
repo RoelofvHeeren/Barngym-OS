@@ -148,6 +148,40 @@ export async function matchPaymentToLead(
     });
   }
 
+  // --- SYNC TO CONTACT TRANSACTIONS (Phase 3) ---
+  if (lead.email) {
+    const contact = await prisma.contact.findUnique({
+      where: { email: lead.email },
+    });
+
+    if (contact) {
+      await prisma.transaction.upsert({
+        where: { externalId: payment.externalPaymentId },
+        update: {
+          contactId: contact.id,
+          status: "paid", // Assuming successful payment if we are here
+          amountMinor: payment.amountCents,
+        },
+        create: {
+          contactId: contact.id,
+          externalId: payment.externalPaymentId,
+          source: payment.sourceSystem,
+          provider: payment.sourceSystem,
+          amountMinor: payment.amountCents,
+          currency: "GBP", // Defaulting, ideally should come from payment object if available
+          occurredAt: payment.timestamp,
+          status: "paid",
+          confidence: "high",
+          productType: category,
+          personName: contact.fullName,
+        }
+      });
+      // Optionally update Contact LTV here if not handled elsewhere, 
+      // but the recalculate-ltv script or other services might handle it.
+      // For now, syncing the transaction is the key request.
+    }
+  }
+
   await appendConversionLog(
     `${new Date().toISOString()} | lead=${lead.id} | payment=${payment.id} | amount=${payment.amountCents} | source=${payment.sourceSystem}`
   );

@@ -17,7 +17,7 @@ export default async function CorporatePage() {
   ];
 
   return (
-    <div className="flex flex-col gap-10 text-primary pb-10">
+    <div className="flex flex-col gap-10 text-primary pb-10 w-full max-w-full overflow-x-hidden">
       {/* Tier 1 - Header */}
       <section className="flex flex-col gap-2">
         <h1 className="text-3xl font-semibold">Corporate Dashboard</h1>
