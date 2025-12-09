@@ -162,7 +162,7 @@ export default function CorporatePipeline({ initialData }: { initialData: any })
             onDragOver={handleDragOver}
             onDragEnd={handleDragEnd}
         >
-            <div className="glass-panel w-full overflow-hidden flex flex-col h-[600px]">
+            <div className="glass-panel w-full max-w-full min-w-0 overflow-hidden flex flex-col h-[600px]">
                 <div className="mb-4 flex flex-shrink-0 items-center justify-between px-1">
                     <div>
                         <h2 className="text-xl font-semibold">Corporate Pipeline</h2>

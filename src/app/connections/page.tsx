@@ -433,7 +433,7 @@ export default function ConnectionsPage() {
   };
 
   return (
-    <div className="flex flex-col gap-8 text-primary">
+    <div className="flex flex-col gap-8 text-primary w-full max-w-full min-w-0 overflow-x-hidden">
       <section className="glass-panel flex flex-col gap-3">
         <p className="text-xs uppercase tracking-[0.35em] text-muted">Connections</p>
         <h1 className="text-3xl font-semibold">Integrations Control Room</h1>
