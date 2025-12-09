@@ -132,7 +132,11 @@ export default function ManualMatchPage() {
         const payload = await response.json();
         if (!payload.ok) return;
         const options: LeadOption[] = (payload.data || []).map((lead: any) => {
-          const name = [lead.firstName, lead.lastName].filter(Boolean).join(" ").trim() || "Unnamed";
+          let name = [lead.firstName, lead.lastName].filter(Boolean).join(" ").trim();
+          if (lead.companyName) {
+            name = `${lead.companyName} (${name})`;
+          }
+          if (!name) name = "Unnamed";
           const contact = lead.email || lead.phone || lead.externalId || lead.id;
           return {
             id: lead.id,

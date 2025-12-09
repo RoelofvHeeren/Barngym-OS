@@ -1,5 +1,8 @@
+"use client";
 
 import { FileText, Download, Upload, Filter, Search } from "lucide-react";
+import { useRef } from "react";
+import { handleFileUpload } from "../actions";
 
 type DocFile = {
     id: string;
@@ -19,6 +22,25 @@ const documents: DocFile[] = [
 ];
 
 export default function DocumentLibrary() {
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const handleUploadClick = () => {
+        fileInputRef.current?.click();
+    };
+
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files.length > 0) {
+            const formData = new FormData();
+            formData.append("file", e.target.files[0]);
+            try {
+                await handleFileUpload(formData);
+                alert("File uploaded (placeholder functionality)");
+            } catch (error) {
+                console.error("Upload failed", error);
+            }
+        }
+    };
+
     return (
         <div className="glass-panel min-h-[200px]">
             <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -39,10 +61,19 @@ export default function DocumentLibrary() {
                     <button className="flex h-10 w-10 items-center justify-center rounded-full border border-emerald-900/10 bg-white/40 text-emerald-800 hover:bg-white/60">
                         <Filter size={18} />
                     </button>
-                    <button className="btn-primary flex items-center gap-2 text-sm shadow-md hover:shadow-lg">
+                    <button
+                        onClick={handleUploadClick}
+                        className="btn-primary flex items-center gap-2 text-sm shadow-md hover:shadow-lg"
+                    >
                         <Upload size={16} />
                         <span>Upload</span>
                     </button>
+                    <input
+                        type="file"
+                        ref={fileInputRef}
+                        className="hidden"
+                        onChange={handleFileChange}
+                    />
                 </div>
             </div>
 
@@ -71,7 +102,10 @@ export default function DocumentLibrary() {
                 ))}
 
                 {/* Drop zone placeholder */}
-                <div className="flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-emerald-900/10 bg-black/[0.01] p-4 text-center transition-colors hover:bg-emerald-50/30">
+                <div
+                    onClick={handleUploadClick}
+                    className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-emerald-900/10 bg-black/[0.01] p-4 text-center transition-colors hover:bg-emerald-50/30"
+                >
                     <Upload size={24} className="text-muted opacity-50" />
                     <p className="text-xs font-medium text-muted">Drop files to upload</p>
                 </div>

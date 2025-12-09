@@ -356,7 +356,7 @@ async function recalculateContactLtv(contactId: string) {
     const aggregates = await prisma.transaction.aggregate({
       where: {
         contactId: contactId,
-        status: 'Completed',
+        status: { in: ['Completed', 'succeeded', 'SETTLED'] }
       },
       _sum: {
         amountMinor: true, // Sum amounts in stored currency minor units

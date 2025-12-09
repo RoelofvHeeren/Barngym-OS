@@ -12,6 +12,8 @@ export async function GET() {
                 lastName: true,
                 email: true,
                 phone: true,
+                companyName: true,
+                isCorporate: true,
             },
             orderBy: { createdAt: "desc" },
             take: 2000,

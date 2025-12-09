@@ -1,15 +1,13 @@
-const corporateClients = [
-  { name: "Riverside Legal", headcount: 82, revenue: "€182k", lastActivity: "Townhall · 08 Sep" },
-  { name: "Nova Printworks", headcount: 54, revenue: "€126k", lastActivity: "Retreat Planning · 07 Sep" },
-  { name: "Northshore Legal", headcount: 44, revenue: "€98k", lastActivity: "Wellness Report · 06 Sep" },
-];
-
 import CorporatePipeline from "./components/CorporatePipeline";
 import OfferPerformance from "./components/OfferPerformance";
 import CorporateClients from "./components/CorporateClients";
 import DocumentLibrary from "./components/DocumentLibrary";
+import { getCorporatePipeline, getCorporateClients } from "./actions";
 
-export default function CorporatePage() {
+export default async function CorporatePage() {
+  const pipelineData = await getCorporatePipeline();
+  const clientData = await getCorporateClients();
+
   const kpiCards = [
     { label: "Total Corporate Revenue", value: "€842k", sub: "YTD Revenue" },
     { label: "MRR from Corporate Coaching", value: "€32k", sub: "+8% vs last month" },
@@ -20,7 +18,7 @@ export default function CorporatePage() {
 
   return (
     <div className="flex flex-col gap-10 text-primary pb-10">
-      {/* Tier 1 - Header (Already in Layout, but we can add specific page context if needed) */}
+      {/* Tier 1 - Header */}
       <section className="flex flex-col gap-2">
         <h1 className="text-3xl font-semibold">Corporate Dashboard</h1>
         <p className="text-sm text-muted">
@@ -43,13 +41,13 @@ export default function CorporatePage() {
       <div className="flex flex-col gap-10">
 
         {/* Tier 3.1 - Corporate Pipeline */}
-        <CorporatePipeline />
+        <CorporatePipeline initialData={pipelineData} />
 
         {/* Tier 3.2 - Offer Performance */}
         <OfferPerformance />
 
         {/* Tier 3.3 - Corporate Clients */}
-        <CorporateClients />
+        <CorporateClients clients={clientData} />
 
         {/* Tier 3.4 - Document Library */}
         <DocumentLibrary />

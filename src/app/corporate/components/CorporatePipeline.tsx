@@ -1,166 +1,224 @@
+"use client";
+
+import { useState } from "react";
 import { Plus } from "lucide-react";
+import {
+    DndContext,
+    DragOverlay,
+    useSensors,
+    useSensor,
+    PointerSensor,
+    DragStartEvent,
+    DragEndEvent,
+    DragOverEvent,
+    closestCorners,
+} from "@dnd-kit/core";
+import { SortableContext, arrayMove } from "@dnd-kit/sortable";
+import { createPortal } from "react-dom";
+import { updateLeadStage } from "../actions";
+import { PipelineStageColumn } from "./PipelineStageColumn";
+import { PipelineCardItem } from "./PipelineCardItem";
+import CreateCorporateLeadDialog from "./CreateCorporateLeadDialog";
+import CompanyProfileDialog from "./CompanyProfileDialog";
 
 type PipelineStage = {
     id: string;
     title: string;
-    cards: PipelineCard[];
 };
 
-type PipelineCard = {
-    id: string;
-    companyName: string;
-    contactName: string;
-    offerType: "Coaching" | "Retreat" | "Workshop";
-    value: string;
-    nextAction: string;
-    lastUpdated: string;
-};
-
-const stages: PipelineStage[] = [
-    {
-        id: "new",
-        title: "New Inquiry",
-        cards: [
-            {
-                id: "1",
-                companyName: "TechFlow Systems",
-                contactName: "Sarah Jenkins",
-                offerType: "Retreat",
-                value: "£12,000",
-                nextAction: "Initial call scheduled",
-                lastUpdated: "2h ago",
-            },
-            {
-                id: "2",
-                companyName: "Bright Path",
-                contactName: "Mike Ross",
-                offerType: "Workshop",
-                value: "£3,500",
-                nextAction: "Review inquiry form",
-                lastUpdated: "5h ago",
-            },
-        ],
-    },
-    {
-        id: "qualified",
-        title: "Qualified",
-        cards: [
-            {
-                id: "3",
-                companyName: "Apex Legal",
-                contactName: "Jessica Pearson",
-                offerType: "Coaching",
-                value: "£4,200/mo",
-                nextAction: "Send brochure",
-                lastUpdated: "1d ago",
-            },
-        ],
-    },
-    {
-        id: "discovery",
-        title: "Discovery Call",
-        cards: [],
-    },
-    {
-        id: "proposal",
-        title: "Proposal Sent",
-        cards: [
-            {
-                id: "4",
-                companyName: "Global Corp",
-                contactName: "Harvey Specter",
-                offerType: "Retreat",
-                value: "£25,000",
-                nextAction: "Follow up on proposal",
-                lastUpdated: "3d ago",
-            },
-        ],
-    },
-    {
-        id: "negotiation",
-        title: "Negotiation",
-        cards: [],
-    },
-    {
-        id: "won",
-        title: "Closed Won",
-        cards: [
-            {
-                id: "5",
-                companyName: "Pearson Hardman",
-                contactName: "Louis Litt",
-                offerType: "Coaching",
-                value: "£15,000",
-                nextAction: "Onboarding scheduled",
-                lastUpdated: "1w ago",
-            },
-        ],
-    },
-    {
-        id: "lost",
-        title: "Closed Lost",
-        cards: [],
-    },
+const STAGES: PipelineStage[] = [
+    { id: "New", title: "New Inquiry" },
+    { id: "Qualified", title: "Qualified" },
+    { id: "Discovery Call", title: "Discovery Call" },
+    { id: "Proposal Sent", title: "Proposal Sent" },
+    { id: "Negotiation", title: "Negotiation" },
+    { id: "Closed Won", title: "Closed Won" },
+    { id: "Closed Lost", title: "Closed Lost" },
 ];
 
-export default function CorporatePipeline() {
+export default function CorporatePipeline({ initialData }: { initialData: any }) {
+    const [items, setItems] = useState<any>(initialData);
+    const [activeId, setActiveId] = useState<string | null>(null);
+    const [isCreateOpen, setIsCreateOpen] = useState(false);
+    const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
+
+    const sensors = useSensors(
+        useSensor(PointerSensor, {
+            activationConstraint: {
+                distance: 5,
+            },
+        })
+    );
+
+    function findContainer(id: string) {
+        if (items[id]) return id;
+        return Object.keys(items).find((key) =>
+            items[key].find((item: any) => item.id === id)
+        );
+    }
+
+    function handleDragStart(event: DragStartEvent) {
+        setActiveId(event.active.id as string);
+    }
+
+    function handleDragOver(event: DragOverEvent) {
+        const { active, over } = event;
+        const overId = over?.id;
+
+        if (!overId || active.id === overId) return;
+
+        const activeContainer = findContainer(active.id as string);
+        const overContainer = findContainer(overId as string);
+
+        if (!activeContainer || !overContainer || activeContainer === overContainer) {
+            return;
+        }
+
+        setItems((prev: any) => {
+            const activeItems = prev[activeContainer];
+            const overItems = prev[overContainer];
+            const activeIndex = activeItems.findIndex((i: any) => i.id === active.id);
+            const overIndex = overItems.findIndex((i: any) => i.id === overId);
+
+            let newIndex;
+            if (items[overId as string]) {
+                // We're hovering over a column container (empty column case)
+                newIndex = overItems.length + 1;
+            } else {
+                const isBelowOverItem =
+                    over &&
+                    active.rect.current.translated &&
+                    active.rect.current.translated.top >
+                    over.rect.top + over.rect.height;
+
+                const modifier = isBelowOverItem ? 1 : 0;
+                newIndex = overIndex >= 0 ? overIndex + modifier : overItems.length + 1;
+            }
+
+            return {
+                ...prev,
+                [activeContainer]: [
+                    ...prev[activeContainer].filter((item: any) => item.id !== active.id),
+                ],
+                [overContainer]: [
+                    ...prev[overContainer].slice(0, newIndex),
+                    activeItems[activeIndex],
+                    ...prev[overContainer].slice(newIndex, prev[overContainer].length),
+                ],
+            };
+        });
+    }
+
+    function handleDragEnd(event: DragEndEvent) {
+        const { active, over } = event;
+        const activeContainer = findContainer(active.id as string);
+        const overContainer = over ? findContainer(over.id as string) : null;
+
+        if (activeContainer && overContainer) {
+            // Persist change
+            const stageMap: Record<string, string> = {
+                new: "New",
+                qualified: "Qualified",
+                discovery: "Discovery Call",
+                proposal: "Proposal Sent",
+                negotiation: "Negotiation",
+                won: "Closed Won",
+                lost: "Closed Lost"
+            };
+
+            const backendStage = overContainer in stageMap ? stageMap[overContainer] : stageMap[overContainer.toLowerCase()] || overContainer;
+            // Find correct standard case
+            const standardStage = STAGES.find(s => s.id.toLowerCase() === backendStage.toLowerCase())?.id || backendStage;
+
+            updateLeadStage(active.id as string, standardStage);
+        }
+
+        setActiveId(null);
+    }
+
+    const getActiveItem = () => {
+        for (const key of Object.keys(items)) {
+            const item = items[key].find((i: any) => i.id === activeId);
+            if (item) return item;
+        }
+        return null;
+    };
+
+    const handleCardClick = (id: string) => {
+        setSelectedLeadId(id);
+    }
+
     return (
-        <div className="glass-panel w-full overflow-hidden">
-            <div className="mb-6 flex items-center justify-between px-1">
-                <div>
-                    <h2 className="text-xl font-semibold">Corporate Pipeline</h2>
-                    <p className="text-sm text-muted">Track leads across the full corporate sales cycle.</p>
-                </div>
-                <button className="btn-primary flex items-center gap-2 text-sm shadow-lg hover:shadow-xl">
-                    <Plus size={16} />
-                    <span>New Lead</span>
-                </button>
-            </div>
-
-            <div className="flex gap-4 overflow-x-auto pb-4">
-                {stages.map((stage) => (
-                    <div key={stage.id} className="min-w-[280px] flex-shrink-0">
-                        <div className="mb-3 flex items-center justify-between px-2">
-                            <h3 className="font-medium text-primary">{stage.title}</h3>
-                            <span className="rounded-full bg-emerald-900/5 px-2 py-0.5 text-xs font-semibold text-emerald-800">
-                                {stage.cards.length}
-                            </span>
-                        </div>
-
-                        <div className="flex flex-col gap-3">
-                            {stage.cards.map((card) => (
-                                <div
-                                    key={card.id}
-                                    className="group relative flex cursor-pointer flex-col gap-3 rounded-xl border border-white/40 bg-white/40 p-4 shadow-sm transition-all hover:-translate-y-1 hover:border-emerald-500/20 hover:bg-white/60 hover:shadow-md"
-                                >
-                                    <div className="flex items-start justify-between">
-                                        <p className="font-bold text-primary">{card.companyName}</p>
-                                        <span className="rounded-md bg-emerald-100/50 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-emerald-800">
-                                            {card.offerType}
-                                        </span>
-                                    </div>
-
-                                    <div>
-                                        <p className="text-sm text-muted">{card.contactName}</p>
-                                        <p className="text-sm font-semibold text-emerald-700">{card.value}</p>
-                                    </div>
-
-                                    <div className="border-t border-emerald-900/5 pt-2">
-                                        <p className="text-xs text-muted">Let's {card.nextAction.toLowerCase()}</p>
-                                        <p className="mt-1 text-[10px] text-muted opacity-60">Updated {card.lastUpdated}</p>
-                                    </div>
-                                </div>
-                            ))}
-
-                            {stage.cards.length === 0 && (
-                                <div className="flex h-32 items-center justify-center rounded-xl border border-dashed border-emerald-900/10 bg-black/[0.02]">
-                                    <p className="text-xs text-muted opacity-50">No leads</p>
-                                </div>
-                            )}
-                        </div>
+        <DndContext
+            sensors={sensors}
+            collisionDetection={closestCorners}
+            onDragStart={handleDragStart}
+            onDragOver={handleDragOver}
+            onDragEnd={handleDragEnd}
+        >
+            <div className="glass-panel w-full overflow-hidden flex flex-col h-[600px]">
+                <div className="mb-4 flex flex-shrink-0 items-center justify-between px-1">
+                    <div>
+                        <h2 className="text-xl font-semibold">Corporate Pipeline</h2>
+                        <p className="text-sm text-muted">
+                            Track leads across the full corporate sales cycle.
+                        </p>
                     </div>
-                ))}
+                    <button
+                        onClick={() => setIsCreateOpen(true)}
+                        className="btn-primary flex items-center gap-2 text-sm shadow-lg hover:shadow-xl"
+                    >
+                        <Plus size={16} />
+                        <span>New Lead</span>
+                    </button>
+                </div>
+
+                <div className="flex h-full gap-4 overflow-x-auto pb-4">
+                    {STAGES.map((stage) => {
+                        const containerId = stage.id === "New Inquiry" ? "new"
+                            : stage.id.toLowerCase().replace(' ', ''); // rudimentary mapping matching 'getCorporatePipeline' keys
+                        // Ensure keys match what comes from actions.ts: new, qualified, discovery, proposal, negotiation, won, lost
+                        let dataKey = "new";
+                        if (stage.id === "New") dataKey = "new";
+                        if (stage.id === "Qualified") dataKey = "qualified";
+                        if (stage.id === "Discovery Call") dataKey = "discovery";
+                        if (stage.id === "Proposal Sent") dataKey = "proposal";
+                        if (stage.id === "Negotiation") dataKey = "negotiation";
+                        if (stage.id === "Closed Won") dataKey = "won";
+                        if (stage.id === "Closed Lost") dataKey = "lost";
+
+                        return (
+                            <PipelineStageColumn
+                                key={dataKey}
+                                id={dataKey}
+                                title={stage.title}
+                                items={items[dataKey] || []}
+                                onCardClick={handleCardClick}
+                            />
+                        )
+                    })}
+                </div>
+
+                {createPortal(
+                    <DragOverlay>
+                        {activeId ? <PipelineCardItem lead={getActiveItem()} /> : null}
+                    </DragOverlay>,
+                    document.body
+                )}
             </div>
-        </div>
+
+            <CreateCorporateLeadDialog
+                open={isCreateOpen}
+                onOpenChange={setIsCreateOpen}
+            />
+
+            {selectedLeadId && (
+                <CompanyProfileDialog
+                    leadId={selectedLeadId}
+                    open={!!selectedLeadId}
+                    onOpenChange={(open) => !open && setSelectedLeadId(null)}
+                />
+            )}
+        </DndContext>
     );
 }

@@ -59,6 +59,13 @@ model Lead {
   channel        String?
   stage          String?  @default("New")
   owner          String?
+  companyName    String?
+  pocName        String?
+  pocEmail       String?
+  employeeCount  Int?
+  contractDuration String?
+  activities     Json?
+  isCorporate    Boolean  @default(false)
   nextStep       String?
   valueMinor     Int?
   membershipName String?
