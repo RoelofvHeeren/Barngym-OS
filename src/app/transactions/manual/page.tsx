@@ -67,8 +67,7 @@ function extractContactHint(metadata?: unknown) {
   return { email, phone };
 }
 
-return { email, phone };
-}
+
 
 const getDisplayName = (item: QueueItem) => {
   if (item.transaction?.provider?.toLowerCase() === "starling") {
