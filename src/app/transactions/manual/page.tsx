@@ -75,6 +75,7 @@ export default function ManualMatchPage() {
   const [creating, setCreating] = useState<Record<string, boolean>>({});
   const [leads, setLeads] = useState<LeadOption[]>([]);
   const [sourceFilter, setSourceFilter] = useState<string>("All");
+  const [sortBy, setSortBy] = useState<"date-desc" | "date-asc" | "amount-desc" | "amount-asc">("date-desc");
   const [createPayload, setCreatePayload] = useState<{
     queueId: string | null;
     email: string;
@@ -203,11 +204,33 @@ export default function ManualMatchPage() {
 
   const filteredQueue = useMemo(
     () =>
-      queue.filter((item) => {
-        if (sourceFilter === "All") return true;
-        return (item.transaction?.provider || "").toLowerCase().includes(sourceFilter.toLowerCase());
-      }),
-    [queue, sourceFilter]
+      queue
+        .filter((item) => {
+          if (sourceFilter === "All") return true;
+          return (item.transaction?.provider || "").toLowerCase().includes(sourceFilter.toLowerCase());
+        })
+        .sort((a, b) => {
+          if (sortBy === "date-desc") {
+            return (
+              new Date(b.transaction?.occurredAt ?? 0).getTime() -
+              new Date(a.transaction?.occurredAt ?? 0).getTime()
+            );
+          }
+          if (sortBy === "date-asc") {
+            return (
+              new Date(a.transaction?.occurredAt ?? 0).getTime() -
+              new Date(b.transaction?.occurredAt ?? 0).getTime()
+            );
+          }
+          if (sortBy === "amount-desc") {
+            return (b.transaction?.amountMinor ?? 0) - (a.transaction?.amountMinor ?? 0);
+          }
+          if (sortBy === "amount-asc") {
+            return (a.transaction?.amountMinor ?? 0) - (b.transaction?.amountMinor ?? 0);
+          }
+          return 0;
+        }),
+    [queue, sourceFilter, sortBy]
   );
 
   const floatingBar =
@@ -280,6 +303,19 @@ export default function ManualMatchPage() {
               <option value="Starling">Starling</option>
             </select>
             <span className="text-muted text-sm">Remaining: {filteredQueue.length}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-muted text-xs uppercase tracking-[0.2em]">Sort</span>
+            <select
+              className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-primary"
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as any)}
+            >
+              <option value="date-desc">Recent to Oldest</option>
+              <option value="date-asc">Oldest to Recent</option>
+              <option value="amount-desc">Highest Amount</option>
+              <option value="amount-asc">Lowest Amount</option>
+            </select>
           </div>
           <button
             className="rounded-full bg-black px-4 py-2 text-xs font-semibold text-white"
