@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 const leadStages = ["All", "New", "Follow Up", "Proposal", "Won", "Lost"] as const;
@@ -378,7 +378,7 @@ function normalizeApiLead(lead: ApiLead): NormalizedLead {
 }
 
 // Duplicate type removed
-export default function PeoplePage() {
+function PeopleContent() {
   const [search, setSearch] = useState("");
   const [leadFilter, setLeadFilter] = useState<LeadStage>("All");
   const [viewMode, setViewMode] = useState<"all" | "leads" | "members">("all");
@@ -1411,5 +1411,13 @@ export default function PeoplePage() {
       }
 
     </div >
+  );
+}
+
+export default function PeoplePage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-muted">Loading...</div>}>
+      <PeopleContent />
+    </Suspense>
   );
 }
