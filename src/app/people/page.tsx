@@ -765,6 +765,24 @@ export default function PeoplePage() {
     }
   };
 
+  const handleDelete = async () => {
+    if (!selectedLeadId) return;
+    if (!confirm("Are you sure you want to delete this contact? This will remove all their data permanently.")) return;
+
+    try {
+      const response = await fetch(`/api/people/${selectedLeadId}`, { method: "DELETE" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message);
+
+      // Optimistic update
+      setImportedLeads(prev => prev.filter(l => l.id !== selectedLeadId));
+      setModalOpen(false);
+      setSelectedLeadId(null);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to delete");
+    }
+  };
+
   return (
     <div className="flex flex-col gap-8 text-primary">
       <section className="glass-panel space-y-6">
@@ -1210,13 +1228,22 @@ export default function PeoplePage() {
                     )}
                   </div>
                 </div>
-                <button
-                  type="button"
-                  className="chip text-xs"
-                  onClick={() => setModalOpen(false)}
-                >
-                  Close
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    className="chip text-xs !bg-red-500/10 !text-red-500 hover:!bg-red-500/20"
+                    onClick={handleDelete}
+                  >
+                    Delete
+                  </button>
+                  <button
+                    type="button"
+                    className="chip text-xs"
+                    onClick={() => setModalOpen(false)}
+                  >
+                    Close
+                  </button>
+                </div>
               </div>
               <div className="mt-5 space-y-3 text-sm text-muted">
                 <p>Phone · {selectedLeadProfile.phone}</p>
