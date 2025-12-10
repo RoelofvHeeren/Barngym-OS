@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useCallback, useEffect, useMemo, useState, Suspense } from "react";
+import { createPortal } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
 
 const leadStages = ["All", "New", "Follow Up", "Proposal", "Won", "Lost"] as const;
@@ -410,6 +411,11 @@ function PeopleContent() {
   const [leadError, setLeadError] = useState<string | null>(null);
   const [newTag, setNewTag] = useState("");
   const [tagLoading, setTagLoading] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const loadImportedLeads = useCallback(async () => {
     setLoadingLeads(true);
@@ -1225,7 +1231,7 @@ function PeopleContent() {
       </section>
 
       {
-        modalOpen && selectedLeadProfile && (
+        modalOpen && selectedLeadProfile && mounted && createPortal(
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-8">
             <div className="glass-panel max-h-[90vh] w-full max-w-4xl overflow-y-auto">
               <div className="flex items-center justify-between">
@@ -1406,7 +1412,8 @@ function PeopleContent() {
                 </div>
               </div>
             </div>
-          </div>
+          </div>,
+          document.body
         )
       }
 

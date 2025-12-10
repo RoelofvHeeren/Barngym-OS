@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
+import { createPortal } from "react-dom";
 
 type LeadOption = {
     id: string;
@@ -23,6 +24,11 @@ export default function AddTransactionModal({ isOpen, onClose, onSuccess }: Prop
     const [notes, setNotes] = useState("");
     const [loading, setLoading] = useState(false);
     const [submitting, setSubmitting] = useState(false);
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
 
     // Existing client search
     const [leads, setLeads] = useState<LeadOption[]>([]);
@@ -107,9 +113,9 @@ export default function AddTransactionModal({ isOpen, onClose, onSuccess }: Prop
         onClose();
     };
 
-    if (!isOpen) return null;
+    if (!isOpen || !mounted) return null;
 
-    return (
+    return createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
             <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-white/10 bg-[#0A0A0A] shadow-2xl">
                 <div className="p-6">
@@ -156,8 +162,8 @@ export default function AddTransactionModal({ isOpen, onClose, onSuccess }: Prop
                                     type="button"
                                     onClick={() => setMode("existing")}
                                     className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${mode === "existing"
-                                            ? "bg-white/10 text-white shadow-sm"
-                                            : "text-neutral-400 hover:text-white"
+                                        ? "bg-white/10 text-white shadow-sm"
+                                        : "text-neutral-400 hover:text-white"
                                         }`}
                                 >
                                     Existing Client
@@ -166,8 +172,8 @@ export default function AddTransactionModal({ isOpen, onClose, onSuccess }: Prop
                                     type="button"
                                     onClick={() => setMode("new")}
                                     className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${mode === "new"
-                                            ? "bg-white/10 text-white shadow-sm"
-                                            : "text-neutral-400 hover:text-white"
+                                        ? "bg-white/10 text-white shadow-sm"
+                                        : "text-neutral-400 hover:text-white"
                                         }`}
                                 >
                                     New Client
@@ -196,8 +202,8 @@ export default function AddTransactionModal({ isOpen, onClose, onSuccess }: Prop
                                                 type="button"
                                                 onClick={() => setSelectedLeadId(lead.id)}
                                                 className={`w-full px-3 py-2 text-left text-sm transition hover:bg-white/5 ${selectedLeadId === lead.id
-                                                        ? "bg-emerald-500/20 text-emerald-200"
-                                                        : "text-neutral-300"
+                                                    ? "bg-emerald-500/20 text-emerald-200"
+                                                    : "text-neutral-300"
                                                     }`}
                                             >
                                                 <div className="font-medium">{lead.fullName || "Unnamed"}</div>
@@ -268,6 +274,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSuccess }: Prop
                     </form>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }

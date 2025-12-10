@@ -1,6 +1,7 @@
 'use client';
 
 import { Suspense, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 type RangeKey = "today" | "7d" | "30d" | "month" | "all";
@@ -96,6 +97,16 @@ function AdsDashboardContent() {
   });
   const [spendSaving, setSpendSaving] = useState(false);
   const [spendMessage, setSpendMessage] = useState<string | null>(null);
+
+  const [modalOpen, setModalOpen] = useState(false);
+  const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
+  const [profileData, setProfileData] = useState<any>(null);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const updateRange = (next: RangeKey | "custom") => {
     setRange(next);
@@ -215,6 +226,25 @@ function AdsDashboardContent() {
         (lead.email ?? "").toLowerCase().includes(term)
     );
   }, [leadSearch, leads]);
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      if (!selectedContactId) return;
+      setProfileLoading(true);
+      try {
+        const response = await fetch(`/api/people/${selectedContactId}`);
+        const data = await response.json();
+        if (data.ok) {
+          setProfileData(data.data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch profile:', error);
+      } finally {
+        setProfileLoading(false);
+      }
+    };
+    fetchProfile();
+  }, [selectedContactId]);
 
   const handleSpendSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -412,7 +442,8 @@ function AdsDashboardContent() {
                     className="group hover:bg-emerald-50/50 transition-colors cursor-pointer"
                     onClick={() => {
                       const targetId = lead.linkedContactId || lead.id;
-                      router.push(`/people?id=${targetId}`);
+                      setSelectedContactId(targetId);
+                      setModalOpen(true);
                     }}
                   >
                     <td className="py-3 pr-4 pl-2">
@@ -476,7 +507,8 @@ function AdsDashboardContent() {
                             className="text-xs font-medium text-emerald-600 hover:text-emerald-800"
                             onClick={(e) => {
                               e.stopPropagation();
-                              router.push(`/people?id=${lead.linkedContactId}`);
+                              setSelectedContactId(lead.linkedContactId!);
+                              setModalOpen(true);
                             }}
                           >
                             View
@@ -610,6 +642,121 @@ function AdsDashboardContent() {
           </form>
         </div>
       </div>
+
+      {modalOpen && profileData && mounted && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-8">
+          <div className="glass-panel max-h-[90vh] w-full max-w-4xl overflow-y-auto">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-[0.35em] text-muted">
+                  Contact Profile
+                </p>
+                <h3 className="mt-2 text-2xl font-semibold">{profileData.name || 'Unknown'}</h3>
+                <p className="text-sm text-muted">{profileData.title || 'Contact'}</p>
+                {profileData.status && (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <span
+                      className={`chip text-xs ${profileData.statusTone === "client"
+                        ? "!bg-emerald-100 !text-emerald-800 !border-emerald-200"
+                        : "!bg-amber-100 !text-amber-800 !border-amber-200"
+                        }`}
+                    >
+                      {profileData.status}
+                    </span>
+                    {profileData.source && (
+                      <span className="chip text-xs !bg-white/80 !text-primary !border-white/40">
+                        Source: {profileData.source}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+              <button
+                type="button"
+                className="chip text-xs"
+                onClick={() => setModalOpen(false)}
+              >
+                Close
+              </button>
+            </div>
+            <div className="mt-5 space-y-3 text-sm text-muted">
+              <p>Phone · {profileData.phone || '—'}</p>
+              <p>Email · {profileData.email || '—'}</p>
+              {profileData.tags && profileData.tags.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {profileData.tags.map((tag: string) => (
+                    <span key={tag} className="chip text-xs">
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                <p className="text-xs uppercase tracking-[0.35em] text-muted">
+                  Lifetime Value
+                </p>
+                <p className="mt-2 text-lg font-semibold">
+                  {profileData.stats?.lifetimeSpend || '€0'}
+                </p>
+              </div>
+              <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                <p className="text-xs uppercase tracking-[0.35em] text-muted">
+                  Membership
+                </p>
+                <p className="mt-2 text-lg font-semibold">
+                  {profileData.stats?.memberships || 'Unassigned'}
+                </p>
+              </div>
+              <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                <p className="text-xs uppercase tracking-[0.35em] text-muted">
+                  Recent Payment
+                </p>
+                <p className="mt-2 text-lg font-semibold">
+                  {profileData.stats?.lastPayment || '—'}
+                </p>
+              </div>
+              <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                <p className="text-xs uppercase tracking-[0.35em] text-muted">
+                  Attendance
+                </p>
+                <p className="mt-2 text-lg font-semibold">
+                  {profileData.stats?.lastAttendance || '—'}
+                </p>
+              </div>
+            </div>
+            {profileData.history && profileData.history.length > 0 && (
+              <div className="mt-4 rounded-3xl border border-white/10 bg-white/5 p-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs uppercase tracking-[0.35em] text-muted">Transaction History</p>
+                  <span className="text-xs text-muted">
+                    Showing {profileData.history.length} records
+                  </span>
+                </div>
+                <div className="mt-3 space-y-2 max-h-72 overflow-y-auto pr-2">
+                  {profileData.history.map((entry: any, idx: number) => (
+                    <div
+                      key={`${entry.timestamp}-${idx}`}
+                      className="rounded-2xl border border-white/10 bg-white/5 p-3"
+                    >
+                      <div className="flex items-center justify-between text-sm text-primary">
+                        <span className="font-semibold">{entry.amount}</span>
+                        <span className="text-muted">{entry.source}</span>
+                      </div>
+                      <div className="text-xs text-muted">
+                        {entry.timestamp} · {entry.product}
+                        {entry.reference ? ` · Ref: ${entry.reference}` : ""}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
