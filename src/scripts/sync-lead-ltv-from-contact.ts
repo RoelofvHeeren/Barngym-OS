@@ -16,7 +16,9 @@ async function syncLeadLtvFromContact() {
             email: true,
             ltvAllCents: true,
             ltvAdsCents: true,
-            source: true
+            source: true,
+            isClient: true,
+            status: true
         }
     });
 
