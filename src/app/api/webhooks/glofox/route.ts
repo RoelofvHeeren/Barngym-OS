@@ -265,6 +265,7 @@ export async function POST(request: Request) {
     // 1. Verify Signature
     const signature = request.headers.get("x-glofox-signature");
     if (secret?.webhookSalt && !verifySignature(rawBody, signature, secret.webhookSalt)) {
+      console.error("Glofox webhook signature verification failed");
       return NextResponse.json({ ok: false, message: "Invalid Glofox signature." }, { status: 401 });
     }
 
@@ -275,17 +276,20 @@ export async function POST(request: Request) {
     const payload = JSON.parse(rawBody) as any;
     const eventType = (payload.Type || payload.type || "").toString().toUpperCase();
 
-    // 2. Logging
+    // 2. Comprehensive Logging - Log ALL incoming webhooks
+    console.log(`[Glofox Webhook] Received event: ${eventType}`);
+    console.log(`[Glofox Webhook] Payload preview:`, JSON.stringify(payload).slice(0, 500));
+
     await prisma.syncLog.create({
       data: {
         source: "Glofox",
-        detail: `Processed ${eventType}`,
+        detail: `Webhook received: ${eventType || "UNKNOWN"}`,
         records: rawBody.slice(0, 1000),
       },
     });
 
     if (!eventType) {
-      // Fallback or ignore
+      console.warn("[Glofox Webhook] No event type found in payload");
       return NextResponse.json({ ok: true, message: "No event type" });
     }
 
@@ -300,9 +304,10 @@ export async function POST(request: Request) {
       await handleBookingEvent(eventType, payload);
     } else if (eventType.includes("ACCESS") || eventType.includes("EVENT") || eventType.includes("SERVICE")) {
       // Ignore for now
+      console.log(`[Glofox Webhook] Ignoring event type: ${eventType}`);
     } else {
       // Unknown or Legacy event - Try to extract payments using fallback logic
-      // This ensures we didn't break existing payment extraction for generic payloads
+      console.log(`[Glofox Webhook] Unknown event type: ${eventType}, attempting fallback payment extraction`);
       const payments = extractPayments(payload).filter(Boolean);
       if (payments.length > 0) {
         try {
@@ -310,19 +315,53 @@ export async function POST(request: Request) {
             mapGlofoxPayment(payment as any)
           );
           await upsertTransactions(normalized);
-          console.log(`Fallback processed ${normalized.length} payments`);
+          console.log(`[Glofox Webhook] Fallback processed ${normalized.length} payments`);
+
+          // Log success
+          await prisma.syncLog.create({
+            data: {
+              source: "Glofox",
+              detail: `Processed ${normalized.length} payment(s) from ${eventType}`,
+              records: normalized.length.toString(),
+            },
+          });
         } catch (err) {
-          console.error("Fallback payment processing failed", err);
+          console.error("[Glofox Webhook] Fallback payment processing failed", err);
+          await prisma.syncLog.create({
+            data: {
+              source: "Glofox",
+              detail: `Failed to process payments from ${eventType}`,
+              errors: err instanceof Error ? err.message : "Unknown error",
+            },
+          });
         }
       } else {
-        console.log("Unknown Glofox event type and no payments found:", eventType);
+        console.log(`[Glofox Webhook] Unknown event type and no payments found: ${eventType}`);
+        await prisma.syncLog.create({
+          data: {
+            source: "Glofox",
+            detail: `Unknown event type: ${eventType} (no payments extracted)`,
+            records: rawBody.slice(0, 500),
+          },
+        });
       }
     }
 
     return NextResponse.json({ ok: true });
 
   } catch (error) {
-    console.error("Glofox webhook failed", error, rawBody ? rawBody.slice(0, 100) : "<empty>");
+    console.error("[Glofox Webhook] Error:", error, rawBody ? rawBody.slice(0, 100) : "<empty>");
+
+    // Log error to database
+    await prisma.syncLog.create({
+      data: {
+        source: "Glofox",
+        detail: "Webhook processing failed",
+        errors: error instanceof Error ? error.message : "Unknown error",
+        records: rawBody?.slice(0, 500),
+      },
+    }).catch(e => console.error("Failed to log error to database:", e));
+
     return NextResponse.json(
       { ok: false, message: error instanceof Error ? error.message : "Glofox webhook failed." },
       { status: 500 }
