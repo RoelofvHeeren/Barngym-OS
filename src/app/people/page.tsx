@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
 const leadStages = ["All", "New", "Follow Up", "Proposal", "Won", "Lost"] as const;
 type LeadStage = (typeof leadStages)[number];
@@ -449,6 +450,30 @@ export default function PeoplePage() {
   useEffect(() => {
     loadImportedLeads();
   }, [loadImportedLeads]);
+
+  const searchParams = useSearchParams();
+  const initialId = searchParams.get("id");
+
+  useEffect(() => {
+    if (initialId && importedLeads.length > 0) {
+      const found = importedLeads.find(l => l.id === initialId || l.id === `lead_${initialId}` || l.id === initialId);
+      // ID might be exact match.
+      if (found) {
+        setSelectedLeadId(found.id);
+        setModalOpen(true);
+      } else {
+        // Fallback: Check if it's a contact ID needing mapping? 
+        // The API might return leads with Contact ID as generic ID if normalized?
+        // normalizeApiLead uses `lead.externalId ?? lead.id`. 
+        // Let's assume ID matches.
+        const match = importedLeads.find(l => l.id === initialId);
+        if (match) {
+          setSelectedLeadId(match.id);
+          setModalOpen(true);
+        }
+      }
+    }
+  }, [initialId, importedLeads]);
 
   const allLeads = useMemo(() => importedLeads, [importedLeads]);
 

@@ -409,13 +409,10 @@ function AdsDashboardContent() {
                 filteredLeads.map((lead) => (
                   <tr
                     key={lead.id}
-                    className={`group hover:bg-emerald-50/50 transition-colors ${lead.linkedContactId ? "cursor-pointer" : ""
-                      }`}
+                    className="group hover:bg-emerald-50/50 transition-colors cursor-pointer"
                     onClick={() => {
-                      // Only navigate if clicking row, buttons can override
-                      if (lead.linkedContactId) {
-                        router.push(`/people?id=${lead.linkedContactId}`);
-                      }
+                      const targetId = lead.linkedContactId || lead.id;
+                      router.push(`/people?id=${targetId}`);
                     }}
                   >
                     <td className="py-3 pr-4 pl-2">
