@@ -59,7 +59,6 @@ async function main() {
     const result = await upsertTransactions(normalized);
 
     console.log(`✅ Successfully imported ${result.added} new transactions (total: ${result.total})`);
-    console.log(`ℹ️  Skipped ${result.skipped} duplicate transactions`);
 
     // Log which leads should now be promoted to clients
     console.log('\n📊 Checking lead status updates...');
