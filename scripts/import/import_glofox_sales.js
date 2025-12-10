@@ -69,7 +69,7 @@ async function main() {
   const base = path.resolve(__dirname, "../../../Barn Gym Transaction : Member Data");
   const files = fs
     .readdirSync(base)
-    .filter((f) => f.startsWith("Gross Sales") && f.endsWith(".csv"))
+    .filter((f) => (f.startsWith("Gross Sales") || f.startsWith("Glofox")) && f.endsWith(".csv"))
     .map((f) => path.join(base, f));
 
   let imported = 0;
@@ -80,104 +80,104 @@ async function main() {
     const rows = parse(fs.readFileSync(file, "utf8"), { columns: true, skip_empty_lines: true, trim: true });
     for (const row of rows) {
       try {
-      const transactionId = getField(row, ["Transaction Id", "Transaction ID", "transaction_id"]) ??
-        crypto.createHash("sha1").update(JSON.stringify(row)).digest("hex").slice(0, 10);
-      const transactionUid = `glofox_sale:${transactionId}`;
-      const grossAmount = toNumber(row["Gross sale"] ?? row["Gross Sale"]);
-      const netAmount = toNumber(row["Net sale"] ?? row["Net Sale"]);
-      const feeAmount = grossAmount && netAmount ? grossAmount - netAmount : 0;
-      const amountMinor = Math.round(netAmount * 100);
+        const transactionId = getField(row, ["Transaction Id", "Transaction ID", "transaction_id"]) ??
+          crypto.createHash("sha1").update(JSON.stringify(row)).digest("hex").slice(0, 10);
+        const transactionUid = `glofox_sale:${transactionId}`;
+        const grossAmount = toNumber(row["Gross sale"] ?? row["Gross Sale"]);
+        const netAmount = toNumber(row["Net sale"] ?? row["Net Sale"]);
+        const feeAmount = grossAmount && netAmount ? grossAmount - netAmount : 0;
+        const amountMinor = Math.round(netAmount * 100);
 
-      const memberId = getField(row, ["Member ID", "member_id"]);
-      const email = normalizeEmail(getField(row, ["Email", "Customer Email"]));
-      const phone = normalizePhone(getField(row, ["Phone", "Customer Phone"]));
-      const fullName = getField(row, ["Customer Name", "customer_name", "Full name", "Full Name"]);
+        const memberId = getField(row, ["Member ID", "member_id"]);
+        const email = normalizeEmail(getField(row, ["Email", "Customer Email"]));
+        const phone = normalizePhone(getField(row, ["Phone", "Customer Phone"]));
+        const fullName = getField(row, ["Customer Name", "customer_name", "Full name", "Full Name"]);
 
-      const match = await matchTransactionToMember({
-        email,
-        phone,
-        fullName,
-        glofoxMemberId: memberId ?? undefined,
-      });
+        const match = await matchTransactionToMember({
+          email,
+          phone,
+          fullName,
+          glofoxMemberId: memberId ?? undefined,
+        });
 
-      const data = {
-        provider: "Glofox",
-        externalId: transactionUid,
-        transactionUid,
-        transactionType: "payment",
-        amountMinor,
-        currency: (row["Currency"] || "GBP").toUpperCase(),
-        occurredAt: new Date(
-          toIso(
-            row["Transaction time"] ||
+        const data = {
+          provider: "Glofox",
+          externalId: transactionUid,
+          transactionUid,
+          transactionType: "payment",
+          amountMinor,
+          currency: (row["Currency"] || "GBP").toUpperCase(),
+          occurredAt: new Date(
+            toIso(
+              row["Transaction time"] ||
               row["transaction_time"] ||
               row["Completed at"] ||
               row["Created at"] ||
               row["created_at"]
-          )
-        ),
-        personName: fullName || email || phone || null,
-        productType: inferProductType(row),
-        status: (row["Order status"] || row["Status"] || "completed").toString(),
-        confidence: match.kind === "single_confident" ? "Matched" : "Needs Review",
-        description:
-          row["Product description"] ||
-          row["Product Name"] ||
-          row["Description"] ||
-          row["Service name"],
-        reference: getField(row, ["Order note", "Reference", "Transaction Id", "Invoice Id"]),
-        metadata: {
-          paymentMethod: row["Payment method"],
-          serviceType: row["Service type"],
-          revenueStream: row["Revenue stream type"],
-          raw: row,
-        },
-        grossAmount,
-        netAmount,
-        feeAmount,
-        membershipPlan: row["Membership Name"],
-        glofoxSaleId: transactionId,
-        leadId: null,
-        sourceFile: path.basename(file),
-      };
-
-      if (match.kind === "single_confident") {
-        data.leadId = match.memberId;
-        matched++;
-      }
-
-      const tx = await getPrisma().transaction.upsert({
-        where: { externalId: transactionUid },
-        update: data,
-        create: data,
-      });
-
-      if (match.kind === "multiple_candidates") {
-        manual++;
-        await getPrisma().manualMatchQueue.create({
-          data: {
-            transactionId: tx.id,
-            reason: "ambiguous_match",
-            suggestedMemberIds: match.candidateMemberIds,
+            )
+          ),
+          personName: fullName || email || phone || null,
+          productType: inferProductType(row),
+          status: (row["Order status"] || row["Status"] || "completed").toString(),
+          confidence: match.kind === "single_confident" ? "Matched" : "Needs Review",
+          description:
+            row["Product description"] ||
+            row["Product Name"] ||
+            row["Description"] ||
+            row["Service name"],
+          reference: getField(row, ["Order note", "Reference", "Transaction Id", "Invoice Id"]),
+          metadata: {
+            paymentMethod: row["Payment method"],
+            serviceType: row["Service type"],
+            revenueStream: row["Revenue stream type"],
+            raw: row,
           },
-        });
-      } else if (match.kind === "no_match") {
-        manual++;
-        await getPrisma().manualMatchQueue.create({
-          data: {
-            transactionId: tx.id,
-            reason: "no_match",
-            suggestedMemberIds: [],
-          },
-        });
-      }
+          grossAmount,
+          netAmount,
+          feeAmount,
+          membershipPlan: row["Membership Name"],
+          glofoxSaleId: transactionId,
+          leadId: null,
+          sourceFile: path.basename(file),
+        };
 
-      imported++;
-      if (imported % 100 === 0) {
-        console.log(
-          `[Glofox Sales] progress: ${imported} rows processed (matched ${matched}, manual ${manual})`
-        );
-      }
+        if (match.kind === "single_confident") {
+          data.leadId = match.memberId;
+          matched++;
+        }
+
+        const tx = await getPrisma().transaction.upsert({
+          where: { externalId: transactionUid },
+          update: data,
+          create: data,
+        });
+
+        if (match.kind === "multiple_candidates") {
+          manual++;
+          await getPrisma().manualMatchQueue.create({
+            data: {
+              transactionId: tx.id,
+              reason: "ambiguous_match",
+              suggestedMemberIds: match.candidateMemberIds,
+            },
+          });
+        } else if (match.kind === "no_match") {
+          manual++;
+          await getPrisma().manualMatchQueue.create({
+            data: {
+              transactionId: tx.id,
+              reason: "no_match",
+              suggestedMemberIds: [],
+            },
+          });
+        }
+
+        imported++;
+        if (imported % 100 === 0) {
+          console.log(
+            `[Glofox Sales] progress: ${imported} rows processed (matched ${matched}, manual ${manual})`
+          );
+        }
       } catch (error) {
         if (error.code === "P1017") {
           console.log("[Glofox Sales] Connection dropped. Resetting Prisma and continuing...");
