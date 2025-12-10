@@ -7,7 +7,12 @@ async function main() {
     const leads = await prisma.lead.findMany({
         include: {
             transactions: {
-                where: { status: 'completed' }
+                where: {
+                    status: {
+                        in: ['Completed', 'completed', 'succeeded', 'paid', 'SETTLED'],
+                        mode: 'insensitive'
+                    }
+                }
             }
         }
     });
