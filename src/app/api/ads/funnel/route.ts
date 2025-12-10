@@ -49,15 +49,37 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const rangeParam = searchParams.get("range") ?? "30d";
-    const { start, end } = parseRange(rangeParam);
-    const dateFilter = buildDateFilter(start, end);
+
+    let start: Date | null = null;
+    let end: Date = new Date();
+
+    if (rangeParam === "custom") {
+      const startParam = searchParams.get("start");
+      const endParam = searchParams.get("end");
+      if (startParam) start = new Date(startParam);
+      if (endParam) end = new Date(endParam);
+      if (endParam && endParam.length <= 10) {
+        end.setHours(23, 59, 59, 999);
+      }
+    } else {
+      const parsed = parseRange(rangeParam);
+      start = parsed.start;
+      end = parsed.end;
+    }
+
+    const dateFilter = start ? { gte: start, lte: end } : { lte: end };
+
+    const whereCondition = {
+      ...isAdsLeadFilter,
+      OR: [
+        { submissionDate: dateFilter },
+        { submissionDate: null, createdAt: dateFilter },
+      ],
+    };
 
     const [leadsCount, conversionEvents] = await Promise.all([
       prisma.lead.count({
-        where: {
-          ...isAdsLeadFilter,
-          createdAt: start ? { gte: start, lte: end } : { lte: end },
-        },
+        where: whereCondition,
       }),
       prisma.leadEvent.count({
         where: {

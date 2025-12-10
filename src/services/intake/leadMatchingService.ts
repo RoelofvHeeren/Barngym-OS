@@ -120,6 +120,7 @@ export async function matchPaymentToLead(
       data: {
         leadId: lead.id,
         eventType: "client_conversion",
+        createdAt: payment.timestamp,
         payload: {
           paymentId: payment.id,
           amountCents: payment.amountCents,

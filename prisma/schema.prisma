@@ -20,72 +20,73 @@ enum LeadStatus {
 }
 
 model ConnectionSecret {
-  id             String   @id @default(cuid())
-  provider       String   @unique
+  id             String    @id @default(cuid())
+  provider       String    @unique
   secret         Json?
   webhookSecret  String?
   status         String?
   accountId      String?
   lastVerifiedAt DateTime?
   metadata       Json?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 }
 
 model Lead {
-  id             String   @id @default(cuid())
-  externalId     String?  @unique
-  glofoxMemberId String?  @unique
-  stripeCustomerId String?
-  ghlContactId   String?  @unique
-  fullName       String?
-  firstName      String?
-  lastName       String?
-  email          String?
-  phone          String?
-  goal           String?
-  status         LeadStatus?
-  source         String?
-  isClient       Boolean  @default(false)
-  gender         String?
-  dateOfBirth    DateTime?
-  street         String?
-  city           String?
-  state          String?
-  country        String?
-  zipCode        String?
-  primaryMembershipPlan String?
-  tags           Json?
-  channel        String?
-  stage          String?  @default("New")
-  owner          String?
-  companyName    String?
-  pocName        String?
-  pocEmail       String?
-  employeeCount  Int?
-  contractDuration String?
-  activities     Json?
-  isCorporate    Boolean  @default(false)
-  nextStep       String?
-  valueMinor     Int?
-  membershipName String?
-  metadata       Json?
-  ltvAllCents          Int @default(0)
-  ltvAdsCents          Int @default(0)
-  ltvPTCents           Int @default(0)
-  ltvClassesCents      Int @default(0)
-  ltvSixWeekCents      Int @default(0)
-  ltvOnlineCoachingCents Int @default(0)
-  ltvCommunityCents    Int @default(0)
-  ltvCorporateCents    Int @default(0)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  transactions   Transaction[]
-  payments       Payment[]
-  adsRevenue     AdsRevenue[]
-  counterpartyMappings CounterpartyMapping[]
-  leadTracking   LeadTracking[]
-  leadEvents     LeadEvent[]
+  id                     String                @id @default(cuid())
+  externalId             String?               @unique
+  glofoxMemberId         String?               @unique
+  stripeCustomerId       String?
+  ghlContactId           String?               @unique
+  fullName               String?
+  firstName              String?
+  lastName               String?
+  email                  String?
+  phone                  String?
+  goal                   String?
+  status                 LeadStatus?
+  source                 String?
+  isClient               Boolean               @default(false)
+  gender                 String?
+  dateOfBirth            DateTime?
+  street                 String?
+  city                   String?
+  state                  String?
+  country                String?
+  zipCode                String?
+  primaryMembershipPlan  String?
+  tags                   Json?
+  channel                String?
+  stage                  String?               @default("New")
+  owner                  String?
+  companyName            String?
+  pocName                String?
+  pocEmail               String?
+  employeeCount          Int?
+  contractDuration       String?
+  activities             Json?
+  isCorporate            Boolean               @default(false)
+  nextStep               String?
+  valueMinor             Int?
+  membershipName         String?
+  metadata               Json?
+  ltvAllCents            Int                   @default(0)
+  ltvAdsCents            Int                   @default(0)
+  ltvPTCents             Int                   @default(0)
+  ltvClassesCents        Int                   @default(0)
+  ltvSixWeekCents        Int                   @default(0)
+  ltvOnlineCoachingCents Int                   @default(0)
+  ltvCommunityCents      Int                   @default(0)
+  ltvCorporateCents      Int                   @default(0)
+  submissionDate         DateTime?
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
+  transactions           Transaction[]
+  payments               Payment[]
+  adsRevenue             AdsRevenue[]
+  counterpartyMappings   CounterpartyMapping[]
+  leadTracking           LeadTracking[]
+  leadEvents             LeadEvent[]
 
   @@index([email])
   @@index([phone])
@@ -93,7 +94,7 @@ model Lead {
 }
 
 model Payment {
-  id                String   @id @default(cuid())
+  id                String       @id @default(cuid())
   externalPaymentId String
   amountCents       Int
   currency          String
@@ -103,9 +104,9 @@ model Payment {
   sourceSystem      String
   rawPayload        Json
   leadId            String?
-  lead              Lead?    @relation(fields: [leadId], references: [id])
+  lead              Lead?        @relation(fields: [leadId], references: [id])
   adsRevenue        AdsRevenue[]
-  createdAt         DateTime @default(now())
+  createdAt         DateTime     @default(now())
 
   @@index([externalPaymentId, sourceSystem])
 }
@@ -138,37 +139,37 @@ model AdsSpend {
 }
 
 model MetaAdAccount {
-  id          String            @id
-  name        String?
-  currency    String?
-  timezone    String?
-  insights    MetaDailyInsight[]
-  campaigns   MetaCampaign[]
-  adsets      MetaAdSet[]
-  ads         MetaAd[]
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
+  id        String             @id
+  name      String?
+  currency  String?
+  timezone  String?
+  insights  MetaDailyInsight[]
+  campaigns MetaCampaign[]
+  adsets    MetaAdSet[]
+  ads       MetaAd[]
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
 }
 
 model MetaCampaign {
-  id         String            @id
-  account    MetaAdAccount     @relation(fields: [accountId], references: [id])
-  accountId  String
-  name       String?
-  objective  String?
-  status     String?
-  adsets     MetaAdSet[]
-  ads        MetaAd[]
-  insights   MetaDailyInsight[]
-  createdAt  DateTime          @default(now())
-  updatedAt  DateTime          @updatedAt
+  id        String             @id
+  account   MetaAdAccount      @relation(fields: [accountId], references: [id])
+  accountId String
+  name      String?
+  objective String?
+  status    String?
+  adsets    MetaAdSet[]
+  ads       MetaAd[]
+  insights  MetaDailyInsight[]
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
 }
 
 model MetaAdSet {
-  id               String            @id
-  account          MetaAdAccount     @relation(fields: [accountId], references: [id])
+  id               String             @id
+  account          MetaAdAccount      @relation(fields: [accountId], references: [id])
   accountId        String
-  campaign         MetaCampaign?     @relation(fields: [campaignId], references: [id])
+  campaign         MetaCampaign?      @relation(fields: [campaignId], references: [id])
   campaignId       String?
   name             String?
   status           String?
@@ -178,24 +179,24 @@ model MetaAdSet {
   lifetimeBudget   Int?
   insights         MetaDailyInsight[]
   ads              MetaAd[]
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
 }
 
 model MetaAd {
-  id         String            @id
-  account    MetaAdAccount     @relation(fields: [accountId], references: [id])
-  accountId  String
-  campaign   MetaCampaign?     @relation(fields: [campaignId], references: [id])
-  campaignId String?
-  adset      MetaAdSet?        @relation(fields: [adsetId], references: [id])
-  adsetId    String?
-  name       String?
-  status     String?
+  id           String             @id
+  account      MetaAdAccount      @relation(fields: [accountId], references: [id])
+  accountId    String
+  campaign     MetaCampaign?      @relation(fields: [campaignId], references: [id])
+  campaignId   String?
+  adset        MetaAdSet?         @relation(fields: [adsetId], references: [id])
+  adsetId      String?
+  name         String?
+  status       String?
   creativeName String?
-  insights   MetaDailyInsight[]
-  createdAt  DateTime          @default(now())
-  updatedAt  DateTime          @updatedAt
+  insights     MetaDailyInsight[]
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
 }
 
 model MetaDailyInsight {
@@ -219,11 +220,11 @@ model MetaDailyInsight {
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
+  @@unique([accountId, campaignId, adsetId, adId, date])
   @@index([accountId, date])
   @@index([campaignId, date])
   @@index([adsetId, date])
   @@index([adId, date])
-  @@unique([accountId, campaignId, adsetId, adId, date])
 }
 
 model UnmatchedPayment {
@@ -240,26 +241,26 @@ model UnmatchedPayment {
 }
 
 model Contact {
-  id                String    @id @default(cuid())
+  id                String        @id @default(cuid())
   fullName          String?
   email             String?
   phone             String?
-  status            String    @default("lead")
-  sourceTags        String[]  @default([])
-  segmentTags       String[]  @default([])
-  isActive          Boolean   @default(false)
+  status            String        @default("lead")
+  sourceTags        String[]      @default([])
+  segmentTags       String[]      @default([])
+  isActive          Boolean       @default(false)
   firstSeenAt       DateTime?
   lastPaymentAt     DateTime?
   renewalDate       DateTime?
   membershipType    String?
   membershipEndDate DateTime?
   trainerizeId      String?
-  ltvAllCents          Int @default(0)
-  ltvGlofoxCents       Int @default(0)
-  ltvStripeCents       Int @default(0)
-  ltvStarlingCents     Int @default(0)
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  ltvAllCents       Int           @default(0)
+  ltvGlofoxCents    Int           @default(0)
+  ltvStripeCents    Int           @default(0)
+  ltvStarlingCents  Int           @default(0)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
   transactions      Transaction[]
 
   @@unique([email])
@@ -269,49 +270,48 @@ model Contact {
 model Transaction {
   contactId      String?
   contact        Contact? @relation(fields: [contactId], references: [id])
-  id           String   @id @default(cuid())
-  source       String
-  provider     String
-  externalId   String   @unique
-  transactionUid String? @unique
-  amountMinor  Int
-  currency     String
-  occurredAt   DateTime
-  personName   String?
-  productType  String?
-  status       String
-  confidence   String
-  description  String?
-  reference    String?
-  raw          Json?
-  metadata     Json?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  leadId       String?
-  lead         Lead?    @relation(fields: [leadId], references: [id])
+  id             String   @id @default(cuid())
+  source         String
+  provider       String
+  externalId     String   @unique
+  transactionUid String?  @unique
+  amountMinor    Int
+  currency       String
+  occurredAt     DateTime
+  personName     String?
+  productType    String?
+  status         String
+  confidence     String
+  description    String?
+  reference      String?
+  raw            Json?
+  metadata       Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  leadId         String?
+  lead           Lead?    @relation(fields: [leadId], references: [id])
 
-
-  grossAmount     Float?
-  feeAmount       Float?  @default(0)
-  netAmount       Float?
-  paymentMethod   String?
-  membershipPlan  String?
-  glofoxSaleId    String?
-  stripeChargeId  String?
+  grossAmount        Float?
+  feeAmount          Float?             @default(0)
+  netAmount          Float?
+  paymentMethod      String?
+  membershipPlan     String?
+  glofoxSaleId       String?
+  stripeChargeId     String?
   starlingFeedItemId String?
-  memberUid       String?
-  externalAliases Json?
-  notes           String?
-  sourceFile      String?
-  manualMatches   ManualMatchQueue[]
+  memberUid          String?
+  externalAliases    Json?
+  notes              String?
+  sourceFile         String?
+  manualMatches      ManualMatchQueue[]
 
   @@index([occurredAt])
 }
 
 model RevenueGoal {
   id            String   @id @default(cuid())
-  category      String   // e.g. "Total Revenue", "PT", "Classes", "Online", "Corporate", "Retreats", "Q1", etc.
-  period        String   // "Yearly", "Quarterly", "Monthly"
+  category      String // e.g. "Total Revenue", "PT", "Classes", "Online", "Corporate", "Retreats", "Q1", etc.
+  period        String // "Yearly", "Quarterly", "Monthly"
   targetAmount  Float
   currentAmount Float    @default(0)
   progress      Float    @default(0)
@@ -329,11 +329,11 @@ model SyncLog {
 }
 
 model ManualMatchQueue {
-  id                 String   @id @default(cuid())
+  id                 String    @id @default(cuid())
   transactionId      String
   reason             String
   suggestedMemberIds Json?
-  createdAt          DateTime @default(now())
+  createdAt          DateTime  @default(now())
   resolvedAt         DateTime?
   resolvedBy         String?
 
@@ -397,7 +397,6 @@ model CounterpartyMapping {
 
   lead Lead @relation(fields: [leadId], references: [id])
 
-
   @@unique([provider, key])
 }
 
@@ -416,33 +415,33 @@ model Member {
 }
 
 model Membership {
-  id              String   @id @default(cuid())
-  membershipId    String   @unique
+  id              String    @id @default(cuid())
+  membershipId    String    @unique
   memberId        String
-  member          Member   @relation(fields: [memberId], references: [memberId])
+  member          Member    @relation(fields: [memberId], references: [memberId])
   status          String?
   name            String?
   startDate       DateTime?
   endDate         DateTime?
   price           Float?
   nextPaymentDate DateTime?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
   @@index([memberId])
 }
 
 model Booking {
-  id          String   @id @default(cuid())
-  bookingId   String   @unique
-  memberId    String
-  member      Member   @relation(fields: [memberId], references: [memberId])
-  classType   String?
-  startTime   DateTime?
-  endTime     DateTime?
-  paid        String?   // Store as string "true"/"false" or whatever Glofox sends, or map to boolean
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        String    @id @default(cuid())
+  bookingId String    @unique
+  memberId  String
+  member    Member    @relation(fields: [memberId], references: [memberId])
+  classType String?
+  startTime DateTime?
+  endTime   DateTime?
+  paid      String? // Store as string "true"/"false" or whatever Glofox sends, or map to boolean
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
   @@index([memberId])
 }
@@ -454,4 +453,3 @@ model GlofoxGhlLink {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
-

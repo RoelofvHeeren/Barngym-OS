@@ -191,6 +191,7 @@ export async function processLeadIntake(rawPayload: unknown) {
     tags: tagsJson as Prisma.InputJsonValue,
     metadata: metadataJson as Prisma.InputJsonValue,
     createdAt: normalized.dateCreated ?? undefined,
+    submissionDate: normalized.dateCreated ?? undefined,
   };
 
   let leadId = existing?.id;

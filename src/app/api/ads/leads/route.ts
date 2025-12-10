@@ -51,13 +51,45 @@ export async function GET(request: Request) {
     const rangeParam = searchParams.get("range") ?? "30d";
     const statusParam = (searchParams.get("status") ?? "all").toLowerCase();
     const campaignFilter = searchParams.get("campaignId") ?? null;
-    const { start, end } = parseRange(rangeParam);
-    const dateFilter = buildDateFilter(start, end);
+
+    let start: Date | null = null;
+    let end: Date = new Date();
+
+    if (rangeParam === "custom") {
+      const startParam = searchParams.get("start");
+      const endParam = searchParams.get("end");
+      if (startParam) start = new Date(startParam);
+      if (endParam) end = new Date(endParam);
+      // Ensure end of day for the end date if it looks like just a date string
+      if (endParam && endParam.length <= 10) {
+        end.setHours(23, 59, 59, 999);
+      }
+    } else {
+      const parsed = parseRange(rangeParam);
+      start = parsed.start;
+      end = parsed.end;
+    }
+
+    // Fallback to createdAt if submissionDate is null, OR assume we migrate data. 
+    // For now, let's query such that we check submissionDate first.
+    // However, Prisma doesn't easily support "COALESCE(submissionDate, createdAt)" in 'where' clause without raw query.
+    // We'll filter on `submissionDate` OR `createdAt` conceptually, but easiest is to migrate data.
+    // Assuming migration/backfill happens, we can use `submissionDate`.
+    // But since backfill isn't instant, let's do:
+    // "submissionDate" in range OR ("submissionDate" is null AND "createdAt" in range)
+
+    const dateFilter = start ? { gte: start, lte: end } : { lte: end };
 
     const leads = await prisma.lead.findMany({
       where: {
         ...isAdsLeadFilter,
-        createdAt: start ? { gte: start, lte: end } : { lte: end },
+        OR: [
+          { submissionDate: dateFilter },
+          {
+            submissionDate: null,
+            createdAt: dateFilter
+          }
+        ],
         ...(statusParam === "lead"
           ? { isClient: false }
           : statusParam === "client"
@@ -80,6 +112,7 @@ export async function GET(request: Request) {
         email: true,
         phone: true,
         status: true,
+        submissionDate: true,
         isClient: true,
         createdAt: true,
         ltvAllCents: true,
@@ -156,7 +189,9 @@ export async function GET(request: Request) {
         email: lead.email ?? "",
         phone: lead.phone ?? "",
         status: lead.isClient ? "CLIENT" : "LEAD",
-        createdAt: lead.createdAt,
+        createdAt: lead.submissionDate ?? lead.createdAt,
+        submissionDate: lead.submissionDate,
+        originalCreatedAt: lead.createdAt,
         firstPaymentAt,
         ltvCents: lead.ltvAllCents ?? 0,
         ltvAdsCents: lead.ltvAdsCents ?? 0,

@@ -3,6 +3,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import AddTransactionModal from "./AddTransactionModal";
 
 type TransactionRecord = {
   id: string;
@@ -16,6 +17,7 @@ type TransactionRecord = {
   confidence: string | null;
   reference?: string | null;
   leadId?: string | null;
+  contactId?: string | null;
   metadata?: Record<string, unknown> | null;
 };
 export type { TransactionRecord };
@@ -64,9 +66,8 @@ function StatusBadge({ status }: { status: string }) {
 
   return (
     <span
-      className={`rounded-full px-3 py-1 text-xs font-semibold ${
-        colors[status] ?? "bg-white/10 text-primary"
-      }`}
+      className={`rounded-full px-3 py-1 text-xs font-semibold ${colors[status] ?? "bg-white/10 text-primary"
+        }`}
     >
       {status}
     </span>
@@ -81,6 +82,7 @@ export default function TransactionsClient({ transactions: initialTransactions }
   const [matchFilter, setMatchFilter] = useState<MatchFilter>("all");
   const [sortBy, setSortBy] = useState<SortOption>("date_desc");
   const [search, setSearch] = useState("");
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     setTransactions(initialTransactions);
@@ -114,6 +116,22 @@ export default function TransactionsClient({ transactions: initialTransactions }
     }
   }, []);
 
+  const handleDelete = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this transaction? This cannot be undone.")) return;
+
+    setRefreshing(true);
+    try {
+      const res = await fetch(`/api/transactions/${id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.message || "Failed to delete");
+
+      await handleRefresh();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Failed to delete transaction");
+      setRefreshing(false);
+    }
+  };
+
   const ledgerRows = useMemo(() => {
     const normalized = transactions.map((transaction) => ({
       id: transaction.id,
@@ -129,11 +147,12 @@ export default function TransactionsClient({ transactions: initialTransactions }
           ? transaction.occurredAt
           : transaction.occurredAt?.toISOString() ?? new Date().toISOString(),
       needsReview:
-        !transaction.leadId ||
+        (!transaction.leadId && !transaction.contactId) ||
         (transaction.confidence ?? "").toLowerCase().includes("review") ||
         transaction.status === "Needs Review",
       reference: transaction.reference,
       leadId: transaction.leadId,
+      contactId: transaction.contactId,
       email:
         (transaction.metadata as Record<string, unknown> | undefined)?.customer_email?.toString() ??
         (transaction.metadata as Record<string, unknown> | undefined)?.email?.toString() ??
@@ -146,9 +165,9 @@ export default function TransactionsClient({ transactions: initialTransactions }
       filtered = filtered.filter((tx) => tx.source.toLowerCase().includes(sourceFilter.toLowerCase()));
     }
     if (matchFilter === "matched") {
-      filtered = filtered.filter((tx) => Boolean(tx.leadId));
+      filtered = filtered.filter((tx) => Boolean(tx.leadId || tx.contactId));
     } else if (matchFilter === "unmatched") {
-      filtered = filtered.filter((tx) => !tx.leadId);
+      filtered = filtered.filter((tx) => !tx.leadId && !tx.contactId);
     }
     if (search.trim().length) {
       const term = search.trim().toLowerCase();
@@ -184,13 +203,27 @@ export default function TransactionsClient({ transactions: initialTransactions }
 
   return (
     <div className="flex flex-col gap-8 text-primary">
+      <AddTransactionModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSuccess={handleRefresh}
+      />
+
       <section className="glass-panel flex flex-col gap-4">
-        <div className="flex flex-col gap-2">
-          <p className="text-xs uppercase tracking-[0.35em] text-muted">Payments & Transactions</p>
-          <h1 className="text-3xl font-semibold">Unified Ledger</h1>
-          <p className="text-sm text-muted">
-            Occurred date shown below. Use filters to slice by source, match status, and sort.
-          </p>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div className="flex flex-col gap-2">
+            <p className="text-xs uppercase tracking-[0.35em] text-muted">Payments & Transactions</p>
+            <h1 className="text-3xl font-semibold">Unified Ledger</h1>
+            <p className="text-sm text-muted">
+              Occurred date shown below. Use filters to slice by source, match status, and sort.
+            </p>
+          </div>
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-black transition hover:bg-emerald-400"
+          >
+            Add Transaction
+          </button>
         </div>
         <div className="grid gap-3 lg:grid-cols-4">
           <input
@@ -308,21 +341,20 @@ export default function TransactionsClient({ transactions: initialTransactions }
               </thead>
               <tbody className="divide-y divide-white/5">
                 {ledgerRows.map((transaction, index) => (
-                  <tr key={`${transaction.id}-${index}`}>
+                  <tr key={`${transaction.id}-${index}`} className="group">
                     <td className="py-4 pr-4 text-muted">{formatDateTime(transaction.occurredAt)}</td>
                     <td
-                    className={`pr-4 font-semibold ${
-                      transaction.leadId ? "text-primary" : "text-amber-200"
-                    }`}
-                  >
-                    {transaction.person}
-                    {transaction.email ? (
-                      <div className="text-xs text-muted">Email: {transaction.email}</div>
-                    ) : null}
-                    {transaction.reference ? (
-                      <div className="text-xs text-muted">Ref: {transaction.reference}</div>
-                    ) : null}
-                  </td>
+                      className={`pr-4 font-semibold ${transaction.leadId || transaction.contactId ? "text-primary" : "text-amber-200"
+                        }`}
+                    >
+                      {transaction.person}
+                      {transaction.email ? (
+                        <div className="text-xs text-muted">Email: {transaction.email}</div>
+                      ) : null}
+                      {transaction.reference ? (
+                        <div className="text-xs text-muted">Ref: {transaction.reference}</div>
+                      ) : null}
+                    </td>
                     <td className="pr-4 font-semibold text-primary">
                       {formatCurrency(transaction.amountMinor ?? 0, transaction.currency ?? "GBP")}
                     </td>
@@ -332,10 +364,11 @@ export default function TransactionsClient({ transactions: initialTransactions }
                       <StatusBadge status={transaction.status} />
                     </td>
                     <td className="pr-4">
-                      <StatusBadge status={transaction.leadId ? "Matched" : transaction.confidence} />
+                      <StatusBadge status={transaction.leadId || transaction.contactId ? "Matched" : transaction.confidence} />
                     </td>
-                    <td>
-                      {transaction.needsReview || !transaction.leadId ? (
+                    <td className="flex items-center gap-2">
+                      {/* Only show 'Fix' button if NOT matched (neither leadId nor contactId) AND needs review */}
+                      {transaction.needsReview ? (
                         <Link
                           href={`/transactions/manual?transactionId=${transaction.id}`}
                           className="rounded-full bg-black px-4 py-2 text-xs font-semibold text-white"
@@ -345,6 +378,16 @@ export default function TransactionsClient({ transactions: initialTransactions }
                       ) : (
                         <span className="text-xs text-emerald-200">Matched</span>
                       )}
+
+                      <button
+                        onClick={() => handleDelete(transaction.id)}
+                        className="opacity-0 transition group-hover:opacity-100 p-2 text-neutral-400 hover:text-rose-400"
+                        title="Delete Transaction"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                        </svg>
+                      </button>
                     </td>
                   </tr>
                 ))}

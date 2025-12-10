@@ -140,17 +140,33 @@ export async function updateCorporateLead(
 export async function getCorporateClients() {
     // Logic: Leads that have become clients (status=CLIENT or stage=Closed Won) and are corporate
     // Adjust based on how 'Client' status is strictly defined in system, for now assuming isCorporate=true and status='CLIENT' or stage='Closed Won'
-    return await prisma.lead.findMany({
+    const clients = await prisma.lead.findMany({
         where: {
             isCorporate: true,
             OR: [
                 { status: "CLIENT" },
                 { stage: "Closed Won" }
-            ]
+            ],
+            // Filter out Test Corp
+            NOT: {
+                companyName: "Test Corp"
+            }
+        },
+        include: {
+            payments: true,
         },
         orderBy: {
             updatedAt: "desc",
         },
+    });
+
+    // Calculate revenue for each client
+    return clients.map(client => {
+        const totalRevenue = client.payments.reduce((sum, payment) => sum + payment.amountCents, 0);
+        return {
+            ...client,
+            totalRevenue // Add this field to the returned object
+        };
     });
 }
 

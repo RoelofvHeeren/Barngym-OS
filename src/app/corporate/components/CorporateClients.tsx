@@ -5,9 +5,11 @@ import { format } from "date-fns";
 
 import CreateCorporateClientDialog from "./CreateCorporateClientDialog";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function CorporateClients({ clients }: { clients: any[] }) {
     const [isCreateOpen, setIsCreateOpen] = useState(false);
+    const router = useRouter();
 
     return (
         <div className="glass-panel min-h-[400px]">
@@ -48,6 +50,7 @@ export default function CorporateClients({ clients }: { clients: any[] }) {
                             clients.map((client) => (
                                 <tr
                                     key={client.id}
+                                    onClick={() => router.push(`/corporate/${client.id}`)}
                                     className="group cursor-pointer transition-colors hover:bg-white/10"
                                 >
                                     <td className="px-6 py-4">
@@ -59,7 +62,7 @@ export default function CorporateClients({ clients }: { clients: any[] }) {
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 text-right font-medium text-emerald-800">
-                                        €{((client.valueMinor || 0) / 100).toLocaleString()}
+                                        €{((client.totalRevenue || 0) / 100).toLocaleString()}
                                     </td>
                                     <td className="px-6 py-4 text-right text-muted">{client.employeeCount || "-"}</td>
                                     <td className="px-6 py-4 text-sm text-muted">{client.contractDuration || "-"}</td>

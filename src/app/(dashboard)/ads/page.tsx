@@ -72,7 +72,9 @@ function AdsDashboardContent() {
   const router = useRouter();
   const pathname = usePathname();
   const initialRange = (searchParams.get("range") as RangeKey) ?? "30d";
-  const [range, setRange] = useState<RangeKey>(initialRange);
+  const [range, setRange] = useState<RangeKey | "custom">(initialRange as RangeKey | "custom");
+  const [customRange, setCustomRange] = useState({ start: "", end: "" });
+
   const [overview, setOverview] = useState<Overview | null>(null);
   const [overviewLoading, setOverviewLoading] = useState(false);
   const [overviewError, setOverviewError] = useState<string | null>(null);
@@ -95,10 +97,23 @@ function AdsDashboardContent() {
   const [spendSaving, setSpendSaving] = useState(false);
   const [spendMessage, setSpendMessage] = useState<string | null>(null);
 
-  const updateRange = (next: RangeKey) => {
+  const updateRange = (next: RangeKey | "custom") => {
     setRange(next);
+    if (next !== "custom") {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("range", next);
+      params.delete("start");
+      params.delete("end");
+      router.replace(`${pathname}?${params.toString()}`);
+    }
+  };
+
+  const applyCustomRange = () => {
+    if (!customRange.start || !customRange.end) return;
     const params = new URLSearchParams(searchParams.toString());
-    params.set("range", next);
+    params.set("range", "custom");
+    params.set("start", customRange.start);
+    params.set("end", customRange.end);
     router.replace(`${pathname}?${params.toString()}`);
   };
 
@@ -108,7 +123,15 @@ function AdsDashboardContent() {
       setOverviewLoading(true);
       setOverviewError(null);
       try {
-        const response = await fetch(`/api/ads/overview?range=${range}`, { signal: controller.signal });
+        const params = new URLSearchParams();
+        params.set("range", range);
+        if (range === "custom") {
+          const start = searchParams.get("start");
+          const end = searchParams.get("end");
+          if (start) params.set("start", start);
+          if (end) params.set("end", end);
+        }
+        const response = await fetch(`/api/ads/overview?${params.toString()}`, { signal: controller.signal });
         const payload = await response.json();
         if (!response.ok || !payload.ok) throw new Error(payload.message || "Failed to load overview");
         setOverview(payload.data as Overview);
@@ -130,8 +153,17 @@ function AdsDashboardContent() {
       setLeadsLoading(true);
       setLeadsError(null);
       try {
+        const params = new URLSearchParams();
+        params.set("range", range);
+        params.set("status", leadStatusFilter);
+        if (range === "custom") {
+          const start = searchParams.get("start");
+          const end = searchParams.get("end");
+          if (start) params.set("start", start);
+          if (end) params.set("end", end);
+        }
         const response = await fetch(
-          `/api/ads/leads?range=${range}&status=${leadStatusFilter}`,
+          `/api/ads/leads?${params.toString()}`,
           { signal: controller.signal }
         );
         const payload = await response.json();
@@ -153,7 +185,15 @@ function AdsDashboardContent() {
     const loadFunnel = async () => {
       setFunnelError(null);
       try {
-        const response = await fetch(`/api/ads/funnel?range=${range}`, { signal: controller.signal });
+        const params = new URLSearchParams();
+        params.set("range", range);
+        if (range === "custom") {
+          const start = searchParams.get("start");
+          const end = searchParams.get("end");
+          if (start) params.set("start", start);
+          if (end) params.set("end", end);
+        }
+        const response = await fetch(`/api/ads/funnel?${params.toString()}`, { signal: controller.signal });
         const payload = await response.json();
         if (!response.ok || !payload.ok) throw new Error(payload.message || "Failed to load funnel");
         setFunnel(payload.data as FunnelData);
@@ -234,6 +274,36 @@ function AdsDashboardContent() {
                 {option.label}
               </button>
             ))}
+            <button
+              className={`chip text-xs ${range === "custom" ? "!bg-emerald-600 !text-white" : ""}`}
+              onClick={() => updateRange("custom")}
+            >
+              Custom
+            </button>
+
+            {range === "custom" && (
+              <div className="flex items-center gap-2 bg-white/50 p-1 rounded-lg border border-emerald-900/10">
+                <input
+                  type="date"
+                  className="text-xs bg-transparent border-none focus:ring-0 p-0 px-1"
+                  value={customRange.start}
+                  onChange={e => setCustomRange(prev => ({ ...prev, start: e.target.value }))}
+                />
+                <span className="text-muted text-xs">-</span>
+                <input
+                  type="date"
+                  className="text-xs bg-transparent border-none focus:ring-0 p-0 px-1"
+                  value={customRange.end}
+                  onChange={e => setCustomRange(prev => ({ ...prev, end: e.target.value }))}
+                />
+                <button
+                  onClick={applyCustomRange}
+                  className="text-[10px] bg-emerald-600 text-white px-2 py-0.5 rounded uppercase font-bold tracking-wider hover:bg-emerald-700"
+                >
+                  Go
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
