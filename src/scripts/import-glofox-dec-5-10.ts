@@ -47,7 +47,7 @@ async function main() {
             currency: 'GBP',
             confidence: 'Matched' as const,
             description: t.desc,
-            reference: null,
+            reference: undefined,
             metadata: {
                 email: t.email,
                 method: 'Card',
@@ -58,7 +58,7 @@ async function main() {
 
     const result = await upsertTransactions(normalized);
 
-    console.log(`✅ Successfully imported ${result.added} new transactions`);
+    console.log(`✅ Successfully imported ${result.added} new transactions (total: ${result.total})`);
     console.log(`ℹ️  Skipped ${result.skipped} duplicate transactions`);
 
     // Log which leads should now be promoted to clients
@@ -70,16 +70,16 @@ async function main() {
         },
         select: {
             id: true,
-            name: true,
+            fullName: true,
             email: true,
             status: true,
-            ltvCents: true,
+            ltvAllCents: true,
         }
     });
 
     console.log('\nContacts that should be updated:');
     contacts.forEach(c => {
-        console.log(`- ${c.name} (${c.email}): ${c.status} → ${c.ltvCents > 0 ? 'Client' : c.status} (LTV: £${(c.ltvCents / 100).toFixed(2)})`);
+        console.log(`- ${c.fullName} (${c.email}): ${c.status} → ${c.ltvAllCents > 0 ? 'Client' : c.status} (LTV: £${(c.ltvAllCents / 100).toFixed(2)})`);
     });
 }
 
