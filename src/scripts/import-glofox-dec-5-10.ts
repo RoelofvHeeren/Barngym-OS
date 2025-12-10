@@ -1,5 +1,5 @@
-import { prisma } from '../src/lib/prisma';
-import { upsertTransactions } from '../src/lib/transactions';
+import { prisma } from '@/lib/prisma';
+import { upsertTransactions } from '@/lib/transactions';
 
 const transactions = [
     { date: '09/12/2025', time: '15:55', name: 'Katie Preston', email: 'katiepreston3@gmail.com', amount: 12, desc: 'Pay As You Go Small group training sessions (1 Small Group Training Session)' },
