@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && prisma migrate deploy && (node scripts/fix-data.js || true) && (node scripts/recalculate-ltv.js || true) && next build",
+    "build": "prisma generate && prisma migrate deploy && (node scripts/fix-data.js || true) && (node scripts/recalculate-ltv.js || true) && (npx tsx src/scripts/sync-lead-ltv-from-contact.ts || true) && next build",
     "start": "next start",
     "lint": "eslint",
     "postinstall": "prisma generate"
