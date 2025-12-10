@@ -702,15 +702,25 @@ function AdsDashboardContent() {
                     </div>
                   )}
                 </div>
-                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                <div className={`mt-4 grid gap-3 ${profileData.stats?.adsLifetimeSpend ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
                   <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
                     <p className="text-xs uppercase tracking-[0.35em] text-muted">
-                      Lifetime Value
+                      Total LTV
                     </p>
                     <p className="mt-2 text-lg font-semibold">
-                      {profileData.stats?.lifetimeSpend || '€0'}
+                      {profileData.stats?.lifetimeSpend || '£0'}
                     </p>
                   </div>
+                  {profileData.stats?.adsLifetimeSpend && (
+                    <div className="rounded-3xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+                      <p className="text-xs uppercase tracking-[0.35em] text-emerald-700">
+                        Ads LTV
+                      </p>
+                      <p className="mt-2 text-lg font-semibold text-emerald-700">
+                        {profileData.stats.adsLifetimeSpend}
+                      </p>
+                    </div>
+                  )}
                   <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
                     <p className="text-xs uppercase tracking-[0.35em] text-muted">
                       Membership

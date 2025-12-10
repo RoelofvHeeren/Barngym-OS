@@ -10,7 +10,81 @@ export async function GET(
     try {
         const { id } = await params;
 
-        // Find the Contact
+        const formatCurrency = (minor: number) =>
+            new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' })
+                .format(minor / 100);
+
+        // First, try to find as a Lead
+        const lead = await prisma.lead.findUnique({
+            where: { id },
+            include: {
+                transactions: {
+                    where: { status: 'completed' },
+                    orderBy: { occurredAt: 'desc' },
+                    take: 50,
+                },
+                payments: {
+                    orderBy: { timestamp: 'desc' },
+                },
+            },
+        });
+
+        if (lead) {
+            // Return Lead-specific data
+            const leadMetadata = (lead?.metadata as any) || {};
+            const profile = leadMetadata.profile || {};
+
+            const transactions = lead.transactions || [];
+            const successfulTransactions = transactions.filter((t: any) =>
+                t.status === 'completed'
+            );
+
+            const lifetimeSpend = lead.ltvAllCents || successfulTransactions.reduce((sum: number, t: any) =>
+                sum + (t.amountMinor || 0), 0
+            );
+
+            const adsLifetimeSpend = lead.ltvAdsCents || 0;
+
+            const profileData = {
+                name: lead.fullName || lead.email || 'Unknown',
+                initials: profile.initials || lead.fullName?.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase() || 'BG',
+                title: profile.title || lead.membershipName || 'Lead',
+                email: lead.email || '',
+                phone: lead.phone || '',
+                status: profile.status || (lead.isClient ? 'Client' : 'Lead'),
+                statusTone: profile.statusTone || (lead.isClient ? 'client' : 'lead'),
+                source: profile.source || lead.source || 'Unknown',
+                tags: profile.tags || [],
+                identities: profile.identities || [
+                    lead.email ? { label: 'Email', value: lead.email } : null,
+                    lead.phone ? { label: 'Phone', value: lead.phone } : null,
+                ].filter(Boolean),
+                stats: {
+                    lifetimeSpend: formatCurrency(lifetimeSpend),
+                    adsLifetimeSpend: adsLifetimeSpend > 0 ? formatCurrency(adsLifetimeSpend) : undefined,
+                    memberships: lead.membershipName || 'Unassigned',
+                    lastPayment: successfulTransactions[0]?.occurredAt
+                        ? new Date(successfulTransactions[0].occurredAt).toLocaleDateString('en-GB')
+                        : '—',
+                    lastAttendance: '—',
+                },
+                payments: profile.payments || [],
+                history: transactions.map((t: any) => ({
+                    timestamp: new Date(t.occurredAt).toLocaleString('en-GB'),
+                    source: t.provider || t.source || 'Unknown',
+                    amount: formatCurrency(t.amountMinor || 0),
+                    product: t.productType || t.description || 'Unknown',
+                    status: t.status,
+                    reference: t.reference,
+                })),
+                notes: profile.notes || [],
+                dataSource: 'lead' as const,
+            };
+
+            return NextResponse.json({ ok: true, data: profileData });
+        }
+
+        // If not found as Lead, try as Contact
         const contact = await prisma.contact.findUnique({
             where: { id },
             include: {
@@ -28,8 +102,8 @@ export async function GET(
             );
         }
 
-        // Find linked Lead (by email)
-        const lead = contact.email
+        // Find linked Lead (by email) for additional context
+        const linkedLead = contact.email
             ? await prisma.lead.findFirst({
                 where: { email: contact.email },
                 include: {
@@ -40,33 +114,29 @@ export async function GET(
             })
             : null;
 
-        // Build profile data
-        const leadMetadata = (lead?.metadata as any) || {};
+        // Build profile data from Contact
+        const leadMetadata = (linkedLead?.metadata as any) || {};
         const profile = leadMetadata.profile || {};
 
         // Calculate stats
         const transactions = contact.transactions || [];
         const successfulTransactions = transactions.filter((t: any) =>
-            t.status === 'succeeded' || t.status === 'paid'
+            t.status === 'succeeded' || t.status === 'paid' || t.status === 'completed'
         );
 
-        const lifetimeSpend = successfulTransactions.reduce((sum: number, t: any) =>
+        const lifetimeSpend = contact.ltvAllCents || successfulTransactions.reduce((sum: number, t: any) =>
             sum + (t.amountMinor || 0), 0
         );
-
-        const formatCurrency = (minor: number) =>
-            new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' })
-                .format(minor / 100);
 
         const profileData = {
             name: contact.fullName || 'Unknown',
             initials: profile.initials || contact.fullName?.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase() || 'BG',
-            title: profile.title || lead?.membershipName || 'Contact',
+            title: profile.title || linkedLead?.membershipName || 'Contact',
             email: contact.email || '',
             phone: contact.phone || '',
-            status: profile.status || (lead?.isClient ? 'Client' : contact.status === 'client' ? 'Client' : undefined),
-            statusTone: profile.statusTone || (lead?.isClient ? 'client' : contact.status === 'client' ? 'client' : 'lead'),
-            source: profile.source || lead?.source,
+            status: profile.status || (linkedLead?.isClient ? 'Client' : contact.status === 'client' ? 'Client' : undefined),
+            statusTone: profile.statusTone || (linkedLead?.isClient ? 'client' : contact.status === 'client' ? 'client' : 'lead'),
+            source: profile.source || linkedLead?.source,
             tags: profile.tags || [...contact.sourceTags, ...contact.segmentTags] || [],
             identities: profile.identities || [
                 contact.email ? { label: 'Email', value: contact.email } : null,
@@ -74,7 +144,7 @@ export async function GET(
             ].filter(Boolean),
             stats: {
                 lifetimeSpend: formatCurrency(lifetimeSpend),
-                memberships: lead?.membershipName || contact.membershipType || 'Unassigned',
+                memberships: linkedLead?.membershipName || contact.membershipType || 'Unassigned',
                 lastPayment: successfulTransactions[0]?.occurredAt
                     ? new Date(successfulTransactions[0].occurredAt).toLocaleDateString('en-GB')
                     : '—',
@@ -90,6 +160,7 @@ export async function GET(
                 reference: t.reference,
             })),
             notes: profile.notes || [],
+            dataSource: 'contact' as const,
         };
 
         return NextResponse.json({ ok: true, data: profileData });
