@@ -3,6 +3,106 @@ import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
 
+export async function GET(
+    request: Request,
+    { params }: { params: Promise<{ id: string }> }
+) {
+    try {
+        const { id } = await params;
+
+        // Find the Contact
+        const contact = await prisma.contact.findUnique({
+            where: { id },
+            include: {
+                transactions: {
+                    orderBy: { occurredAt: 'desc' },
+                    take: 50,
+                },
+            },
+        });
+
+        if (!contact) {
+            return NextResponse.json(
+                { ok: false, message: "Contact not found" },
+                { status: 404 }
+            );
+        }
+
+        // Find linked Lead (by email)
+        const lead = contact.email
+            ? await prisma.lead.findFirst({
+                where: { email: contact.email },
+                include: {
+                    payments: {
+                        orderBy: { timestamp: 'desc' },
+                    },
+                },
+            })
+            : null;
+
+        // Build profile data
+        const leadMetadata = (lead?.metadata as any) || {};
+        const profile = leadMetadata.profile || {};
+
+        // Calculate stats
+        const transactions = contact.transactions || [];
+        const successfulTransactions = transactions.filter((t: any) =>
+            t.status === 'succeeded' || t.status === 'paid'
+        );
+
+        const lifetimeSpend = successfulTransactions.reduce((sum: number, t: any) =>
+            sum + (t.amountMinor || 0), 0
+        );
+
+        const formatCurrency = (minor: number) =>
+            new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' })
+                .format(minor / 100);
+
+        const profileData = {
+            name: contact.fullName || 'Unknown',
+            initials: profile.initials || contact.fullName?.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase() || 'BG',
+            title: profile.title || lead?.membershipName || 'Contact',
+            email: contact.email || '',
+            phone: contact.phone || '',
+            status: profile.status || (lead?.isClient ? 'Client' : contact.status === 'client' ? 'Client' : undefined),
+            statusTone: profile.statusTone || (lead?.isClient ? 'client' : contact.status === 'client' ? 'client' : 'lead'),
+            source: profile.source || lead?.source,
+            tags: profile.tags || [...contact.sourceTags, ...contact.segmentTags] || [],
+            identities: profile.identities || [
+                contact.email ? { label: 'Email', value: contact.email } : null,
+                contact.phone ? { label: 'Phone', value: contact.phone } : null,
+            ].filter(Boolean),
+            stats: {
+                lifetimeSpend: formatCurrency(lifetimeSpend),
+                memberships: lead?.membershipName || contact.membershipType || 'Unassigned',
+                lastPayment: successfulTransactions[0]?.occurredAt
+                    ? new Date(successfulTransactions[0].occurredAt).toLocaleDateString('en-GB')
+                    : '—',
+                lastAttendance: '—',
+            },
+            payments: profile.payments || [],
+            history: transactions.map((t: any) => ({
+                timestamp: new Date(t.occurredAt).toLocaleString('en-GB'),
+                source: t.source || 'Unknown',
+                amount: formatCurrency(t.amountMinor || 0),
+                product: t.productType || 'Unknown',
+                status: t.status,
+                reference: t.reference,
+            })),
+            notes: profile.notes || [],
+        };
+
+        return NextResponse.json({ ok: true, data: profileData });
+    } catch (error) {
+        console.error("GET error:", error);
+        return NextResponse.json(
+            { ok: false, message: error instanceof Error ? error.message : "Failed to fetch contact" },
+            { status: 500 }
+        );
+    }
+}
+
+
 export async function DELETE(
     request: Request,
     { params }: { params: Promise<{ id: string }> }

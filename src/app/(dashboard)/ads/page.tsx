@@ -643,114 +643,140 @@ function AdsDashboardContent() {
         </div>
       </div>
 
-      {modalOpen && profileData && mounted && createPortal(
+      {modalOpen && mounted && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-8">
           <div className="glass-panel max-h-[90vh] w-full max-w-4xl overflow-y-auto">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-[0.35em] text-muted">
-                  Contact Profile
-                </p>
-                <h3 className="mt-2 text-2xl font-semibold">{profileData.name || 'Unknown'}</h3>
-                <p className="text-sm text-muted">{profileData.title || 'Contact'}</p>
-                {profileData.status && (
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    <span
-                      className={`chip text-xs ${profileData.statusTone === "client"
-                        ? "!bg-emerald-100 !text-emerald-800 !border-emerald-200"
-                        : "!bg-amber-100 !text-amber-800 !border-amber-200"
-                        }`}
-                    >
-                      {profileData.status}
-                    </span>
-                    {profileData.source && (
-                      <span className="chip text-xs !bg-white/80 !text-primary !border-white/40">
-                        Source: {profileData.source}
-                      </span>
+            {profileLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <p className="text-muted">Loading profile...</p>
+              </div>
+            ) : profileData ? (
+              <>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.35em] text-muted">
+                      Contact Profile
+                    </p>
+                    <h3 className="mt-2 text-2xl font-semibold">{profileData.name || 'Unknown'}</h3>
+                    <p className="text-sm text-muted">{profileData.title || 'Contact'}</p>
+                    {profileData.status && (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <span
+                          className={`chip text-xs ${profileData.statusTone === "client"
+                            ? "!bg-emerald-100 !text-emerald-800 !border-emerald-200"
+                            : "!bg-amber-100 !text-amber-800 !border-amber-200"
+                            }`}
+                        >
+                          {profileData.status}
+                        </span>
+                        {profileData.source && (
+                          <span className="chip text-xs !bg-white/80 !text-primary !border-white/40">
+                            Source: {profileData.source}
+                          </span>
+                        )}
+                      </div>
                     )}
                   </div>
-                )}
-              </div>
-              <button
-                type="button"
-                className="chip text-xs"
-                onClick={() => setModalOpen(false)}
-              >
-                Close
-              </button>
-            </div>
-            <div className="mt-5 space-y-3 text-sm text-muted">
-              <p>Phone · {profileData.phone || '—'}</p>
-              <p>Email · {profileData.email || '—'}</p>
-              {profileData.tags && profileData.tags.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {profileData.tags.map((tag: string) => (
-                    <span key={tag} className="chip text-xs">
-                      {tag}
-                    </span>
-                  ))}
+                  <button
+                    type="button"
+                    className="chip text-xs"
+                    onClick={() => {
+                      setModalOpen(false);
+                      setProfileData(null);
+                      setSelectedContactId(null);
+                    }}
+                  >
+                    Close
+                  </button>
                 </div>
-              )}
-            </div>
-            <div className="mt-4 grid gap-3 md:grid-cols-2">
-              <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                <p className="text-xs uppercase tracking-[0.35em] text-muted">
-                  Lifetime Value
-                </p>
-                <p className="mt-2 text-lg font-semibold">
-                  {profileData.stats?.lifetimeSpend || '€0'}
-                </p>
-              </div>
-              <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                <p className="text-xs uppercase tracking-[0.35em] text-muted">
-                  Membership
-                </p>
-                <p className="mt-2 text-lg font-semibold">
-                  {profileData.stats?.memberships || 'Unassigned'}
-                </p>
-              </div>
-              <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                <p className="text-xs uppercase tracking-[0.35em] text-muted">
-                  Recent Payment
-                </p>
-                <p className="mt-2 text-lg font-semibold">
-                  {profileData.stats?.lastPayment || '—'}
-                </p>
-              </div>
-              <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                <p className="text-xs uppercase tracking-[0.35em] text-muted">
-                  Attendance
-                </p>
-                <p className="mt-2 text-lg font-semibold">
-                  {profileData.stats?.lastAttendance || '—'}
-                </p>
-              </div>
-            </div>
-            {profileData.history && profileData.history.length > 0 && (
-              <div className="mt-4 rounded-3xl border border-white/10 bg-white/5 p-4">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs uppercase tracking-[0.35em] text-muted">Transaction History</p>
-                  <span className="text-xs text-muted">
-                    Showing {profileData.history.length} records
-                  </span>
-                </div>
-                <div className="mt-3 space-y-2 max-h-72 overflow-y-auto pr-2">
-                  {profileData.history.map((entry: any, idx: number) => (
-                    <div
-                      key={`${entry.timestamp}-${idx}`}
-                      className="rounded-2xl border border-white/10 bg-white/5 p-3"
-                    >
-                      <div className="flex items-center justify-between text-sm text-primary">
-                        <span className="font-semibold">{entry.amount}</span>
-                        <span className="text-muted">{entry.source}</span>
-                      </div>
-                      <div className="text-xs text-muted">
-                        {entry.timestamp} · {entry.product}
-                        {entry.reference ? ` · Ref: ${entry.reference}` : ""}
-                      </div>
+                <div className="mt-5 space-y-3 text-sm text-muted">
+                  <p>Phone · {profileData.phone || '—'}</p>
+                  <p>Email · {profileData.email || '—'}</p>
+                  {profileData.tags && profileData.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {profileData.tags.map((tag: string) => (
+                        <span key={tag} className="chip text-xs">
+                          {tag}
+                        </span>
+                      ))}
                     </div>
-                  ))}
+                  )}
                 </div>
+                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                  <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                    <p className="text-xs uppercase tracking-[0.35em] text-muted">
+                      Lifetime Value
+                    </p>
+                    <p className="mt-2 text-lg font-semibold">
+                      {profileData.stats?.lifetimeSpend || '€0'}
+                    </p>
+                  </div>
+                  <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                    <p className="text-xs uppercase tracking-[0.35em] text-muted">
+                      Membership
+                    </p>
+                    <p className="mt-2 text-lg font-semibold">
+                      {profileData.stats?.memberships || 'Unassigned'}
+                    </p>
+                  </div>
+                  <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                    <p className="text-xs uppercase tracking-[0.35em] text-muted">
+                      Recent Payment
+                    </p>
+                    <p className="mt-2 text-lg font-semibold">
+                      {profileData.stats?.lastPayment || '—'}
+                    </p>
+                  </div>
+                  <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                    <p className="text-xs uppercase tracking-[0.35em] text-muted">
+                      Attendance
+                    </p>
+                    <p className="mt-2 text-lg font-semibold">
+                      {profileData.stats?.lastAttendance || '—'}
+                    </p>
+                  </div>
+                </div>
+                {profileData.history && profileData.history.length > 0 && (
+                  <div className="mt-4 rounded-3xl border border-white/10 bg-white/5 p-4">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs uppercase tracking-[0.35em] text-muted">Transaction History</p>
+                      <span className="text-xs text-muted">
+                        Showing {profileData.history.length} records
+                      </span>
+                    </div>
+                    <div className="mt-3 space-y-2 max-h-72 overflow-y-auto pr-2">
+                      {profileData.history.map((entry: any, idx: number) => (
+                        <div
+                          key={`${entry.timestamp}-${idx}`}
+                          className="rounded-2xl border border-white/10 bg-white/5 p-3"
+                        >
+                          <div className="flex items-center justify-between text-sm text-primary">
+                            <span className="font-semibold">{entry.amount}</span>
+                            <span className="text-muted">{entry.source}</span>
+                          </div>
+                          <div className="text-xs text-muted">
+                            {entry.timestamp} · {entry.product}
+                            {entry.reference ? ` · Ref: ${entry.reference}` : ""}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-12">
+                <p className="text-muted">Failed to load profile data</p>
+                <button
+                  type="button"
+                  className="chip text-xs mt-4"
+                  onClick={() => {
+                    setModalOpen(false);
+                    setSelectedContactId(null);
+                  }}
+                >
+                  Close
+                </button>
               </div>
             )}
           </div>
