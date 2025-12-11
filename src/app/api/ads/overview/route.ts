@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 type RangeKey = "today" | "7d" | "30d" | "month" | "all";
 
@@ -222,9 +223,20 @@ export async function GET(request: Request) {
           spendCents = DAILY_BUDGET_CENTS * 7;
           break;
         case "30d":
-        case "month":
           spendCents = MONTHLY_BUDGET_CENTS;
           break;
+        case "month": {
+          const now = new Date();
+          const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+          const currentDay = now.getDate();
+          // Prorate: (CurrentDay / DaysInMonth) * MonthlyBudget? 
+          // Or just CurrentDay * DailyBudget?
+          // User said: "increase by 25 bucks... if it's the 10th... should show 250".
+          // So CurrentDay * DAILY_BUDGET_CENTS.
+          // But cap at Monthly Budget if end of month?
+          spendCents = Math.min(currentDay * DAILY_BUDGET_CENTS, MONTHLY_BUDGET_CENTS);
+          break;
+        }
         case "all":
           // Estimate duration based on first ever ad lead
           const firstLead = await prisma.lead.findFirst({

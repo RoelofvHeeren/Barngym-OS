@@ -26,6 +26,23 @@ async function main() {
         // Calculate total LTV from all completed transactions
         const totalLTV = lead.transactions.reduce((sum, t) => sum + t.amountMinor, 0);
 
+        // Find associated contact LTV
+        let contactLTV = 0;
+        if (lead.email) {
+            const contact = await prisma.contact.findFirst({
+                where: { email: { equals: lead.email, mode: 'insensitive' } },
+                select: { ltvAllCents: true }
+            });
+            if (contact) {
+                contactLTV = contact.ltvAllCents;
+            }
+        }
+
+        // Use the MAX of Lead Direct LTV or Contact LTV
+        // This prevents overwriting valid Lead data with 0 if contact link is missing,
+        // and prevents overwriting valid Contact data with 0 if lead link is missing.
+        const bestLTV = Math.max(totalLTV, contactLTV);
+
         // Check if this is an ads lead
         const isAdsLead = lead.source?.toLowerCase().includes('ads') ||
             lead.source?.toLowerCase().includes('facebook') ||
@@ -33,8 +50,8 @@ async function main() {
             lead.source?.toLowerCase().includes('meta') ||
             lead.source?.toLowerCase().includes('tiktok');
 
-        // Ads LTV = total LTV if from ads source, otherwise 0
-        const adsLTV = isAdsLead ? totalLTV : 0;
+        // Ads LTV = bestLTV if from ads source, otherwise 0
+        const adsLTV = isAdsLead ? bestLTV : 0;
 
         // Calculate product-specific LTVs
         const ltvByProduct = {
@@ -65,7 +82,7 @@ async function main() {
 
         // Check if update is needed
         const needsUpdate =
-            lead.ltvAllCents !== totalLTV ||
+            lead.ltvAllCents !== bestLTV ||
             lead.ltvAdsCents !== adsLTV ||
             lead.ltvPTCents !== ltvByProduct.PT ||
             lead.ltvClassesCents !== ltvByProduct.Classes ||
@@ -78,7 +95,7 @@ async function main() {
             await prisma.lead.update({
                 where: { id: lead.id },
                 data: {
-                    ltvAllCents: totalLTV,
+                    ltvAllCents: bestLTV,
                     ltvAdsCents: adsLTV,
                     ltvPTCents: ltvByProduct.PT,
                     ltvClassesCents: ltvByProduct.Classes,

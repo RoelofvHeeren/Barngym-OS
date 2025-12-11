@@ -58,24 +58,46 @@ function extractArray(value: unknown): string[] {
   return [];
 }
 
-function normalizePayload(rawPayload: Record<string, any>): NormalizedPayload {
+export function normalizePayload(rawPayload: Record<string, any>): NormalizedPayload {
   const contact = rawPayload.contact ?? {};
   const root = rawPayload ?? {};
 
   // IMPORTANT: GHL webhook is the sole source of leads and conversions.
   // Meta Ads data must NEVER be used to create or update leads.
-  const fullName =
+  let fullName =
     normalizeString(root.fullName) ||
     normalizeString(contact.full_name) ||
     normalizeString(contact.fullName);
-  const firstName =
+  let firstName =
     normalizeString(root.firstName) ||
     normalizeString(contact.first_name) ||
     normalizeString(contact.firstName);
-  const lastName =
+  let lastName =
     normalizeString(root.lastName) ||
     normalizeString(contact.last_name) ||
     normalizeString(contact.lastName);
+
+  // Heuristic 1: If firstName contains spaces and lastName is empty, assume firstName is actually fullName
+  if (firstName && firstName.includes(" ") && !lastName) {
+    const parts = firstName.split(" ").filter(Boolean);
+    if (parts.length > 1) {
+      if (!fullName) fullName = firstName; // Preserve original as full name if missing
+      firstName = parts[0];
+      lastName = parts.slice(1).join(" ");
+    }
+  }
+
+  // Heuristic 2: If firstName/lastName are missing but fullName exists, split fullName
+  if (!firstName && !lastName && fullName) {
+    const parts = fullName.split(" ").filter(Boolean);
+    if (parts.length > 0) {
+      firstName = parts[0];
+      if (parts.length > 1) {
+        lastName = parts.slice(1).join(" ");
+      }
+    }
+  }
+
   const email =
     normalizeString(root.email) ||
     normalizeString(contact.email);

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 type RangeKey = "today" | "7d" | "30d" | "month" | "all";
 
@@ -35,7 +36,13 @@ const parseRange = (range?: string): { start: Date | null; end: Date } => {
 };
 
 const isAdsLeadFilter = {
-  source: { contains: "ads", mode: "insensitive" as const },
+  OR: [
+    { source: { contains: "ads", mode: "insensitive" as const } },
+    { source: { contains: "facebook", mode: "insensitive" as const } },
+    { source: { contains: "instagram", mode: "insensitive" as const } },
+    { source: { contains: "meta", mode: "insensitive" as const } },
+    { source: { contains: "tiktok", mode: "insensitive" as const } },
+  ],
 };
 
 const buildDateFilter = (start: Date | null, end: Date) => {
@@ -60,7 +67,6 @@ export async function GET(request: Request) {
       const endParam = searchParams.get("end");
       if (startParam) start = new Date(startParam);
       if (endParam) end = new Date(endParam);
-      // Ensure end of day for the end date if it looks like just a date string
       if (endParam && endParam.length <= 10) {
         end.setHours(23, 59, 59, 999);
       }
@@ -70,39 +76,54 @@ export async function GET(request: Request) {
       end = parsed.end;
     }
 
-    // Fallback to createdAt if submissionDate is null, OR assume we migrate data. 
-    // For now, let's query such that we check submissionDate first.
-    // However, Prisma doesn't easily support "COALESCE(submissionDate, createdAt)" in 'where' clause without raw query.
-    // We'll filter on `submissionDate` OR `createdAt` conceptually, but easiest is to migrate data.
-    // Assuming migration/backfill happens, we can use `submissionDate`.
-    // But since backfill isn't instant, let's do:
-    // "submissionDate" in range OR ("submissionDate" is null AND "createdAt" in range)
-
     const dateFilter = start ? { gte: start, lte: end } : { lte: end };
 
-    const leads = await prisma.lead.findMany({
-      where: {
-        ...isAdsLeadFilter,
+    let whereCondition: any = {
+      ...isAdsLeadFilter,
+      ...(campaignFilter ? { leadTracking: { some: { campaignId: campaignFilter } } } : {}),
+    };
+
+    if (statusParam === "client") {
+      // Acquired Client Logic:
+      // 1. Must be a client
+      // 2. Must have a payment in the range
+      // 3. Must NOT have a payment before the range (strict acquisition)
+      // Note: If range is "All Time" (start is null), condition 3 is moot.
+      whereCondition = {
+        ...whereCondition,
+        isClient: true,
+        payments: {
+          some: { timestamp: dateFilter },
+          ...(start ? { none: { timestamp: { lt: start } } } : {}),
+        },
+      };
+    } else if (statusParam === "lead") {
+      // Active Lead Logic:
+      // 1. Must be a lead (not client)
+      // 2. Created (or submitted) in the range
+      whereCondition = {
+        ...whereCondition,
+        isClient: false,
         OR: [
           { submissionDate: dateFilter },
-          {
-            submissionDate: null,
-            createdAt: dateFilter
-          }
+          { submissionDate: null, createdAt: dateFilter },
         ],
-        ...(statusParam === "lead"
-          ? { isClient: false }
-          : statusParam === "client"
-            ? { isClient: true }
-            : {}),
-        ...(campaignFilter
-          ? {
-            leadTracking: {
-              some: { campaignId: campaignFilter },
-            },
-          }
-          : {}),
-      },
+      };
+    } else {
+      // Fallback 'all' (mixed):
+      // Use creation date filter for simplicity if no specific status requested, 
+      // or maybe union? Let's stick to creation date for "all" to be consistent with lists.
+      whereCondition = {
+        ...whereCondition,
+        OR: [
+          { submissionDate: dateFilter },
+          { submissionDate: null, createdAt: dateFilter },
+        ],
+      };
+    }
+
+    const leads = await prisma.lead.findMany({
+      where: whereCondition,
       orderBy: { createdAt: "desc" },
       select: {
         id: true,
@@ -127,7 +148,7 @@ export async function GET(request: Request) {
         where: {
           leadId: { in: leadIds },
         },
-        select: { leadId: true, timestamp: true, productType: true },
+        select: { leadId: true, timestamp: true, productType: true, amountCents: true },
         orderBy: { timestamp: "asc" },
       }),
       prisma.leadTracking.findMany({
@@ -139,14 +160,26 @@ export async function GET(request: Request) {
       }),
     ]);
 
-    const paymentsMap = new Map<string, { first: Date; categories: Set<string> }>();
+    const paymentsMap = new Map<string, { first: Date; categories: Set<string>; periodRevenue: number }>();
     payments.forEach((p) => {
       if (!p.leadId) return;
       const existing = paymentsMap.get(p.leadId);
-      const first = existing?.first ?? p.timestamp;
+
+      const first = existing?.first ?? p.timestamp; // already sorted asc
       const categories = existing?.categories ?? new Set<string>();
       if (p.productType) categories.add(p.productType);
-      paymentsMap.set(p.leadId, { first, categories });
+
+      let periodRevenue = existing?.periodRevenue ?? 0;
+      // Check if payment falls in selected range
+      const inRange = start
+        ? (p.timestamp >= start && p.timestamp <= end)
+        : (p.timestamp <= end);
+
+      if (inRange) {
+        periodRevenue += p.amountCents;
+      }
+
+      paymentsMap.set(p.leadId, { first, categories, periodRevenue });
     });
 
     const trackingMap = new Map<string, typeof tracking>();
@@ -195,6 +228,7 @@ export async function GET(request: Request) {
         firstPaymentAt,
         ltvCents: lead.ltvAllCents ?? 0,
         ltvAdsCents: lead.ltvAdsCents ?? 0,
+        periodRevenueCents: paymentInfo?.periodRevenue ?? 0,
         productCategories: Array.from(paymentInfo?.categories ?? []),
         tracking: {
           utm_source: trackingEntry?.utmSource ?? null,

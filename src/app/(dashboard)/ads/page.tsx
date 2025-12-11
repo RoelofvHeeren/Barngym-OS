@@ -29,6 +29,7 @@ type LeadRow = {
   firstPaymentAt: string | null;
   ltvCents: number;
   ltvAdsCents: number;
+  periodRevenueCents: number;
   productCategories: string[];
   tracking: {
     utm_source: string | null;
@@ -220,12 +221,19 @@ function AdsDashboardContent() {
   const filteredLeads = useMemo(() => {
     if (!leadSearch.trim()) return leads;
     const term = leadSearch.toLowerCase();
-    return leads.filter(
+    const filtered = leads.filter(
       (lead) =>
         lead.fullName.toLowerCase().includes(term) ||
         (lead.email ?? "").toLowerCase().includes(term)
     );
-  }, [leadSearch, leads]);
+    // Sort clients by period revenue (highest first), leads by newest
+    return filtered.sort((a, b) => {
+      if (leadStatusFilter === "client") {
+        return (b.periodRevenueCents ?? 0) - (a.periodRevenueCents ?? 0);
+      }
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+  }, [leadSearch, leads, leadStatusFilter]);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -406,6 +414,7 @@ function AdsDashboardContent() {
                 <th className="pb-3 pr-4 font-medium pl-2">Name & Contact</th>
                 {leadStatusFilter === "client" ? (
                   <>
+                    <th className="pb-3 pr-4 font-medium">Period Rev</th>
                     <th className="pb-3 pr-4 font-medium">Ads LTV</th>
                     <th className="pb-3 pr-4 font-medium">Total LTV</th>
                     <th className="pb-3 pr-4 font-medium">First Payment</th>
@@ -460,10 +469,13 @@ function AdsDashboardContent() {
 
                     {leadStatusFilter === "client" ? (
                       <>
-                        <td className="pr-4 font-mono font-medium text-emerald-700">
+                        <td className="pr-4 font-mono font-bold text-emerald-800">
+                          {formatCurrency(lead.periodRevenueCents)}
+                        </td>
+                        <td className="pr-4 font-mono font-medium text-emerald-600/80">
                           {formatCurrency(lead.ltvAdsCents)}
                         </td>
-                        <td className="pr-4 font-mono text-muted">
+                        <td className="pr-4 font-mono text-muted text-xs">
                           {formatCurrency(lead.ltvCents)}
                         </td>
                         <td className="pr-4 text-muted">{formatDate(lead.firstPaymentAt)}</td>
