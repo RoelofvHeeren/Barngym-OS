@@ -76,11 +76,16 @@ export async function GET(request: Request) {
     const dateFilter = start ? { gte: start, lte: end } : { lte: end };
 
     // Filter by submissionDate OR createdAt
+    // Filter by submissionDate OR createdAt
     const whereCondition = {
-      ...isAdsLeadFilter,
-      OR: [
-        { submissionDate: dateFilter },
-        { submissionDate: null, createdAt: dateFilter },
+      AND: [
+        isAdsLeadFilter,
+        {
+          OR: [
+            { submissionDate: dateFilter },
+            { submissionDate: null, createdAt: dateFilter },
+          ],
+        },
       ],
     };
 
