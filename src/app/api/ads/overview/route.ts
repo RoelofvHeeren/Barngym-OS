@@ -83,31 +83,29 @@ export async function GET(request: Request) {
       where: whereCondition,
     });
 
-    // 2. New Clients (Cohort): Converted in period + source is ads
-    // We look for client_conversion events in the period for ads leads.
-    const conversionEvents = await prisma.leadEvent.findMany({
+    // 2. New Clients (Cohort): Leads created in this period who are consistently marked as clients.
+    // This avoids issues with backfilled "conversion event" timestamps.
+    // Logic: Look at the leads *created* in this window. How many are clients?
+
+    // We reuse the same date filter as leadsCount, but add isClient=true
+    const cohortClients = await prisma.lead.findMany({
       where: {
-        eventType: "client_conversion",
-        createdAt: dateFilter,
-        lead: isAdsLeadFilter as any,
+        ...whereCondition, // Same date filter as leads
+        isClient: true,
       },
-      select: { leadId: true },
+      select: {
+        ltvAllCents: true
+      }
     });
 
-    // Get unique converted lead IDs
-    const newClientIds = Array.from(new Set(conversionEvents.map((e) => e.leadId)));
-    const conversionsCount = newClientIds.length;
+    const conversionsCount = cohortClients.length;
 
-    // 3. Cohort Revenue & LTV: Sum LTV of these specific new clients
+    // 3. Cohort Revenue & LTV: Sum LTV of these specific cohort clients
     let revenueFromAdsCents = 0;
     let avgLtvAdsCents = 0;
 
     if (conversionsCount > 0) {
-      const newClients = await prisma.lead.findMany({
-        where: { id: { in: newClientIds } },
-        select: { ltvAllCents: true }
-      });
-      revenueFromAdsCents = newClients.reduce((sum, c) => sum + (c.ltvAllCents ?? 0), 0);
+      revenueFromAdsCents = cohortClients.reduce((sum, c) => sum + (c.ltvAllCents ?? 0), 0);
       avgLtvAdsCents = Math.round(revenueFromAdsCents / conversionsCount);
     }
 

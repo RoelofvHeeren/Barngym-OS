@@ -14,18 +14,12 @@ export const navGroups = [
     label: "Command",
     items: [
       { name: "Dashboard", href: "/", icon: LayoutDashboard },
-      { name: "Goals", href: "/dashboard/goals", icon: Target },
       { name: "People / CRM", href: "/people", icon: Users },
+      { name: "Ads Dashboard", href: "/ads", icon: Megaphone },
+      { name: "Corporate Dashboard", href: "/corporate", icon: Building2 },
+      { name: "To Do", href: "/todo", icon: ClipboardList },
       { name: "Payments & Transactions", href: "/transactions", icon: CreditCard },
       { name: "Connections", href: "/connections", icon: Cable },
-      { name: "Ads Dashboard", href: "/ads", icon: Megaphone },
-      { name: "To Do", href: "/todo", icon: ClipboardList },
-    ],
-  },
-  {
-    label: "Phase 2",
-    items: [
-      { name: "Corporate Dashboard", href: "/corporate", icon: Building2 },
     ],
   },
 ];

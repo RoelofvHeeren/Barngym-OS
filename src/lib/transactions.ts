@@ -194,7 +194,26 @@ export type StarlingFeedItem = {
   spendingCategory?: string;
 };
 
+/**
+ * Check if a Starling transaction represents a payout from a payment processor
+ * (Stripe or Glofox). These should be excluded to avoid double-counting revenue.
+ */
+export function isPaymentProcessorPayout(item: StarlingFeedItem): boolean {
+  const counterParty = (item?.counterPartyName ?? "").toLowerCase();
+
+  // Stripe payouts (e.g., "Stripe Payments UK Ltd")
+  if (counterParty.includes("stripe payments")) return true;
+
+  // Glofox/Zappy payouts (e.g., "ZAPPY LTD")
+  if (counterParty.includes("zappy")) return true;
+
+  return false;
+}
+
 export function isIncomingStarling(item: StarlingFeedItem): boolean {
+  // First check if it's a payment processor payout - exclude these
+  if (isPaymentProcessorPayout(item)) return false;
+
   const dir = (item?.direction ?? "").toString().toUpperCase();
   if (dir) {
     return dir === "IN" || dir === "CREDIT";
