@@ -124,9 +124,12 @@ export async function GET(
             t.status === 'succeeded' || t.status === 'paid' || t.status === 'completed'
         );
 
-        const lifetimeSpend = contact.ltvAllCents || successfulTransactions.reduce((sum: number, t: any) =>
+        const contactLtv = contact.ltvAllCents || successfulTransactions.reduce((sum: number, t: any) =>
             sum + (t.amountMinor || 0), 0
         );
+
+        // Use the maximum of Contact LTV or Linked Lead LTV
+        const lifetimeSpend = Math.max(contactLtv, linkedLead?.ltvAllCents || 0);
 
         const profileData = {
             name: contact.fullName || 'Unknown',
