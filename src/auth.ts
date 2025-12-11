@@ -8,23 +8,26 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     ...authConfig,
     providers: [
         Credentials({
-            if(email.toLowerCase() === 'guy@barn-gym.com' && password === 'Barndashboard-2025') {
-            return {
-                id: '1',
-                email: 'Guy@barn-gym.com',
-                name: 'Guy',
-            }
-        }
+            async authorize(credentials) {
+                const { email, password } = credentials as any;
 
-                if(email.toLowerCase() === 'roelof@elvison.com' && password === 'Barndashboard-2025') {
-        return {
-            id: '2',
-            email: 'Roelof@elvison.com',
-            name: 'Roelof',
-        }
-    }
+                if (email.toLowerCase() === 'guy@barn-gym.com' && password === 'Barndashboard-2025') {
+                    return {
+                        id: '1',
+                        email: 'Guy@barn-gym.com',
+                        name: 'Guy',
+                    }
+                }
 
-return null;
+                if (email.toLowerCase() === 'roelof@elvison.com' && password === 'Barndashboard-2025') {
+                    return {
+                        id: '2',
+                        email: 'Roelof@elvison.com',
+                        name: 'Roelof',
+                    }
+                }
+
+                return null;
             },
         }),
     ],
