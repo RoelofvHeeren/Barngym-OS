@@ -57,9 +57,24 @@ export default function CorporateClients({ clients }: { clients: any[] }) {
                                         <p className="font-semibold text-primary">{client.companyName || "Unknown"}</p>
                                     </td>
                                     <td className="px-6 py-4">
-                                        <span className="inline-flex rounded-full bg-emerald-100/50 px-2.5 py-0.5 text-xs font-medium text-emerald-800">
-                                            {Array.isArray(client.activities) ? client.activities[0] : "General"}
-                                        </span>
+                                        <div className="flex flex-wrap gap-1">
+                                            {Array.isArray(client.activities) && client.activities.length > 0 ? (
+                                                client.activities.slice(0, 2).map((activity: string, idx: number) => (
+                                                    <span key={idx} className="inline-flex rounded-full bg-emerald-100/50 px-2.5 py-0.5 text-xs font-medium text-emerald-800">
+                                                        {activity}
+                                                    </span>
+                                                ))
+                                            ) : (
+                                                <span className="inline-flex rounded-full bg-emerald-100/50 px-2.5 py-0.5 text-xs font-medium text-emerald-800">
+                                                    General
+                                                </span>
+                                            )}
+                                            {Array.isArray(client.activities) && client.activities.length > 2 && (
+                                                <span className="inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-xs text-emerald-600">
+                                                    +{client.activities.length - 2}
+                                                </span>
+                                            )}
+                                        </div>
                                     </td>
                                     <td className="px-6 py-4 text-right font-medium text-emerald-800">
                                         €{((client.totalRevenue || 0) / 100).toLocaleString()}

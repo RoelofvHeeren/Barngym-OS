@@ -83,30 +83,96 @@ export async function GET(request: Request) {
       where: whereCondition,
     });
 
-    // 2. New Clients (Cohort): Leads created in this period who are consistently marked as clients.
-    // This avoids issues with backfilled "conversion event" timestamps.
-    // Logic: Look at the leads *created* in this window. How many are clients?
-
-    // We reuse the same date filter as leadsCount, but add isClient=true
-    const cohortClients = await prisma.lead.findMany({
+    // 2. Revenue (Cash Flow): Sum of all payments in this period from ads leads
+    const revenueAgg = await prisma.payment.aggregate({
+      _sum: { amountCents: true },
       where: {
-        ...whereCondition, // Same date filter as leads
+        timestamp: dateFilter,
+        lead: isAdsLeadFilter as any,
+      }
+    });
+    const revenueFromAdsCents = revenueAgg._sum.amountCents ?? 0;
+
+    // 3. Conversions (Acquisitions): Count of leads whose FIRST payment was in this period.
+    // Optimization: Fetch leads who made a payment *in this period* (candidates), 
+    // then verify if that was their *first* payment.
+    const activeAdsClients = await prisma.lead.findMany({
+      where: {
+        ...isAdsLeadFilter,
         isClient: true,
+        payments: {
+          some: { timestamp: dateFilter }
+        }
       },
       select: {
-        ltvAllCents: true
+        id: true,
+        ltvAdsCents: true,
+        payments: {
+          select: { timestamp: true },
+          orderBy: { timestamp: "asc" },
+          take: 1
+        }
       }
     });
 
-    const conversionsCount = cohortClients.length;
+    let conversionsCount = 0;
 
-    // 3. Cohort Revenue & LTV: Sum LTV of these specific cohort clients
-    let revenueFromAdsCents = 0;
+    for (const client of activeAdsClients) {
+      if (!client.payments.length) continue;
+
+      const firstPaymentDate = client.payments[0].timestamp;
+
+      // Check if first payment falls in the requested range
+      const isAcquiredInPeriod = start
+        ? (firstPaymentDate >= start && firstPaymentDate <= end)
+        : (firstPaymentDate <= end);
+
+      if (isAcquiredInPeriod) {
+        conversionsCount++;
+      }
+    }
+
+    // Avg LTV for ads clients (Overall or Cohort?)
+    // "Average LTV per ads client" usually implies the average value of acquried customers.
+    // Let's stick to: Revenue / Conversions (if cohort) OR Revenue / Active Clients?
+    // Dashboard label says "Average LTV per ads client".
+    // If we use Cash Flow Revenue, dividing by Conversions gives "Avg Revenue per New Client" which might be skewed if revenue includes recurring from old clients.
+    // However, usually LTV is calculated on the *population*.
+    // Let's calculate Avg LTV based on the *Conversions* (New Clients) LTV, to keep it consistent with "Quality of these new leads".
+    // BUT user wants Cash Flow revenue. 
+    // Let's calculate Avg LTV as: (Total Lifetime Value of ALL Ads Clients) / (Total Ads Clients) ? 
+    // Or (Revenue in Period) / (Conversions)? -> This is "Average Transaction Size" roughly.
+    // Given the previous code tried to do "Cohort LTV", let's try to show the Average LTV of the *Newly Acquired* clients.
+
+    let sumLtvOfNewClients = 0;
     let avgLtvAdsCents = 0;
-
     if (conversionsCount > 0) {
-      revenueFromAdsCents = cohortClients.reduce((sum, c) => sum + (c.ltvAllCents ?? 0), 0);
-      avgLtvAdsCents = Math.round(revenueFromAdsCents / conversionsCount);
+      // We need to re-fetch or use a different metric if we want "Avg LTV" of these specific converted people.
+      // We have `activeAdsClients`. We identified which ones are new.
+      // Let's iterate again or optimize the loop above.
+      const newClientIds = new Set<string>();
+      for (const client of activeAdsClients) {
+        if (!client.payments.length) continue;
+        const firstPaymentDate = client.payments[0].timestamp;
+        const isAcquiredInPeriod = start ? (firstPaymentDate >= start && firstPaymentDate <= end) : (firstPaymentDate <= end);
+        if (isAcquiredInPeriod) {
+          newClientIds.add(client.id);
+        }
+      }
+
+      // We need the LTV of these new clients. 
+      // `activeAdsClients` has `ltvAdsCents`.
+      // Let's verify if `activeAdsClients` contains them all. Yes, they paid in this period (first payment), so they are in `activeAdsClients`.
+
+      for (const client of activeAdsClients) {
+        if (newClientIds.has(client.id)) {
+          sumLtvOfNewClients += (client.ltvAdsCents ?? 0);
+          // Note: using ltvAdsCents because they are ads clients.
+        }
+      }
+      avgLtvAdsCents = Math.round(sumLtvOfNewClients / conversionsCount);
+    } else {
+      avgLtvAdsCents = 0;
     }
 
     // 4. Spend: Real data OR Default Budget

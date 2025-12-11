@@ -147,27 +147,84 @@ export async function getCorporateClients() {
                 { status: "CLIENT" },
                 { stage: "Closed Won" }
             ],
-            // Filter out Test Corp
+            // Filter out Test Corp and other placeholders
             NOT: {
-                companyName: "Test Corp"
+                companyName: { in: ["Test Corp", "Decathlon", "Unity Care", "Infinity Group"] }
             }
         },
         include: {
             payments: true,
+            transactions: {
+                where: {
+                    status: { in: ["success", "completed", "paid"] }
+                }
+            }
         },
         orderBy: {
             updatedAt: "desc",
         },
     });
 
-    // Calculate revenue for each client
+    // Calculate revenue and activities for each client
     return clients.map(client => {
-        const totalRevenue = client.payments.reduce((sum, payment) => sum + payment.amountCents, 0);
+        // Calculate revenue from transactions (primary source for corporate)
+        const transactionRevenue = client.transactions.reduce((sum, tx) => sum + (tx.amountMinor || 0), 0);
+
+        // Calculate revenue from direct payments if any (fallback/additive depending on logic, here treating as additive but usually one or other)
+        const paymentRevenue = client.payments.reduce((sum, payment) => sum + payment.amountCents, 0);
+
+        // Use transaction revenue as primary if available, otherwise paymenmts
+        const totalRevenue = transactionRevenue > 0 ? transactionRevenue : paymentRevenue;
+
+        // Derive activities from distinct product types in transactions
+        const distinctActivities = Array.from(new Set(
+            client.transactions
+                .map(t => t.productType)
+                .filter(Boolean)
+        ));
+
         return {
             ...client,
-            totalRevenue // Add this field to the returned object
+            totalRevenue,
+            activities: distinctActivities.length > 0 ? distinctActivities : (client.activities || ["General"])
         };
     });
+}
+
+export async function getCorporateClientDetails(id: string) {
+    const client = await prisma.lead.findUnique({
+        where: { id },
+        include: {
+            payments: true,
+            transactions: {
+                where: {
+                    status: { in: ["success", "completed", "paid"] }
+                },
+                orderBy: {
+                    occurredAt: 'desc'
+                }
+            }
+        }
+    });
+
+    if (!client) return null;
+
+    // Calculate details
+    const transactionRevenue = client.transactions.reduce((sum, tx) => sum + (tx.amountMinor || 0), 0);
+    const paymentRevenue = client.payments.reduce((sum, payment) => sum + payment.amountCents, 0);
+    const totalRevenue = transactionRevenue > 0 ? transactionRevenue : paymentRevenue;
+
+    const distinctActivities = Array.from(new Set(
+        client.transactions
+            .map(t => t.productType)
+            .filter(Boolean)
+    ));
+
+    return {
+        ...client,
+        totalRevenue,
+        derivedActivities: distinctActivities
+    };
 }
 
 export async function getLead(id: string) {
