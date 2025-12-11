@@ -2,18 +2,27 @@ import CorporatePipeline from "./components/CorporatePipeline";
 import OfferPerformance from "./components/OfferPerformance";
 import CorporateClients from "./components/CorporateClients";
 import DocumentLibrary from "./components/DocumentLibrary";
-import { getCorporatePipeline, getCorporateClients } from "./actions";
+import { getCorporatePipeline, getCorporateClients, getCorporateOverview } from "./actions";
 
 export default async function CorporatePage() {
   const pipelineData = await getCorporatePipeline();
   const clientData = await getCorporateClients();
+  const overviewData = await getCorporateOverview();
 
   const kpiCards = [
-    { label: "Total Corporate Revenue", value: "€842k", sub: "YTD Revenue" },
-    { label: "MRR from Corporate Coaching", value: "€32k", sub: "+8% vs last month" },
-    { label: "Retreat Revenue", value: "€210k", sub: "12 retreats delivered" },
-    { label: "Workshop Revenue", value: "€45k", sub: "18 workshops delivered" },
-    { label: "Forecasted Revenue", value: "€1.2m", sub: "Weighted pipeline" },
+    {
+      label: "Total Corporate Revenue",
+      value: `€${Math.round((overviewData.totalRevenue || 0) / 100).toLocaleString()}`,
+      sub: "YTD Revenue"
+    },
+    {
+      label: "Active Corporate Clients",
+      value: overviewData.activeContracts.toString(),
+      sub: "Current active contracts"
+    },
+    // { label: "Retreat Revenue", value: "€210k", sub: "12 retreats delivered" },
+    // { label: "Workshop Revenue", value: "€45k", sub: "18 workshops delivered" },
+    // { label: "Forecasted Revenue", value: "€1.2m", sub: "Weighted pipeline" },
   ];
 
   return (
@@ -27,7 +36,7 @@ export default async function CorporatePage() {
       </section>
 
       {/* Tier 2 - KPI Row */}
-      <section className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-5">
+      <section className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
         {kpiCards.map((card) => (
           <div key={card.label} className="glass-panel flex flex-col gap-2 p-6">
             <p className="text-xs uppercase tracking-wider text-muted">{card.label}</p>
@@ -44,7 +53,7 @@ export default async function CorporatePage() {
         <CorporatePipeline initialData={pipelineData} />
 
         {/* Tier 3.2 - Offer Performance */}
-        <OfferPerformance />
+        <OfferPerformance overview={overviewData} />
 
         {/* Tier 3.3 - Corporate Clients */}
         <CorporateClients clients={clientData} />

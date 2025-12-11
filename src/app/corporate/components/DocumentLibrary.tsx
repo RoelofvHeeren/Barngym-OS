@@ -13,13 +13,7 @@ type DocFile = {
     size: string;
 };
 
-const documents: DocFile[] = [
-    { id: "1", name: "Corporate Program Overview.pdf", type: "PDF", tag: "General", date: "Sep 12, 2025", size: "2.4 MB" },
-    { id: "2", name: "Q3 Coaching ROI Report.pdf", type: "PDF", tag: "Coaching", date: "Sep 08, 2025", size: "1.1 MB" },
-    { id: "3", name: "Retreat Logistics Checklist.docx", type: "DOC", tag: "Retreats", date: "Aug 29, 2025", size: "450 KB" },
-    { id: "4", name: "Workshop Feedback Summary.xlsx", type: "XLS", tag: "Workshops", date: "Aug 15, 2025", size: "85 KB" },
-    { id: "5", name: "Standard Contract Template.docx", type: "DOC", tag: "General", date: "Jul 22, 2025", size: "120 KB" },
-];
+const documents: DocFile[] = [];
 
 export default function DocumentLibrary() {
     const fileInputRef = useRef<HTMLInputElement>(null);

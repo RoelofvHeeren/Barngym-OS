@@ -147,9 +147,9 @@ export async function getCorporateClients() {
                 { status: "CLIENT" },
                 { stage: "Closed Won" }
             ],
-            // Filter out Test Corp and other placeholders
+            // Filter out Test Corp only
             NOT: {
-                companyName: { in: ["Test Corp", "Decathlon", "Unity Care", "Infinity Group"] }
+                companyName: "Test Corp"
             }
         },
         include: {
@@ -170,13 +170,11 @@ export async function getCorporateClients() {
         // Calculate revenue from transactions (primary source for corporate)
         const transactionRevenue = client.transactions.reduce((sum, tx) => sum + (tx.amountMinor || 0), 0);
 
-        // Calculate revenue from direct payments if any (fallback/additive depending on logic, here treating as additive but usually one or other)
+        // Calculate revenue from direct payments if any
         const paymentRevenue = client.payments.reduce((sum, payment) => sum + payment.amountCents, 0);
 
-        // Use transaction revenue as primary if available, otherwise paymenmts
         const totalRevenue = transactionRevenue > 0 ? transactionRevenue : paymentRevenue;
 
-        // Derive activities from distinct product types in transactions
         const distinctActivities = Array.from(new Set(
             client.transactions
                 .map(t => t.productType)
@@ -189,6 +187,58 @@ export async function getCorporateClients() {
             activities: distinctActivities.length > 0 ? distinctActivities : (client.activities || ["General"])
         };
     });
+}
+
+export async function getCorporateOverview() {
+    const clients = await prisma.lead.findMany({
+        where: { isCorporate: true, status: "CLIENT" }
+    });
+
+    // Get all corporate transactions for stats
+    const transactions = await prisma.transaction.findMany({
+        where: {
+            lead: { isCorporate: true },
+            status: { in: ["success", "completed", "paid"] }
+        },
+        orderBy: { occurredAt: 'desc' },
+        take: 50 // Fetch enough to find recent types
+    });
+
+    const activeContracts = clients.length;
+
+    // Calculate total revenue
+    const totalRevenue = transactions.reduce((sum, t) => sum + (t.amountMinor || 0), 0);
+
+    // Get recent retreats
+    const recentRetreats = transactions
+        .filter(t => t.productType === 'Retreat' || t.description?.toLowerCase().includes('retreat'))
+        .slice(0, 3)
+        .map(t => ({
+            id: t.id,
+            date: t.occurredAt,
+            location: t.description || 'Unknown', // Using description as location proxy or "Unknown"
+            revenue: t.amountMinor
+        }));
+
+    // Get recent workshops
+    const recentWorkshops = transactions
+        .filter(t => t.productType?.includes('Workshop') || t.description?.toLowerCase().includes('workshop'))
+        .slice(0, 4)
+        .map(t => ({
+            id: t.id,
+            name: t.productType || 'Workshop',
+            date: t.occurredAt,
+            revenue: t.amountMinor,
+            attendees: 0 // No attendee count in transaction yet
+        }));
+
+    return {
+        activeContracts,
+        totalRevenue,
+        recentRetreats,
+        recentWorkshops,
+        atRisk: [] // real data or empty
+    };
 }
 
 export async function getCorporateClientDetails(id: string) {
