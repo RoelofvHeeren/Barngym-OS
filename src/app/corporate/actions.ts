@@ -156,7 +156,7 @@ export async function getCorporateClients() {
             payments: true,
             transactions: {
                 where: {
-                    status: { in: ["success", "completed", "paid"] }
+                    status: { in: ["success", "completed", "paid", "succeeded", "SETTLED", "COMPLETED", "Completed", "Success", "Paid"] }
                 }
             }
         },
@@ -198,7 +198,7 @@ export async function getCorporateOverview() {
     const transactions = await prisma.transaction.findMany({
         where: {
             lead: { isCorporate: true },
-            status: { in: ["success", "completed", "paid"] }
+            status: { in: ["success", "completed", "paid", "succeeded", "SETTLED", "COMPLETED", "Completed", "Success", "Paid"] }
         },
         orderBy: { occurredAt: 'desc' },
         take: 50 // Fetch enough to find recent types
@@ -248,7 +248,7 @@ export async function getCorporateClientDetails(id: string) {
             payments: true,
             transactions: {
                 where: {
-                    status: { in: ["success", "completed", "paid"] }
+                    status: { in: ["success", "completed", "paid", "succeeded", "SETTLED", "COMPLETED", "Completed", "Success", "Paid"] }
                 },
                 orderBy: {
                     occurredAt: 'desc'
