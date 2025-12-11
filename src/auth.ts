@@ -9,8 +9,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     providers: [
         Credentials({
             async authorize(credentials) {
-                const parsedCredentials = credentials;
-                const { email, password } = parsedCredentials;
+                console.log('Authorize called with:', credentials);
+                const { email, password } = credentials;
+                console.log('Checking against:', 'Roelof@elvison.com', 'Barndashboard-2025');
 
                 if (email === 'Guy@barn-gym.com' && password === 'Barndashboard-2025') {
                     return {
