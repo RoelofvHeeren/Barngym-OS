@@ -6,7 +6,7 @@ async function main() {
     console.log(`\n🚑 Force Fixing Mark Sheldon...`);
 
     const markLead = await prisma.lead.findFirst({
-        where: { email: { equals: markEmail, mode: 'insensitive' } },
+        where: { email: { equals: markEmail, mode: 'insensitive' as const } },
         include: { transactions: true }
     });
 

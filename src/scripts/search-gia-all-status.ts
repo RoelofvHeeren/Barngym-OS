@@ -6,12 +6,12 @@ async function main() {
 
     // Search by related emails in Lead or Contact
     const leads = await prisma.lead.findMany({
-        where: { email: { in: emails, mode: 'insensitive' } },
+        where: { email: { in: emails, mode: 'insensitive' as const } },
         select: { id: true, email: true }
     });
 
     const contacts = await prisma.contact.findMany({
-        where: { email: { in: emails, mode: 'insensitive' } },
+        where: { email: { in: emails, mode: 'insensitive' as const } },
         select: { id: true, email: true }
     });
 
@@ -26,7 +26,7 @@ async function main() {
             OR: [
                 { leadId: { in: leadIds } },
                 { contactId: { in: contactIds } },
-                { personName: { contains: 'Badenhorst', mode: 'insensitive' } }
+                { personName: { contains: 'Badenhorst', mode: 'insensitive' as const } }
             ]
         }
     });

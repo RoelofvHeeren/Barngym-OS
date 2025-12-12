@@ -6,7 +6,7 @@ async function main() {
     // Find the transactions
     const transactions = await prisma.transaction.findMany({
         where: {
-            personName: { contains: 'Katie Brinsmead-Stockham', mode: 'insensitive' }
+            personName: { contains: 'Katie Brinsmead-Stockham', mode: 'insensitive' as const }
         },
         include: {
             contact: true,
@@ -31,7 +31,7 @@ async function main() {
     // Now find the correct Katie contact
     console.log('\n🔍 Finding Katie Brinsmead-Stockham contact...');
     const katieContact = await prisma.contact.findFirst({
-        where: { email: { equals: 'katie.brinsmead@gmail.com', mode: 'insensitive' } }
+        where: { email: { equals: 'katie.brinsmead@gmail.com', mode: 'insensitive' as const } }
     });
 
     if (katieContact) {

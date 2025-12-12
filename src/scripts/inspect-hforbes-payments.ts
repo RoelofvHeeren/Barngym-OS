@@ -5,7 +5,7 @@ async function main() {
     console.log(`Inspecting Payments for ${email}...`);
 
     const lead = await prisma.lead.findFirst({
-        where: { email: { equals: email, mode: 'insensitive' } },
+        where: { email: { equals: email, mode: 'insensitive' as const } },
         include: {
             payments: true,
             transactions: true

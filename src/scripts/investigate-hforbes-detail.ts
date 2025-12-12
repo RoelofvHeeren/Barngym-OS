@@ -4,7 +4,7 @@ async function main() {
     const email = 'hforbes88@hotmail.com';
 
     const lead = await prisma.lead.findFirst({
-        where: { email: { equals: email, mode: 'insensitive' } },
+        where: { email: { equals: email, mode: 'insensitive' as const } },
         include: {
             transactions: true
         }

@@ -20,7 +20,7 @@ async function main() {
 
     // Update Contact
     const contacts = await prisma.contact.findMany({
-        where: { email: { in: emails, mode: 'insensitive' } },
+        where: { email: { in: emails, mode: 'insensitive' as const } },
         include: { transactions: true }
     });
 
@@ -39,7 +39,7 @@ async function main() {
 
     // Update Lead
     const leads = await prisma.lead.findMany({
-        where: { email: { in: emails, mode: 'insensitive' } },
+        where: { email: { in: emails, mode: 'insensitive' as const } },
         include: { transactions: true }
     });
 
@@ -53,7 +53,7 @@ async function main() {
         let contactLTV = 0;
         if (lead.email) {
             const c = await prisma.contact.findFirst({
-                where: { email: { equals: lead.email, mode: 'insensitive' } }
+                where: { email: { equals: lead.email, mode: 'insensitive' as const } }
             });
             if (c) contactLTV = c.ltvAllCents;
         }

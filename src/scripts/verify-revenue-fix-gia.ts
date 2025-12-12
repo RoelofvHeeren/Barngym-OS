@@ -6,11 +6,11 @@ async function main() {
 
     const isAdsLeadFilter = {
         OR: [
-            { source: { contains: "ads", mode: "insensitive" } },
-            { source: { contains: "facebook", mode: "insensitive" } },
-            { source: { contains: "instagram", mode: "insensitive" } },
-            { source: { contains: "meta", mode: "insensitive" } },
-            { source: { contains: "tiktok", mode: "insensitive" } },
+            { source: { contains: "ads", mode: "insensitive" as const } },
+            { source: { contains: "facebook", mode: "insensitive" as const } },
+            { source: { contains: "instagram", mode: "insensitive" as const } },
+            { source: { contains: "meta", mode: "insensitive" as const } },
+            { source: { contains: "tiktok", mode: "insensitive" as const } },
         ]
     };
 
@@ -28,7 +28,7 @@ async function main() {
 
     // Calculate sum of transactions for her lead ID only
     const giaLead = await prisma.lead.findFirst({
-        where: { email: { equals: giaEmail, mode: 'insensitive' } },
+        where: { email: { equals: giaEmail, mode: 'insensitive' as const } },
         include: { transactions: true }
     });
 

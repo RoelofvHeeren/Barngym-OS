@@ -23,7 +23,7 @@ async function main() {
         for (const lead of batch) {
             // Find matching contact by email
             const contact = await prisma.contact.findFirst({
-                where: { email: { equals: lead.email!, mode: 'insensitive' } },
+                where: { email: { equals: lead.email!, mode: 'insensitive' as const } },
                 select: {
                     ltvAllCents: true,
                 }

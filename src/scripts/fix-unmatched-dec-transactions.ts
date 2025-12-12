@@ -14,7 +14,7 @@ async function main() {
 
         // Find the contact
         const contact = await prisma.contact.findFirst({
-            where: { email: { equals: email, mode: 'insensitive' } },
+            where: { email: { equals: email, mode: 'insensitive' as const } },
             include: {
                 transactions: true,
             }
@@ -35,8 +35,8 @@ async function main() {
             where: {
                 contactId: null,
                 OR: [
-                    { personName: { contains: name.split(' ')[0], mode: 'insensitive' } },
-                    { personName: { contains: name.split(' ')[1], mode: 'insensitive' } },
+                    { personName: { contains: name.split(' ')[0], mode: 'insensitive' as const } },
+                    { personName: { contains: name.split(' ')[1], mode: 'insensitive' as const } },
                 ]
             }
         });

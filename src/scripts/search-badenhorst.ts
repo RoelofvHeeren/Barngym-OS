@@ -6,7 +6,7 @@ async function main() {
 
     // Search Transactions by personName
     const transactions = await prisma.transaction.findMany({
-        where: { personName: { contains: nameQuery, mode: 'insensitive' } },
+        where: { personName: { contains: nameQuery, mode: 'insensitive' as const } },
     });
 
     console.log(`\nFound ${transactions.length} Transactions:`);
@@ -16,7 +16,7 @@ async function main() {
 
     // Search Contacts by name
     const contacts = await prisma.contact.findMany({
-        where: { fullName: { contains: nameQuery, mode: 'insensitive' } },
+        where: { fullName: { contains: nameQuery, mode: 'insensitive' as const } },
     });
     console.log(`\nFound ${contacts.length} Contacts:`);
     contacts.forEach(c => {

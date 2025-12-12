@@ -10,7 +10,7 @@ async function main() {
                 where: {
                     status: {
                         in: ['Completed', 'completed', 'succeeded', 'paid', 'SETTLED'],
-                        mode: 'insensitive'
+                        mode: 'insensitive' as const
                     }
                 }
             }
@@ -30,7 +30,7 @@ async function main() {
         let contactLTV = 0;
         if (lead.email) {
             const contact = await prisma.contact.findFirst({
-                where: { email: { equals: lead.email, mode: 'insensitive' } },
+                where: { email: { equals: lead.email, mode: 'insensitive' as const } },
                 select: { ltvAllCents: true }
             });
             if (contact) {

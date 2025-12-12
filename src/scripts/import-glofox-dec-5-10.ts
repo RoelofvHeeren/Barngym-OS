@@ -65,7 +65,7 @@ async function main() {
     const emails = transactions.map(t => t.email.toLowerCase());
     const contacts = await prisma.contact.findMany({
         where: {
-            email: { in: emails, mode: 'insensitive' }
+            email: { in: emails, mode: 'insensitive' as const }
         },
         select: {
             id: true,

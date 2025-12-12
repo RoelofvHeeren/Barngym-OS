@@ -5,7 +5,7 @@ async function main() {
     console.log(`Deleting duplicate with typo email: ${typoEmail}...`);
 
     const lead = await prisma.lead.findFirst({
-        where: { email: { equals: typoEmail, mode: 'insensitive' } }
+        where: { email: { equals: typoEmail, mode: 'insensitive' as const } }
     });
 
     if (lead) {
@@ -24,7 +24,7 @@ async function main() {
     // Also verify the valid lead name is correct
     const validEmail = 'fionamcintosh1169@gmail.com';
     const validLead = await prisma.lead.findFirst({
-        where: { email: { equals: validEmail, mode: 'insensitive' } }
+        where: { email: { equals: validEmail, mode: 'insensitive' as const } }
     });
 
     if (validLead) {

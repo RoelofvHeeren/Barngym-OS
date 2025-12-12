@@ -6,7 +6,7 @@ async function main() {
 
     // 1. Check Lead
     const lead = await prisma.lead.findFirst({
-        where: { email: { equals: email, mode: 'insensitive' } },
+        where: { email: { equals: email, mode: 'insensitive' as const } },
         include: { transactions: true }
     });
 
@@ -23,7 +23,7 @@ async function main() {
 
     // 2. Check Contact (matched by email)
     const contact = await prisma.contact.findFirst({
-        where: { email: { equals: email, mode: 'insensitive' } },
+        where: { email: { equals: email, mode: 'insensitive' as const } },
         include: { transactions: true }
     });
 

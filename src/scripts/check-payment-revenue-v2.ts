@@ -29,11 +29,11 @@ async function main() {
         const allAdLeads = await prisma.lead.findMany({
             where: {
                 OR: [
-                    { source: { contains: 'ads', mode: 'insensitive' } },
-                    { source: { contains: 'facebook', mode: 'insensitive' } },
-                    { source: { contains: 'instagram', mode: 'insensitive' } },
-                    { source: { contains: 'meta', mode: 'insensitive' } },
-                    { source: { contains: 'tiktok', mode: 'insensitive' } }
+                    { source: { contains: 'ads', mode: 'insensitive' as const } },
+                    { source: { contains: 'facebook', mode: 'insensitive' as const } },
+                    { source: { contains: 'instagram', mode: 'insensitive' as const } },
+                    { source: { contains: 'meta', mode: 'insensitive' as const } },
+                    { source: { contains: 'tiktok', mode: 'insensitive' as const } }
                 ]
             },
             select: { id: true, email: true, ltvAdsCents: true, payments: { select: { id: true, amountCents: true } } }
