@@ -324,7 +324,7 @@ export async function POST(request: Request) {
 
     // 2. Comprehensive Logging - Log ALL incoming webhooks
     console.log(`[Glofox Webhook] Received event: ${eventType}`);
-    console.log(`[Glofox Webhook] Payload preview:`, JSON.stringify(payload).slice(0, 500));
+    console.log(`[Glofox Webhook] Payload preview:`, JSON.stringify(json).slice(0, 500));
 
     await prisma.syncLog.create({
       data: {
