@@ -77,42 +77,55 @@ export async function syncGlofoxTransactions(daysToSync: number = 7) {
     });
 
     if (!res.ok) {
-        const txt = await res.text();
-        throw new Error(`Glofox API Error (${res.status}): ${txt}`);
+        const errorText = await res.text();
+        throw new Error(`Glofox API Error ${res.status}: ${errorText}`);
     }
 
-    const json = await res.json();
-    const rawData = Array.isArray(json) ? json : (json.data || json.transactions || []);
+    const data = await res.json();
 
-    if (!Array.isArray(rawData)) {
-        console.warn("[Glofox Sync] Unexpected response format:", JSON.stringify(json).slice(0, 200));
+    // Glofox sometimes returns 200 OK with an error message in the body
+    if (data.success === false || (data.message && data.message_code)) {
+        throw new Error(`Glofox API Error (200): ${data.message || JSON.stringify(data)}`);
+    }
+
+    const rawTransactions = Array.isArray(data) ? data : (data.data || data.transactions || []);
+
+    // Normalize and Upsert
+
+    if (!Array.isArray(rawTransactions)) {
+        console.warn("[Glofox Sync] Unexpected response format:", JSON.stringify(data).slice(0, 200));
         return { added: 0, total: 0, message: "Unexpected API response format." };
     }
 
-    console.log(`[Glofox Sync] Received ${rawData.length} records.`);
+    console.log(`[Glofox Sync] Received ${rawTransactions.length} records.`);
 
-    const normalized: NormalizedTransaction[] = rawData.map((item: any) => {
-        // Map to the shape mapGlofoxPayment expects, or handle directly
-        // The API user object might differ from webhook flat fields
-        const payload: any = {
-            ...item,
-            member_name: item.member_name || (item.user ? `${item.user.first_name} ${item.user.last_name}`.trim() : undefined),
-            member_email: item.member_email || item.user?.email,
-            member_phone: item.member_phone || item.user?.phone || item.user?.mobile,
-            member_id: item.member_id || item.user?.id,
-        };
-        return mapGlofoxPayment(payload);
-    });
+    const records = rawTransactions
+        .map((item: any) => {
+            try {
+                const payload: any = {
+                    ...item,
+                    member_name: item.member_name || (item.user ? `${item.user.first_name} ${item.user.last_name}`.trim() : undefined),
+                    member_email: item.member_email || item.user?.email,
+                    member_phone: item.member_phone || item.user?.phone || item.user?.mobile,
+                    member_id: item.member_id || item.user?.id,
+                };
+                return mapGlofoxPayment(payload);
+            } catch (e) {
+                console.error("Failed to map glofox item", item, e);
+                return null;
+            }
+        })
+        .filter((r): r is NormalizedTransaction => r !== null);
 
-    const { added } = await upsertTransactions(normalized);
+    const { added, total } = await upsertTransactions(records);
 
     await prisma.syncLog.create({
         data: {
             source: "Glofox",
-            detail: `Manual Sync: Fetched ${rawData.length} items, Added ${added} new.`,
+            detail: `Manual Sync: Fetched ${rawTransactions.length} items, Added ${added} new.`,
             records: String(added),
         }
     });
 
-    return { added, totalFetched: rawData.length };
+    return { added, totalFetched: rawTransactions.length };
 }

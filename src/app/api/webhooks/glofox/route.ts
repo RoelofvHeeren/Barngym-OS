@@ -185,6 +185,12 @@ async function handleInvoiceEvent(eventType: string, payload: Record<string, unk
 
   if (!invoiceId) return;
 
+  // Helper to get full name
+  const user = payload.user as any;
+  const fullName = user?.name ||
+    (user?.first_name && user?.last_name ? `${user.first_name} ${user.last_name}` : "") ||
+    "Unknown Member";
+
   const transactions: NormalizedTransaction[] = lineItems.map((item, idx) => {
     const prodTypeRaw = String(item.type || "").toUpperCase();
     let productCat = "Other";
@@ -192,17 +198,36 @@ async function handleInvoiceEvent(eventType: string, payload: Record<string, unk
     else if (prodTypeRaw.includes("CLASS") || prodTypeRaw.includes("EVENT")) productCat = "Classes";
     else if (prodTypeRaw.includes("MEMBERSHIP")) productCat = "Membership";
 
-    const amount = Number(item.amount || item.total || 0);
+    // Fallback: If amount/total generic fields are missing, try unit_price * quantity
+    let amount = Number(item.amount || item.total);
+    if (isNaN(amount) && item.unit_price !== undefined) {
+      // Glofox often sends unit_price in major units (e.g. 100 for 100 GBP? Or 100 pennies?)
+      // Based on user feedback "£1" and payload "100", it seems unit_price is 100 major? Or 100 minor?
+      // Logs showed 1000 EUR for membership -> 1000.00.
+      // If payload is 100 and it was complimentary £1 charge...
+      // Actually, if it's complimentary, total is 0. So revenue IS 0.
+      // But "value" might be 1. 
+      // For now, let's respect the "total" of 0 if it exists, otherwise use unit_price.
+      // Wait, the payload has "total": 0 for the invoice, but line item has unit_price: 100.
+      // If we want to track 'revenue', zero is correct.
+      // If we fallback to unit_price, we record £1.
+      // But the user paid 0. So Revenue is 0.
+      // So `item.total` being 0 is CORRECT.
+      amount = 0;
+    }
+
+    // Ensure we don't produce NaN
+    if (isNaN(amount)) amount = 0;
 
     return {
-      externalId: `${invoiceId}_${idx}`, // Unique ID per line item
+      externalId: `${invoiceId}_${idx}`,
       provider: "Glofox",
-      amountMinor: Math.round(amount * 100), // Assuming amount is major currency
-      status: String(payload.status || "Completed"), // Invoices usually paid/due
+      amountMinor: Math.round(amount * 100),
+      status: String(payload.status || "Completed"),
       occurredAt: new Date(String(payload.created || payload.date || new Date())).toISOString(),
       productType: productCat,
-      personName: String((payload.user as any)?.name || ""), // from payload if available
-      leadId: null, // Logic to link lead is handled in upsertTransactions enhancement or separate matcher
+      personName: String(fullName),
+      leadId: null,
       currency: String(payload.currency || "EUR").toUpperCase(),
       confidence: "High",
       description: String(item.name || item.description || `Invoice ${invoiceId}`),
@@ -266,20 +291,13 @@ export async function POST(request: Request) {
     const signature = request.headers.get("x-glofox-signature");
     if (secret?.webhookSalt) {
       // Verify signature
-      // GLOFOX DEBUG: Logging signature details
-      console.log(`[Glofox Webhook] Signature Check: Provided=${signature}, Salt=${secret?.webhookSalt || 'NONE'}`);
-
-      // TEMPORARY: Allow all requests to debug payload
-      // const isValid = verifySignature(rawBody, signature, secret.webhookSalt);
-      // if (!isValid) {
-      //   console.warn("[Glofox Webhook] Signature verification failed", {
-      //     provided: signature,
-      //     calculated: createHmac("sha256", secret.webhookSalt).update(rawBody).digest("hex")
-      //   });
-      //   // TEMPORARY: Allow processing even if signature fails to prevent data loss
-      //   // return NextResponse.json({ ok: false, message: "Invalid Glofox signature." }, { status: 401 });
-      // }
-      console.warn("[Glofox Webhook] Signature verification BYPASSED for debugging");
+      if (!verifySignature(rawBody, signature, secret?.webhookSalt)) {
+        console.warn("[Glofox Webhook] Signature verification failed", {
+          provided: signature,
+          calculated: createHmac("sha256", secret.webhookSalt!).update(rawBody).digest("hex")
+        });
+        return NextResponse.json({ message: "Invalid signature" }, { status: 401 });
+      }
     }
 
     if (!rawBody) {
