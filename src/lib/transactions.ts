@@ -19,6 +19,7 @@ export type NormalizedTransaction = {
   metadata?: Record<string, unknown>;
   raw?: Record<string, unknown>;
   leadId?: string | null;
+  contactId?: string | null;
 };
 
 function safeString(value: unknown): string | undefined {
@@ -65,6 +66,7 @@ export async function upsertTransactions(records: NormalizedTransaction[]) {
           raw: rawPayload as Prisma.TransactionUncheckedUpdateInput["raw"],
           metadata: metadataPayload as Prisma.TransactionUncheckedUpdateInput["metadata"],
           leadId: record.leadId ?? null,
+          contactId: record.contactId ?? null,
         },
         create: {
           externalId: record.externalId,
@@ -82,11 +84,27 @@ export async function upsertTransactions(records: NormalizedTransaction[]) {
           raw: rawPayload as Prisma.TransactionUncheckedCreateInput["raw"],
           metadata: metadataPayload as Prisma.TransactionUncheckedCreateInput["metadata"],
           leadId: record.leadId ?? null,
+          contactId: record.contactId ?? null,
         },
       })
-      .then(() => {
+      .then(async (tx) => {
         if (!existingSet.has(record.externalId)) {
           added += 1;
+        }
+
+        // Add to Manual Match Queue if unmatched
+        if (!record.leadId && !record.contactId && tx.status !== "Failed") {
+          const existingQueue = await prisma.manualMatchQueue.findFirst({
+            where: { transactionId: tx.id }
+          });
+          if (!existingQueue) {
+            await prisma.manualMatchQueue.create({
+              data: {
+                transactionId: tx.id,
+                reason: "Unmatched Transaction",
+              }
+            });
+          }
         }
       })
       .catch((error) => {

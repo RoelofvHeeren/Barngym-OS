@@ -8,10 +8,12 @@ export async function attachLead(record: NormalizedTransaction) {
   }
   const email = (record.metadata?.email as string | undefined) ?? undefined;
   const phone = (record.metadata?.phone as string | undefined) ?? undefined;
-  const leadId = await findLeadMatch({ email, phone, personName: record.personName });
+  const { leadId, contactId } = await findLeadMatch({ email, phone, personName: record.personName });
 
-  if (leadId) {
-    record.leadId = leadId;
+  if (leadId || contactId) {
+    if (leadId) record.leadId = leadId;
+    if (contactId) record.contactId = contactId;
+
     if (record.status === "Needs Review") {
       record.status = "Completed";
     }
