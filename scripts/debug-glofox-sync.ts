@@ -77,7 +77,6 @@ async function main() {
                         "x-glofox-branch-id": bId, // Some endpoints need this header
                         ...(auth.headers as any) // Explicit cast to avoid HeadersInit mismatch
                     },
-                    agent: agent
                 } as any);
                 const json = await res.json();
                 if (json.success === false) {
