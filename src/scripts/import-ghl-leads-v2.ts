@@ -61,7 +61,7 @@ async function main() {
 
         // Check if lead exists
         const existing = await prisma.lead.findFirst({
-            where: { email: { equals: email, mode: "insensitive" } }
+            where: { email: { equals: email, mode: "insensitive" as const } }
         });
 
         const isClient = await checkIsClient(email);

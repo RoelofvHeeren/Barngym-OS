@@ -15,11 +15,11 @@ async function main() {
     // Let's target the AD Leads first since that's where the issue is reported.
     const isAdsLeadFilter = {
         OR: [
-            { source: { contains: "ads", mode: "insensitive" } },
-            { source: { contains: "facebook", mode: "insensitive" } },
-            { source: { contains: "instagram", mode: "insensitive" } },
-            { source: { contains: "meta", mode: "insensitive" } },
-            { source: { contains: "tiktok", mode: "insensitive" } },
+            { source: { contains: "ads", mode: "insensitive" as const } },
+            { source: { contains: "facebook", mode: "insensitive" as const } },
+            { source: { contains: "instagram", mode: "insensitive" as const } },
+            { source: { contains: "meta", mode: "insensitive" as const } },
+            { source: { contains: "tiktok", mode: "insensitive" as const } },
         ]
     };
 

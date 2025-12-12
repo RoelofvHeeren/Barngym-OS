@@ -16,7 +16,7 @@ async function diagnoseMultiple() {
         console.log(`\n=== Diagnosing ${email} ===`);
 
         const lead = await prisma.lead.findFirst({
-            where: { email: { equals: email, mode: "insensitive" } },
+            where: { email: { equals: email, mode: "insensitive" as const } },
             include: { payments: true, transactions: true }
         });
 

@@ -7,7 +7,7 @@ async function checkFiona() {
     const email = "fionamcintosh1169@gmail.com";
 
     const lead = await prisma.lead.findFirst({
-        where: { email: { equals: email, mode: "insensitive" } },
+        where: { email: { equals: email, mode: "insensitive" as const } },
         include: { payments: true }
     });
 

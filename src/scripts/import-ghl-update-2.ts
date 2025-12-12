@@ -61,7 +61,7 @@ async function main() {
 
         // Check existing
         const existing = await prisma.lead.findFirst({
-            where: { email: { equals: email, mode: "insensitive" } }
+            where: { email: { equals: email, mode: "insensitive" as const } }
         });
 
         let leadId = existing?.id;

@@ -8,7 +8,7 @@ async function main() {
         _sum: { amountCents: true },
         where: {
             lead: {
-                source: { contains: "ads", mode: "insensitive" }
+                source: { contains: "ads", mode: "insensitive" as const }
             }
         }
     });
@@ -19,7 +19,7 @@ async function main() {
     const payments = await prisma.payment.findMany({
         where: {
             lead: {
-                source: { contains: "ads", mode: "insensitive" }
+                source: { contains: "ads", mode: "insensitive" as const }
             }
         },
         select: {

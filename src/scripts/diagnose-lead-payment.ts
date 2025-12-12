@@ -20,7 +20,7 @@ async function diagnose() {
 
     // 2. Check Contacts & Transactions
     const contacts = await prisma.contact.findMany({
-        where: { email: { equals: email, mode: "insensitive" } },
+        where: { email: { equals: email, mode: "insensitive" as const } },
         include: { transactions: true }
     });
 
