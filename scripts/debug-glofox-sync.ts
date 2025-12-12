@@ -118,7 +118,7 @@ async function main() {
                     limit: "5",
                     sort: "desc",
                     ...v.params,
-                });
+                } as any);
                 const url = `${baseUrl}/${endpoint}?${queryParams.toString()}`;
 
                 try {
