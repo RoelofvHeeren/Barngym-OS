@@ -309,8 +309,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, message: "Empty body" });
     }
 
-    const payload = JSON.parse(rawBody) as any;
-    const eventType = (payload.Type || payload.type || "").toString().toUpperCase();
+    const json = JSON.parse(rawBody) as any;
+    const eventType = (json.Type || json.type || "").toString().toUpperCase();
+
+    // Glofox wraps the actual data in a 'Payload' field for webhooks
+    // But some legacy/test events might be flat.
+    // We'll pass the 'data' part to handlers.
+    let data = json;
+    if (json.Payload && typeof json.Payload === 'object') {
+      data = json.Payload;
+    } else if (json.payload && typeof json.payload === 'object') {
+      data = json.payload;
+    }
 
     // 2. Comprehensive Logging - Log ALL incoming webhooks
     console.log(`[Glofox Webhook] Received event: ${eventType}`);
@@ -331,20 +341,20 @@ export async function POST(request: Request) {
 
     // 3. Event Routing
     if (eventType.startsWith("MEMBER")) {
-      await handleMemberEvent(eventType, payload);
+      await handleMemberEvent(eventType, data);
     } else if (eventType.startsWith("MEMBERSHIP")) {
-      await handleMembershipEvent(eventType, payload);
+      await handleMembershipEvent(eventType, data);
     } else if (eventType.includes("INVOICE")) {
-      await handleInvoiceEvent(eventType, payload);
+      await handleInvoiceEvent(eventType, data);
     } else if (eventType.includes("BOOKING")) {
-      await handleBookingEvent(eventType, payload);
+      await handleBookingEvent(eventType, data);
     } else if (eventType.includes("ACCESS") || eventType.includes("EVENT") || eventType.includes("SERVICE")) {
       // Ignore for now
       console.log(`[Glofox Webhook] Ignoring event type: ${eventType}`);
     } else {
       // Unknown or Legacy event - Try to extract payments using fallback logic
       console.log(`[Glofox Webhook] Unknown event type: ${eventType}, attempting fallback payment extraction`);
-      const payments = extractPayments(payload).filter(Boolean);
+      const payments = extractPayments(data).filter(Boolean);
       if (payments.length > 0) {
         try {
           const normalized: NormalizedTransaction[] = payments.map((payment) =>
