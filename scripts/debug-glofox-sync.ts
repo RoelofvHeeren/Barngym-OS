@@ -75,10 +75,10 @@ async function main() {
                     headers: {
                         "Content-Type": "application/json",
                         "x-glofox-branch-id": bId, // Some endpoints need this header
-                        ...auth.headers
+                        ...(auth.headers as any) // Explicit cast to avoid HeadersInit mismatch
                     },
-                });
-
+                    agent: agent
+                } as any);
                 const json = await res.json();
                 if (json.success === false) {
                     console.log(`      ❌ Error: ${json.message}`);
