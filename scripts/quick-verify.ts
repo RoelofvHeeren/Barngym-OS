@@ -10,16 +10,22 @@ async function checkCount() {
 
     const count = await prisma.lead.count({
         where: {
-            OR: [
-                { source: { contains: "ads", mode: "insensitive" } },
-                { source: { contains: "facebook", mode: "insensitive" } },
-                { source: { contains: "instagram", mode: "insensitive" } },
-                { source: { contains: "meta", mode: "insensitive" } },
-                { source: { contains: "tiktok", mode: "insensitive" } },
-            ],
-            OR: [
-                { submissionDate: { gte: start7d, lte: end } },
-                { submissionDate: null, createdAt: { gte: start7d, lte: end } }
+            AND: [
+                {
+                    OR: [
+                        { source: { contains: "ads", mode: "insensitive" } },
+                        { source: { contains: "facebook", mode: "insensitive" } },
+                        { source: { contains: "instagram", mode: "insensitive" } },
+                        { source: { contains: "meta", mode: "insensitive" } },
+                        { source: { contains: "tiktok", mode: "insensitive" } },
+                    ]
+                },
+                {
+                    OR: [
+                        { submissionDate: { gte: start7d, lte: end } },
+                        { submissionDate: null, createdAt: { gte: start7d, lte: end } }
+                    ]
+                }
             ]
         }
     });
