@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { GlofoxSyncButton } from "@/components/GlofoxSyncButton";
 
 type SyncLog = {
   id: string;
@@ -489,6 +490,7 @@ export default function ConnectionsPage() {
             <button className="rounded-full bg-black px-5 py-2 text-sm font-semibold text-white disabled:opacity-50" onClick={testGlofoxConnection} disabled={glofoxStatus === "loading"}>
               {glofoxStatus === "loading" ? "Testing..." : "Test Connection"}
             </button>
+            <GlofoxSyncButton />
           </div>
           {glofoxStatus !== "idle" && glofoxMessage && (
             <p className={`flex flex-wrap items-center gap-2 text-sm ${glofoxStatus === "success" ? "text-emerald-700" : "text-amber-600"}`}>
