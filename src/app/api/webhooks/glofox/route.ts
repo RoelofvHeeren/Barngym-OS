@@ -200,20 +200,15 @@ async function handleInvoiceEvent(eventType: string, payload: Record<string, unk
 
     // Fallback: If amount/total generic fields are missing, try unit_price * quantity
     let amount = Number(item.amount || item.total);
+
+    // If explicit amount is missing, calculate from unit_price
     if (isNaN(amount) && item.unit_price !== undefined) {
-      // Glofox often sends unit_price in major units (e.g. 100 for 100 GBP? Or 100 pennies?)
-      // Based on user feedback "£1" and payload "100", it seems unit_price is 100 major? Or 100 minor?
-      // Logs showed 1000 EUR for membership -> 1000.00.
-      // If payload is 100 and it was complimentary £1 charge...
-      // Actually, if it's complimentary, total is 0. So revenue IS 0.
-      // But "value" might be 1. 
-      // For now, let's respect the "total" of 0 if it exists, otherwise use unit_price.
-      // Wait, the payload has "total": 0 for the invoice, but line item has unit_price: 100.
-      // If we want to track 'revenue', zero is correct.
-      // If we fallback to unit_price, we record £1.
-      // But the user paid 0. So Revenue is 0.
-      // So `item.total` being 0 is CORRECT.
-      amount = 0;
+      const qty = Number(item.quantity || 1);
+      const unitPrice = Number(item.unit_price || 0);
+      // Webhook sends unit_price in MINOR units (e.g. 100 = £1.00)
+      // We want 'amount' in Major units for the 'amount' variable (which is multiplied by 100 later for amountMinor)
+      // Actually, let's keep 'amount' as Major to be consistent with the rest of the file.
+      amount = (unitPrice * qty) / 100;
     }
 
     // Ensure we don't produce NaN
