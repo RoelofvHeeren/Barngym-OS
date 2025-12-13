@@ -381,8 +381,11 @@ function normalizeApiLead(lead: ApiLead): NormalizedLead {
 // Duplicate type removed
 function PeopleContent() {
   const [search, setSearch] = useState("");
+  const searchParams = useSearchParams();
+  const initialView = (searchParams.get("view") as "all" | "leads" | "members" | "expiring") ?? "all";
+
   const [leadFilter, setLeadFilter] = useState<LeadStage>("All");
-  const [viewMode, setViewMode] = useState<"all" | "leads" | "members">("all");
+  const [viewMode, setViewMode] = useState<"all" | "leads" | "members" | "expiring">(initialView);
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("All Sources");
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [csvFile, setCsvFile] = useState<File | null>(null);
@@ -457,7 +460,7 @@ function PeopleContent() {
     loadImportedLeads();
   }, [loadImportedLeads]);
 
-  const searchParams = useSearchParams();
+  // const searchParams = useSearchParams(); Moved to top level
   const initialId = searchParams.get("id");
 
   useEffect(() => {

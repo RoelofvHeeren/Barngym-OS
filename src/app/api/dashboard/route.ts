@@ -50,15 +50,15 @@ export async function GET() {
       },
     });
 
-    const followUpLeadsPromise = prisma.lead.count({
-      where: {
-        stage: { in: ["New", "Follow Up", "Proposal"] },
-      },
-    });
+    const nextTwoWeeks = new Date();
+    nextTwoWeeks.setDate(nextTwoWeeks.getDate() + 14);
 
-    const expiringMembershipsPromise = prisma.lead.count({
+    const expiringMembershipsPromise = prisma.contact.count({
       where: {
-        nextStep: { contains: "renew", mode: "insensitive" },
+        membershipEndDate: {
+          gt: now,
+          lte: nextTwoWeeks,
+        },
       },
     });
 
@@ -71,7 +71,7 @@ export async function GET() {
 
     const needsReviewPromise = prisma.transaction.count({
       where: {
-        OR: [{ status: "Needs Review" }, { leadId: null }],
+        status: "Needs Review",
       },
     });
 
@@ -80,7 +80,6 @@ export async function GET() {
       activeMembers,
       trialMembers,
       corporateClients,
-      followUpLeads,
       expiringMemberships,
       failedPayments,
       needsReview,
@@ -89,7 +88,6 @@ export async function GET() {
       activeMembersPromise,
       trialMembersPromise,
       corporateClientsPromise,
-      followUpLeadsPromise,
       expiringMembershipsPromise,
       failedPaymentsPromise,
       needsReviewPromise,
@@ -136,7 +134,7 @@ export async function GET() {
             failedPayments,
             needsReview,
             expiringMemberships,
-            followUps: followUpLeads,
+            followUps: 0, // Deprecated
           },
         },
       },

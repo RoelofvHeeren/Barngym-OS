@@ -1,6 +1,7 @@
 const { PrismaClient } = require('@prisma/client');
 const fs = require('fs');
 const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '../.env.local') });
 
 async function importMembers() {
     const prisma = new PrismaClient();
@@ -44,10 +45,18 @@ async function importMembers() {
         }
 
         // Process function to handle upsert with tag merging
-        async function processContact(email, firstName, lastName, phone, newTag) {
+        async function processContact(email, firstName, lastName, phone, newTag, membershipName, membershipEndDateText) {
             if (!email) return;
             email = email.toLowerCase().trim();
             const fullName = `${firstName || ''} ${lastName || ''}`.trim() || email;
+
+            let membershipEndDate = null;
+            if (membershipEndDateText && membershipEndDateText.trim()) {
+                const date = new Date(membershipEndDateText);
+                if (!isNaN(date.getTime())) {
+                    membershipEndDate = date;
+                }
+            }
 
             const existing = await prisma.contact.findUnique({ where: { email } });
 
@@ -55,14 +64,15 @@ async function importMembers() {
                 // Merge tags
                 const tags = new Set(existing.sourceTags || []);
                 if (newTag) tags.add(newTag);
-                // Force status to client for members
+
                 await prisma.contact.update({
                     where: { email },
                     data: {
                         status: 'client',
                         sourceTags: Array.from(tags),
-                        // Update phone/name if missing? Maybe better to keep existing if valid
                         phone: existing.phone || phone,
+                        membershipType: membershipName || existing.membershipType,
+                        membershipEndDate: membershipEndDate || existing.membershipEndDate,
                     }
                 });
                 process.stdout.write('.');
@@ -78,6 +88,8 @@ async function importMembers() {
                         phone,
                         status: 'client',
                         sourceTags: tags,
+                        membershipType: membershipName,
+                        membershipEndDate: membershipEndDate,
                     }
                 });
                 process.stdout.write('+');
@@ -99,7 +111,9 @@ async function importMembers() {
                 member['First Name'],
                 member['Last Name'],
                 member.Phone,
-                'glofox'
+                'glofox',
+                member['Membership Name'],
+                member['Membership Expiry Date']
             );
         }
         console.log('\n✓ Glofox import done.');

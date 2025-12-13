@@ -39,6 +39,35 @@ export async function GET(request: Request) {
       whereClause.status = 'lead';
     } else if (view === 'members') {
       whereClause.status = 'client';
+    } else if (view === 'expiring') {
+      const nextTwoWeeks = new Date();
+      nextTwoWeeks.setDate(nextTwoWeeks.getDate() + 14);
+      const now = new Date();
+
+      const expiringMemberships = await prisma.membership.findMany({
+        where: {
+          endDate: { gt: now, lte: nextTwoWeeks },
+        },
+        select: { memberId: true },
+      });
+      // Glofox Member ID <-> Lead/Contact Logic?
+      // Wait, Member table links to Membership by memberId.
+      // We need to link Member to Contact/Lead.
+      // Schema: Member (memberId) -> Membership.
+      // Lead has externalId or glofoxMemberId?
+      // Re-checking schema: Lead has glofoxMemberId @unique.
+      // Wait, the Phase 3 schema uses Contact table? The code is using `prisma.contact.findMany`.
+      // Contact table doesn't have glofoxMemberId explicitly on it in the current Prisma snippet view?
+      // Let's check if we can filter contacts by `membershipEndDate` if available or we might need to rely on the Member linkage.
+      // Looking at `people/page.tsx`, it uses `contact.membershipType` and `contact.membershipEndDate`?
+      // Re-reading `schema.prisma` for Contact model:
+      // model Contact { ... membershipEndDate DateTime? ... }
+      // So we can just query Contact directly!
+
+      whereClause.membershipEndDate = {
+        gt: now,
+        lte: nextTwoWeeks,
+      };
     }
 
     if (source && source !== 'All' && source !== 'All Sources') {

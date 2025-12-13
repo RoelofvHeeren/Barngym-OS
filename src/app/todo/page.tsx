@@ -74,14 +74,7 @@ export default function TodoPage() {
         value: alerts.expiringMemberships,
         detail: `${alerts.expiringMemberships} need renewal`,
         action: "Open renewal queue",
-        href: "/people?filter=expiring",
-      },
-      {
-        title: "Leads needing follow up today",
-        value: alerts.followUps,
-        detail: `${alerts.followUps} high intent`,
-        action: "View CRM",
-        href: "/people",
+        href: "/people?view=expiring",
       },
     ];
   }, [alerts]);
