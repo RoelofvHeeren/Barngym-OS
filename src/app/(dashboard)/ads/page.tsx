@@ -16,6 +16,8 @@ type Overview = {
   cplCents: number;
   cpaCents: number;
   roas: number;
+  acquisitionRoas: number;
+  acquisitionRevenueCents: number;
 };
 
 type LeadRow = {
