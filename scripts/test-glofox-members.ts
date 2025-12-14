@@ -55,7 +55,7 @@ async function main() {
                 headers: {
                     "Content-Type": "application/json",
                     ...v.headers
-                },
+                } as any,
             });
 
             if (!res.ok) {
