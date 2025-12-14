@@ -165,7 +165,7 @@ export async function fetchGlofoxMembers() {
                 headers: {
                     "Content-Type": "application/json",
                     ...v.headers
-                },
+                } as any,
             });
 
             if (!res.ok) {
