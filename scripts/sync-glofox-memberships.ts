@@ -74,7 +74,7 @@ async function main() {
                     // Fetch members
                     console.log(`[Glofox] Fetching with ${v.name}...`);
                     const res = await fetch(`${baseUrl}/members?limit=100`, { // Reduced limit to be safe
-                        headers: { ...commonHeaders, ...v.headers },
+                        headers: { ...commonHeaders, ...v.headers } as any,
                         signal: AbortSignal.timeout(15000) // 15s timeout
                     });
 
