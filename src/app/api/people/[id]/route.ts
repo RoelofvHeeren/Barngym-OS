@@ -19,7 +19,12 @@ export async function GET(
             where: { id },
             include: {
                 transactions: {
-                    where: { status: 'completed' },
+                    where: {
+                        status: {
+                            in: ['completed', 'paid', 'PAID', 'succeeded', 'success', 'succeeded'],
+                            mode: 'insensitive'
+                        }
+                    },
                     orderBy: { occurredAt: 'desc' },
                     take: 50,
                 },
@@ -35,8 +40,9 @@ export async function GET(
             const profile = leadMetadata.profile || {};
 
             const transactions = lead.transactions || [];
+            // Relaxed filter for display
             const successfulTransactions = transactions.filter((t: any) =>
-                t.status === 'completed'
+                ['completed', 'paid', 'succeeded', 'success'].includes(t.status?.toLowerCase())
             );
 
             const lifetimeSpend = lead.ltvAllCents || successfulTransactions.reduce((sum: number, t: any) =>

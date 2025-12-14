@@ -140,25 +140,12 @@ export async function GET(request: Request) {
       }
     }
 
-    // Avg LTV for ads clients (Overall or Cohort?)
-    // "Average LTV per ads client" usually implies the average value of acquried customers.
-    // Let's stick to: Revenue / Conversions (if cohort) OR Revenue / Active Clients?
-    // Dashboard label says "Average LTV per ads client".
-    // If we use Cash Flow Revenue, dividing by Conversions gives "Avg Revenue per New Client" which might be skewed if revenue includes recurring from old clients.
-    // However, usually LTV is calculated on the *population*.
-    // Let's calculate Avg LTV based on the *Conversions* (New Clients) LTV, to keep it consistent with "Quality of these new leads".
-    // BUT user wants Cash Flow revenue. 
-    // Let's calculate Avg LTV as: (Total Lifetime Value of ALL Ads Clients) / (Total Ads Clients) ? 
-    // Or (Revenue in Period) / (Conversions)? -> This is "Average Transaction Size" roughly.
-    // Given the previous code tried to do "Cohort LTV", let's try to show the Average LTV of the *Newly Acquired* clients.
+    // 3b. Acquisition Revenue (Filtered by Date)
+    // We need to calculate revenue specifically from the clients acquired in this period.
+    let acquisitionRevenueCents = 0;
 
-    let sumLtvOfNewClients = 0;
-    let acquisitionRevenueCents = 0; // Revenue from ONLY the clients acquired in this period
-    let avgLtvAdsCents = 0;
     if (conversionsCount > 0) {
-      // We need to re-fetch or use a different metric if we want "Avg LTV" of these specific converted people.
-      // We have `activeAdsClients`. We identified which ones are new.
-      // Let's iterate again or optimize the loop above.
+      // Re-identify new clients (acquired in period)
       const newClientIds = new Set<string>();
       for (const client of activeAdsClients) {
         if (!client.payments.length) continue;
@@ -169,13 +156,6 @@ export async function GET(request: Request) {
         }
       }
 
-      // Calculate Acquisition Revenue: Verify which payments from these new clients fell in this period.
-      // We can fetch this specific sum or derive it if we had all payments. 
-      // `activeAdsClients` only fetched `take: 1` payment (the first one).
-      // We need sum of payments for these clients IN THIS PERIOD.
-      // Since we already have the global `revenueAgg` (all payments in period), we can't easily split it without fetching.
-
-      // Let's do a targeted aggregation for these new clients.
       if (newClientIds.size > 0) {
         const acqRevenueAgg = await prisma.payment.aggregate({
           _sum: { amountCents: true },
@@ -186,22 +166,22 @@ export async function GET(request: Request) {
         });
         acquisitionRevenueCents = acqRevenueAgg._sum.amountCents ?? 0;
       }
-
-      // We need the LTV of these new clients. 
-      // `activeAdsClients` has `ltvAdsCents`.
-      // Let's verify if `activeAdsClients` contains them all. Yes, they paid in this period (first payment), so they are in `activeAdsClients`.
-
-      for (const client of activeAdsClients) {
-        if (newClientIds.has(client.id)) {
-          sumLtvOfNewClients += (client.ltvAdsCents ?? 0);
-          // Note: using ltvAdsCents because they are ads clients.
-        }
-      }
-      avgLtvAdsCents = Math.round(sumLtvOfNewClients / conversionsCount);
-    } else {
-      avgLtvAdsCents = 0;
     }
 
+    // 3a. Avg LTV for ads clients (All Time)
+    // Calculated independently of the selected date range to provide a stable baseline.
+    const adsClientsAgg = await prisma.lead.aggregate({
+      _sum: { ltvAdsCents: true },
+      _count: { id: true },
+      where: {
+        ...isAdsLeadFilter,
+        isClient: true
+      }
+    });
+
+    const totalAdsLtv = adsClientsAgg._sum.ltvAdsCents || 0;
+    const totalAdsClients = adsClientsAgg._count.id || 0;
+    const avgLtvAdsCents = totalAdsClients > 0 ? Math.round(totalAdsLtv / totalAdsClients) : 0;
     // 4. Spend: Real data OR Default Budget
     // Exclude "Historical Manual Import" from specific ranges (like 7d, 30d) because it's a lump sum spanning a year.
     // It should only show up in "All Time" (where start is null).
