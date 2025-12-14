@@ -1,4 +1,6 @@
 const { PrismaClient } = require('@prisma/client');
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '../.env.local') });
 
 async function recalculateLtv() {
     const prisma = new PrismaClient();
@@ -23,6 +25,7 @@ async function recalculateLtv() {
         const transactions = await prisma.transaction.findMany({
             where: {
                 contactId: { not: null },
+                status: { in: ['completed', 'paid', 'succeeded', 'settled', 'success', 'COMPLETED', 'PAID', 'SUCCEEDED', 'SETTLED', 'SUCCESS'], mode: 'insensitive' }
             },
             select: {
                 id: true,

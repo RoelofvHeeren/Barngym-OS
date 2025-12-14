@@ -19,6 +19,7 @@ type LeadPayload = {
   nextStep?: string;
   valueMinor?: number | null;
   membershipName?: string;
+  membershipEndDate?: string | null; // Added
   source?: string | null;
   status?: string | null;
   metadata?: Record<string, unknown>;
@@ -155,6 +156,10 @@ export async function GET(request: Request) {
         statusTone = "client";
       }
 
+      const expiryDate = contact.membershipEndDate
+        ? new Date(contact.membershipEndDate).toLocaleDateString('en-GB')
+        : null;
+
       // Construct the Profile object required by the frontend
       const profile = {
         name: displayName,
@@ -171,6 +176,7 @@ export async function GET(request: Request) {
           contact.phone ? { label: "Phone", value: contact.phone } : null,
           contact.trainerizeId ? { label: "Trainerize ID", value: contact.trainerizeId } : null,
           contact.membershipType ? { label: "Membership", value: contact.membershipType } : null,
+          expiryDate ? { label: "Expires", value: expiryDate } : null,
         ].filter(Boolean),
         stats: {
           lifetimeSpend: formatCurrency(lifetimeMinor),
@@ -217,6 +223,7 @@ export async function GET(request: Request) {
         nextStep: "",
         valueMinor: contact.ltvAllCents, // Use LTV from Contact model
         membershipName: contact.membershipType,
+        membershipEndDate: contact.membershipEndDate ? contact.membershipEndDate.toISOString() : null,
         source: source,
         status: contact.status,
         hasPurchases,

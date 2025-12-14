@@ -129,3 +129,70 @@ export async function syncGlofoxTransactions(daysToSync: number = 7) {
 
     return { added, totalFetched: rawTransactions.length };
 }
+
+export async function fetchGlofoxMembers() {
+    const record = await prisma.connectionSecret.findUnique({
+        where: { provider: "glofox" },
+    });
+
+    const secret = (record?.secret as GlofoxSecret | null);
+    if (!secret?.apiKey || !secret?.apiToken || !secret?.branchId) {
+        throw new Error("Glofox Request Failed: Missing credentials (API Key, Token, or Branch ID).");
+    }
+
+    const { apiKey, apiToken, branchId } = secret;
+    const baseUrl = `https://gf-api.aws.glofox.com/prod/2.0/branches/${branchId}`;
+
+    // Auth variations to try (based on test script findings and common Glofox patterns)
+    // The "standard" one uses x-glofox-api-token for the Integrator Token (usually).
+    // Some endpoints or specific tokens use x-api-token.
+    const variations = [
+        { name: "Standard", headers: { "x-api-key": apiKey, "x-glofox-api-token": apiToken, "x-glofox-branch-id": branchId } },
+        { name: "Alt Token", headers: { "x-api-key": apiKey, "x-api-token": apiToken, "x-glofox-branch-id": branchId } },
+        { name: "Swapped", headers: { "x-api-key": apiToken, "x-glofox-api-token": apiKey, "x-glofox-branch-id": branchId } },
+    ];
+
+    let data: any = null;
+    let lastError = null;
+
+    for (const v of variations) {
+        try {
+            const url = `${baseUrl}/members?limit=1000`;
+            // Fetching 1000 for now, pagination might be needed for larger sets but let's start here.
+
+            console.log(`[Glofox Members] Fetching with strategy: ${v.name}`);
+            const res = await fetch(url, {
+                headers: {
+                    "Content-Type": "application/json",
+                    ...v.headers
+                },
+            });
+
+            if (!res.ok) {
+                lastError = `Status ${res.status}: ${await res.text()}`;
+                continue;
+            }
+
+            const json = await res.json();
+
+            // Glofox 200 OK error check
+            if (json.success === false) {
+                lastError = `API Error: ${json.message}`;
+                continue;
+            }
+
+            data = Array.isArray(json) ? json : (json.data || []);
+            console.log(`[Glofox Members] Success with ${v.name}. Found ${data.length} members.`);
+            break; // Success
+        } catch (e) {
+            console.error(`[Glofox Members] Strategy ${v.name} failed`, e);
+            lastError = (e as Error).message;
+        }
+    }
+
+    if (!data) {
+        throw new Error(`Failed to fetch Glofox members. Last error: ${lastError}`);
+    }
+
+    return data;
+}

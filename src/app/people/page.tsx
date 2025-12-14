@@ -207,6 +207,7 @@ type ApiLead = {
   nextStep: string | null;
   valueMinor: number | null;
   membershipName: string | null;
+  membershipEndDate?: string | null; // Added
   source: string | null;
   status: string | null;
   metadata: unknown;
