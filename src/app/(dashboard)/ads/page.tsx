@@ -346,7 +346,7 @@ function AdsDashboardContent() {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {[
           { label: "Spend", value: formatCurrency(overview?.spendCents ?? 0) },
           {
@@ -355,9 +355,11 @@ function AdsDashboardContent() {
             sub: "from ads in this period",
           },
           { label: "Conversions", value: overview?.conversionsCount ?? "—" },
-          { label: "ROAS", value: `${overview?.roas?.toFixed(2) ?? "0.00"} x` },
           { label: "Revenue from ads", value: formatCurrency(overview?.revenueFromAdsCents ?? 0) },
-          { label: "Average LTV per ads client", value: formatCurrency(overview?.avgLtvAdsCents ?? 0) },
+          { label: "Ad Client ROAS", value: `${overview?.roas?.toFixed(2) ?? "0.00"} x` },
+          { label: "Acquisition ROAS", value: `${overview?.acquisitionRoas?.toFixed(2) ?? "0.00"} x` },
+          { label: "Acquisition Revenue", value: formatCurrency(overview?.acquisitionRevenueCents ?? 0) },
+          { label: "Avg LTV (Ads Clients)", value: formatCurrency(overview?.avgLtvAdsCents ?? 0) },
         ].map((card) => (
           <div key={card.label} className="glass-panel">
             <p className="text-xs uppercase tracking-[0.2em] text-muted">{card.label}</p>

@@ -153,6 +153,7 @@ export async function GET(request: Request) {
     // Given the previous code tried to do "Cohort LTV", let's try to show the Average LTV of the *Newly Acquired* clients.
 
     let sumLtvOfNewClients = 0;
+    let acquisitionRevenueCents = 0; // Revenue from ONLY the clients acquired in this period
     let avgLtvAdsCents = 0;
     if (conversionsCount > 0) {
       // We need to re-fetch or use a different metric if we want "Avg LTV" of these specific converted people.
@@ -166,6 +167,24 @@ export async function GET(request: Request) {
         if (isAcquiredInPeriod) {
           newClientIds.add(client.id);
         }
+      }
+
+      // Calculate Acquisition Revenue: Verify which payments from these new clients fell in this period.
+      // We can fetch this specific sum or derive it if we had all payments. 
+      // `activeAdsClients` only fetched `take: 1` payment (the first one).
+      // We need sum of payments for these clients IN THIS PERIOD.
+      // Since we already have the global `revenueAgg` (all payments in period), we can't easily split it without fetching.
+
+      // Let's do a targeted aggregation for these new clients.
+      if (newClientIds.size > 0) {
+        const acqRevenueAgg = await prisma.payment.aggregate({
+          _sum: { amountCents: true },
+          where: {
+            leadId: { in: Array.from(newClientIds) },
+            timestamp: dateFilter
+          }
+        });
+        acquisitionRevenueCents = acqRevenueAgg._sum.amountCents ?? 0;
       }
 
       // We need the LTV of these new clients. 
@@ -258,6 +277,7 @@ export async function GET(request: Request) {
     const cplCents = leadsCount ? Math.round(spendCents / leadsCount) : 0;
     const cpaCents = conversionsCount ? Math.round(spendCents / conversionsCount) : 0;
     const roas = spendCents > 0 ? revenueFromAdsCents / spendCents : 0;
+    const acquisitionRoas = spendCents > 0 ? acquisitionRevenueCents / spendCents : 0;
 
     return NextResponse.json({
       ok: true,
@@ -267,10 +287,12 @@ export async function GET(request: Request) {
         leadsCount,
         conversionsCount,
         revenueFromAdsCents,
+        acquisitionRevenueCents,
         avgLtvAdsCents,
         cplCents,
         cpaCents,
         roas: Number(roas.toFixed(2)),
+        acquisitionRoas: Number(acquisitionRoas.toFixed(2)),
       },
     });
   } catch (error) {
