@@ -69,15 +69,43 @@ async function syncToGHL(endpoint: string, payload: Record<string, unknown>) {
         "Version": "2021-07-28", // Use appropriate version
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        ...payload,
+        locationId: secret.locationId // Ensure locationId is always present
+      }),
     });
 
     if (!res.ok) {
       const txt = await res.text();
       console.error("GHL Sync Failed", res.status, txt);
+      await prisma.syncLog.create({
+        data: {
+          source: "GHL_SYNC_ERROR",
+          detail: `GHL Sync Failed: ${res.status}`,
+          errors: txt,
+          records: JSON.stringify(payload)
+        }
+      });
+    } else {
+      const json = await res.json();
+      await prisma.syncLog.create({
+        data: {
+          source: "GHL_SYNC_SUCCESS",
+          detail: `GHL Sync Success`,
+          records: JSON.stringify(json)
+        }
+      });
     }
   } catch (error) {
     console.error("GHL Sync Error", error);
+    await prisma.syncLog.create({
+      data: {
+        source: "GHL_SYNC_ERROR",
+        detail: "GHL Sync Exception",
+        errors: String(error),
+        records: JSON.stringify(payload)
+      }
+    });
   }
 }
 
@@ -340,7 +368,7 @@ export async function POST(request: Request) {
     }
 
     // 3. Event Routing
-    if (eventType.startsWith("MEMBER")) {
+    if (eventType.startsWith("MEMBER") || eventType.startsWith("USER")) {
       await handleMemberEvent(eventType, data);
     } else if (eventType.startsWith("MEMBERSHIP")) {
       await handleMembershipEvent(eventType, data);
