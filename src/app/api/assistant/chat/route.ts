@@ -171,7 +171,7 @@ export async function POST(req: Request) {
             COALESCE(c."phone", l."phone", 'N/A')
           HAVING COUNT(t.id) >= ${minCount}
           ORDER BY total DESC
-          LIMIT 200;
+          LIMIT 1000;
         `;
 
                 // @ts-ignore
