@@ -68,7 +68,7 @@ export async function POST(req: Request) {
             messages: [
                 {
                     role: "system",
-                    content: `You are the Barn Gym AI Assistant. You have read-only access to the gym's database via tools. 
+                    content: `You are the Barn Gym AI Assistant. Today is ${new Date().toLocaleDateString('en-GB')}. You have read-only access to the gym's database via tools. 
           
           Guidelines:
           - Use 'get_recent_transactions' to see who paid recently.
@@ -77,6 +77,7 @@ export async function POST(req: Request) {
           - If the user asks for a specific list (e.g. "people who paid > 1 time"), use the tool, then format the output nicely as a list.
           - Amounts are stored in minor units (cents/pence). Divide by 100 to show currency (GBP).
           - Be helpful, concise, and professional.
+          - You HAVE access to phone numbers in the database. If a tool result contains phone numbers, you can provide them.
           `,
                 },
                 ...messages,
@@ -157,20 +158,24 @@ export async function POST(req: Request) {
           SELECT 
             COALESCE(c."fullName", l."fullName", t."personName", 'Unknown') as name,
             COALESCE(c."email", l."email", 'Unknown') as email,
+            COALESCE(c."phone", l."phone", 'N/A') as phone,
             COUNT(t.id) as count,
             SUM(t."amountMinor") as total
           FROM "Transaction" t
           LEFT JOIN "Contact" c ON t."contactId" = c.id
           LEFT JOIN "Lead" l ON t."leadId" = l.id
           WHERE t."occurredAt" >= ${startDate} AND t."occurredAt" <= ${endDate}
-          GROUP BY COALESCE(c."fullName", l."fullName", t."personName", 'Unknown'), COALESCE(c."email", l."email", 'Unknown')
+          GROUP BY 
+            COALESCE(c."fullName", l."fullName", t."personName", 'Unknown'), 
+            COALESCE(c."email", l."email", 'Unknown'),
+            COALESCE(c."phone", l."phone", 'N/A')
           HAVING COUNT(t.id) >= ${minCount}
           ORDER BY total DESC
           LIMIT 200;
         `;
 
                 // @ts-ignore
-                const list = results.map((r: any) => `- ${r.name} (${r.email}): ${Number(r.count)} transactions, Total £${(Number(r.total) / 100).toFixed(2)}`).join("\n");
+                const list = results.map((r: any) => `- ${r.name} (${r.email}, ${r.phone}): ${Number(r.count)} transactions, Total £${(Number(r.total) / 100).toFixed(2)}`).join("\n");
                 toolResultContent += `\n[Tool Result for ${fnName} (Period: ${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]})]:\n${list || "No matching clients found."}\n`;
 
                 // Export data
@@ -178,38 +183,20 @@ export async function POST(req: Request) {
                 tableData = results.map((r: any) => ({
                     Name: r.name,
                     Email: r.email,
+                    Phone: r.phone,
                     TransactionCount: Number(r.count),
                     TotalSpent: (Number(r.total) / 100).toFixed(2)
                 }));
                 fileName = `clients_gt_${minCount}_txs_${startDate.toISOString().split('T')[0]}_${endDate.toISOString().split('T')[0]}.csv`;
 
             } else if (fnName === "search_people") {
-                const q = args.query;
+                const q = args.query; // ... existing code ...
                 const people = await prisma.contact.findMany({
-                    where: {
-                        OR: [
-                            { fullName: { contains: q, mode: 'insensitive' } },
-                            { email: { contains: q, mode: 'insensitive' } }
-                        ]
-                    },
-                    take: 20,
+                    // ... existing code ...
                     include: { transactions: { take: 3, orderBy: { occurredAt: 'desc' } } }
                 });
 
-                const summary = people.map(p =>
-                    `Name: ${p.fullName}, Email: ${p.email}, Status: ${p.status}, Recent Txs: ${p.transactions.length}`
-                ).join("\n");
-                toolResultContent += `\n[Tool Result for ${fnName}]:\n${summary || "No people found."}\n`;
-
-                tableData = people.map(p => ({
-                    Name: p.fullName,
-                    Email: p.email,
-                    Phone: p.phone,
-                    Status: p.status,
-                    Source: p.sourceTags.join(", "),
-                    Joined: p.createdAt ? p.createdAt.toISOString().split('T')[0] : ""
-                }));
-                fileName = `search_results_${q}.csv`;
+                // ...
             }
         }
 
@@ -219,14 +206,14 @@ export async function POST(req: Request) {
             messages: [
                 {
                     role: "system",
-                    content: "You are the Barn Gym AI Assistant. Answer the user's question based on the tool results provided. Use a friendly tone.",
+                    content: `You are the Barn Gym AI Assistant. Today is ${new Date().toLocaleDateString('en-GB')}. Answer the user's question based on the tool results provided. You HAVE access to phone numbers if they are returned by the tools. Use a friendly tone.`,
                 },
                 ...messages,
                 message, // The tool call message
                 {
                     role: "tool",
                     content: toolResultContent,
-                    tool_call_id: message.tool_calls![0].id, // Simplified: usually match IDs but we assume sequential 
+                    tool_call_id: message.tool_calls![0].id,
                 } as ChatCompletionMessageParam
             ],
         });
