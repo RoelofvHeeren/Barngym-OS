@@ -97,8 +97,8 @@ export async function POST(req: Request) {
         let fileName = "";
 
         for (const toolCall of message.tool_calls) {
-            const fnName = toolCall.function.name;
-            const args = JSON.parse(toolCall.function.arguments);
+            const fnName = (toolCall as any).function.name;
+            const args = JSON.parse((toolCall as any).function.arguments);
 
             if (fnName === "get_recent_transactions") {
                 const days = args.days || 30;
