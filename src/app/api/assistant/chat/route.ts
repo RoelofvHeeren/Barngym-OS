@@ -3,10 +3,7 @@ import OpenAI from "openai";
 import { prisma } from "@/lib/prisma";
 import { ChatCompletionMessageParam } from "openai/resources/index.mjs";
 
-// Initialize OpenAI
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-});
+
 
 // Define available tools
 const tools = [
@@ -59,6 +56,11 @@ const tools = [
 export async function POST(req: Request) {
     try {
         const { messages } = await req.json();
+
+        // Initialize OpenAI
+        const openai = new OpenAI({
+            apiKey: process.env.OPENAI_API_KEY,
+        });
 
         // 1. Call OpenAI with tools
         const response = await openai.chat.completions.create({
