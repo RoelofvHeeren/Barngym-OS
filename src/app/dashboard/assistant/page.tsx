@@ -89,7 +89,7 @@ export default function AssistantPage() {
                 </div>
             </div>
 
-            <div className="flex flex-1 flex-col overflow-hidden rounded-3xl border border-white/10 bg-white/5 shadow-2xl backdrop-blur-xl">
+            <div className="flex flex-1 flex-col overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-2xl">
                 {/* Chat Area */}
                 <div className="flex-1 overflow-y-auto p-6 scroll-smooth" ref={scrollRef}>
                     <div className="flex flex-col gap-6">
@@ -99,7 +99,7 @@ export default function AssistantPage() {
                                 className={`flex gap-4 ${m.role === "user" ? "flex-row-reverse" : "flex-row"}`}
                             >
                                 <div
-                                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${m.role === "user" ? "bg-white/10 text-white" : "bg-emerald-500/10 text-emerald-500"
+                                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${m.role === "user" ? "bg-emerald-600 text-white" : "bg-emerald-500/10 text-emerald-500"
                                         }`}
                                 >
                                     {m.role === "user" ? <User size={18} /> : <Sparkles size={18} />}
@@ -145,7 +145,7 @@ export default function AssistantPage() {
                 </div>
 
                 {/* Input Area */}
-                <div className="border-t border-white/5 bg-white p-4">
+                <div className="border-t border-gray-100 bg-white p-4">
                     <form onSubmit={handleSubmit} className="relative flex items-center gap-2">
                         <input
                             autoFocus
