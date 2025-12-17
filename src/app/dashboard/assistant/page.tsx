@@ -107,8 +107,8 @@ export default function AssistantPage() {
                                 <div className={`max-w-[80%] flex flex-col gap-2 ${m.role === "user" ? "items-end" : "items-start"}`}>
                                     <div
                                         className={`rounded-2xl px-5 py-3 text-sm leading-relaxed shadow-sm ${m.role === "user"
-                                                ? "bg-white/10 text-white"
-                                                : "bg-black/20 text-gray-200"
+                                            ? "bg-emerald-600 text-white"
+                                            : "bg-[#f3f4f6] text-gray-800"
                                             }`}
                                     >
                                         {m.content.split("\n").map((line, idx) => (
@@ -120,7 +120,7 @@ export default function AssistantPage() {
                                     {m.data && (
                                         <button
                                             onClick={() => downloadCsv(m.data!, m.fileName || "data.csv")}
-                                            className="flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-2 text-xs font-medium text-emerald-400 hover:bg-emerald-500/20"
+                                            className="flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-50 text-xs font-medium text-emerald-600 hover:bg-emerald-100"
                                         >
                                             <Bot size={14} />
                                             Download Result CSV ({m.data.length} rows)
@@ -134,7 +134,7 @@ export default function AssistantPage() {
                                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-500">
                                     <Sparkles size={18} />
                                 </div>
-                                <div className="flex items-center gap-1 rounded-2xl bg-black/20 px-5 py-4">
+                                <div className="flex items-center gap-1 rounded-2xl bg-[#f3f4f6] px-5 py-4">
                                     <div className="h-2 w-2 animate-bounce rounded-full bg-emerald-500/50" style={{ animationDelay: "0ms" }} />
                                     <div className="h-2 w-2 animate-bounce rounded-full bg-emerald-500/50" style={{ animationDelay: "150ms" }} />
                                     <div className="h-2 w-2 animate-bounce rounded-full bg-emerald-500/50" style={{ animationDelay: "300ms" }} />
@@ -145,11 +145,11 @@ export default function AssistantPage() {
                 </div>
 
                 {/* Input Area */}
-                <div className="border-t border-white/5 bg-white/5 p-4">
+                <div className="border-t border-white/5 bg-white p-4">
                     <form onSubmit={handleSubmit} className="relative flex items-center gap-2">
                         <input
                             autoFocus
-                            className="flex-1 rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white placeholder-white/30 focus:border-emerald-500/50 focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
+                            className="flex-1 rounded-2xl border border-emerald-500 bg-white px-4 py-3 text-sm text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                             placeholder="Ask about revenue, recent payments, or member stats..."
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
@@ -162,7 +162,7 @@ export default function AssistantPage() {
                             <Send size={18} className="transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
                         </button>
                     </form>
-                    <p className="mt-3 text-center text-[10px] text-white/20">
+                    <p className="mt-3 text-center text-[10px] text-gray-400">
                         Powered by OpenAI. Results may vary. Always verify important financial data.
                     </p>
                 </div>
