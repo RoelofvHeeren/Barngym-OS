@@ -36,9 +36,11 @@ const parseRange = (range?: string): { start: Date | null; end: Date } => {
 };
 
 const isAdsLeadFilter = {
-  tags: {
-    array_contains: "ads",
-  },
+  OR: [
+    { tags: { array_contains: "ads" } },
+    { tags: { path: ["ghlTags"], array_contains: "ads" } },
+    { source: { contains: "ads", mode: "insensitive" as const } },
+  ],
 };
 
 const buildDateFilter = (start: Date | null, end: Date) => {

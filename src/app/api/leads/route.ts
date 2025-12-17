@@ -173,14 +173,14 @@ export async function GET(request: Request) {
         tags: [...(contact.sourceTags ?? []), ...(contact.segmentTags ?? [])],
         identities: [
           contact.email ? { label: "Email", value: contact.email } : null,
-          contact.phone ? { label: "Phone", value: contact.phone } : null,
+          { label: "Phone", value: contact.phone ?? "—" },
           contact.trainerizeId ? { label: "Trainerize ID", value: contact.trainerizeId } : null,
-          contact.membershipType ? { label: "Membership", value: contact.membershipType } : null,
-          expiryDate ? { label: "Expires", value: expiryDate } : null,
+          { label: "Membership", value: contact.membershipType ?? "—" },
+          { label: "Expires", value: expiryDate ?? "—" },
         ].filter(Boolean),
         stats: {
           lifetimeSpend: formatCurrency(lifetimeMinor),
-          memberships: contact.membershipType ?? "Unassigned",
+          memberships: contact.membershipType ?? "—",
           lastPayment: lastPayment
             ? `${formatCurrency(lastPayment.amountMinor, lastPayment.currency)} · ${formatTimestamp(
               lastPayment.occurredAt

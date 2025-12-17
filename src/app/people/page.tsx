@@ -102,7 +102,7 @@ type LeadProfile = {
 function createDefaultStats() {
   return {
     lifetimeSpend: "€0",
-    memberships: "Unassigned",
+    memberships: "—",
     lastPayment: "—",
     lastAttendance: "—",
   };
@@ -285,14 +285,36 @@ const getStatusInfo = (status?: string | null, source?: string | null, hasPurcha
   return null;
 };
 
+const getExpiryStatus = (expiryDateStr?: string | null) => {
+  if (!expiryDateStr) return null;
+  const expiry = new Date(expiryDateStr);
+  const now = new Date();
+  const diffTime = expiry.getTime() - now.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+  if (diffDays <= 14 && diffDays >= 0) {
+    return { label: "Expiring Soon", tone: "amber" as const, days: diffDays };
+  }
+  if (diffDays < 0) {
+    return { label: "Expired", tone: "red" as const, days: diffDays };
+  }
+  return null;
+};
+
 const buildProfileFromLead = (lead: ApiLead, displayName: string): LeadProfile => {
   const statusInfo = getStatusInfo(lead.isClient ? "CLIENT" : lead.status, lead.source, lead.hasPurchases);
+  const expiryInfo = getExpiryStatus(lead.membershipEndDate);
   const initials = displayName
     .split(" ")
     .map((part) => part.charAt(0))
     .join("")
     .slice(0, 2)
     .toUpperCase();
+
+  const tags = [lead.channel ?? "Imported"];
+  if (expiryInfo) {
+    tags.unshift(expiryInfo.label);
+  }
 
   return {
     name: displayName,
@@ -303,16 +325,18 @@ const buildProfileFromLead = (lead: ApiLead, displayName: string): LeadProfile =
     status: statusInfo?.label,
     statusTone: statusInfo?.tone,
     source: statusInfo?.sourceLabel,
-    tags: [lead.channel ?? "Imported"],
+    tags: tags,
     identities: [
       lead.email ? { label: "Email", value: lead.email } : null,
       lead.phone ? { label: "Phone", value: lead.phone } : null,
+      { label: "Membership", value: lead.membershipName ?? "—" },
+      { label: "Expires", value: lead.membershipEndDate ? new Date(lead.membershipEndDate).toLocaleDateString('en-GB') : "—" },
     ].filter(Boolean) as { label: string; value: string }[],
     stats: {
       lifetimeSpend:
         formatMinorToCurrency(lead.valueMinor) ??
         (lead.membershipName ?? "Not set"),
-      memberships: lead.membershipName ?? "Unassigned",
+      memberships: lead.membershipName ?? "—",
       lastPayment: "—",
       lastAttendance: "—",
     },
@@ -705,7 +729,7 @@ function PeopleContent() {
       const membershipName =
         getValue(row, "membership_name") ||
         formState.membership ||
-        "Unassigned";
+        "—";
       const valueRaw = getValue(row, "value");
       const lastBooking = getValue(row, "last_booking");
       const totalAttendances = getValue(row, "total_attendances");
@@ -834,7 +858,7 @@ function PeopleContent() {
 
           <div className="flex gap-4 items-center">
             <div className="flex items-center rounded-xl bg-white/5 p-1 gap-1 border border-white/10">
-              {(['all', 'members', 'leads'] as const).map((mode) => (
+              {(['all', 'members', 'leads', 'expiring'] as const).map((mode) => (
                 <button
                   key={mode}
                   onClick={() => setViewMode(mode)}
@@ -1323,6 +1347,15 @@ function PeopleContent() {
                   <p className="mt-2 text-lg font-semibold">
                     {selectedLeadProfile.stats.memberships}
                   </p>
+                  {(() => {
+                    const expiry = selectedLeadProfile.identities.find(i => i.label === "Expires");
+                    if (!expiry) return null;
+                    return (
+                      <p className={`text-xs mt-1 ${expiry.value === "—" ? "text-muted" : "text-primary"}`}>
+                        Expires: {expiry.value}
+                      </p>
+                    )
+                  })()}
                 </div>
                 <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
                   <p className="text-xs uppercase tracking-[0.35em] text-muted">

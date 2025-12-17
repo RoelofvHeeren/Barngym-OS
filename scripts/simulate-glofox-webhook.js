@@ -6,14 +6,14 @@ async function main() {
     console.log(`📡 Sending to: ${url}`);
 
     const payload = {
-        Type: "INVOICE_UPDATED",
-        id: "SIMULATED_TEST_" + Date.now(),
-        user: { first_name: "Simulated", last_name: "Tester" },
-        line_items: [
-            { name: "Simulated Item", unit_price: 100, quantity: 1 }
-        ],
-        total: 100,
-        currency: "GBP"
+        Type: "MEMBER_CREATED",
+        id: "VALID_TEST_" + Date.now(),
+        member_id: "VALID_TEST_" + Date.now(),
+        first_name: "Valid",
+        last_name: "TestUser",
+        email: "valid.test." + Date.now() + "@example.com",
+        phone: "+447700900000",
+        created: new Date().toISOString()
     };
 
     try {
