@@ -454,3 +454,85 @@ model GlofoxGhlLink {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
+
+// -- Content Dashboard Models --
+
+enum VideoProjectStatus {
+  IDEA
+  SCRIPTING
+  READY_TO_FILM
+  FILMED
+  EDITING
+  FINAL_PRODUCT
+}
+
+enum VideoProjectPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum VideoPlatform {
+  INSTAGRAM_REEL
+  TIKTOK
+  YOUTUBE_SHORT
+  YOUTUBE_LONG
+  OTHER
+}
+
+model VideoProject {
+  id              String               @id @default(cuid())
+  title           String
+  platform        VideoPlatform        @default(INSTAGRAM_REEL)
+  status          VideoProjectStatus   @default(IDEA)
+  priority        VideoProjectPriority @default(MEDIUM)
+  
+  // Script & Brief Data
+  scriptContent   String?              @db.Text // Rich text or markdown
+  editingBrief    Json?                // Structured brief data
+  
+  // Metadata
+  goal            String?
+  assignedCoach   String?
+  assignedEditor  String?
+  
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  assets          VideoAsset[]
+}
+
+enum VideoAssetType {
+  RAW_FOOTAGE
+  B_ROLL
+  REFERENCE
+  FINAL_EXPORT
+  OTHER
+}
+
+model VideoAsset {
+  id            String         @id @default(cuid())
+  projectId     String
+  type          VideoAssetType
+  url           String
+  filename      String
+  mimeType      String?
+  sizeBytes     Int?
+  
+  createdAt     DateTime       @default(now())
+  
+  project       VideoProject   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  @@index([projectId])
+}
+
+model ContentTemplate {
+  id            String   @id @default(cuid())
+  name          String
+  description   String?
+  structure     Json     // JSON defining the script structure steps
+  defaults      Json?    // Default values for brief etc
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}

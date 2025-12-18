@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import type Stripe from "stripe";
 import { prisma } from "./prisma";
 import { attachLeadBatch } from "./transactionMatcher";
+import { recalculateContactLtv, recalculateLeadLtv } from "@/utils/ltv";
 
 export type NormalizedTransaction = {
   externalId: string;
@@ -105,6 +106,17 @@ export async function upsertTransactions(records: NormalizedTransaction[]) {
               }
             });
           }
+        }
+
+        // Trigger LTV Recalculation (Fire & Forget mostly, or wait?)
+        // Waiting ensures consistency but slows down webhook. 
+        // Given loop, maybe concurrent? But parallel update to same lead might race.
+        // Sequential is safer.
+        if (record.leadId) {
+          await recalculateLeadLtv(record.leadId);
+        }
+        if (record.contactId) {
+          await recalculateContactLtv(record.contactId);
         }
       })
       .catch((error) => {

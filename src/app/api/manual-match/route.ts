@@ -351,25 +351,4 @@ export async function POST(request: Request) {
   }
 }
 
-async function recalculateContactLtv(contactId: string) {
-  try {
-    const aggregates = await prisma.transaction.aggregate({
-      where: {
-        contactId: contactId,
-        status: { in: ['Completed', 'succeeded', 'SETTLED'] }
-      },
-      _sum: {
-        amountMinor: true, // Sum amounts in stored currency minor units
-      }
-    });
-
-    const total = aggregates._sum.amountMinor || 0;
-
-    await prisma.contact.update({
-      where: { id: contactId },
-      data: { ltvAllCents: total }
-    });
-  } catch (e) {
-    console.error("Failed to recalculate LTV for contact", contactId, e);
-  }
-}
+import { recalculateContactLtv, recalculateLeadLtv } from "@/utils/ltv";

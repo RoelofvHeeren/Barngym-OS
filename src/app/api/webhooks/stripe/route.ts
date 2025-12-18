@@ -10,6 +10,7 @@ import {
   mapStripePaymentIntent,
   upsertTransactions,
 } from "@/lib/transactions";
+// import { recalculateContactLtv, recalculateLeadLtv } from "@/utils/ltv"; // Removed: handled in upsertTransactions
 
 export const runtime = "nodejs";
 
@@ -21,11 +22,11 @@ type StripeSecret = {
 type StripeEvent = Stripe.Event & {
   data: {
     object:
-      | Stripe.Charge
-      | Stripe.PaymentIntent
-      | Stripe.Invoice
-      | Stripe.Checkout.Session
-      | Record<string, unknown>;
+    | Stripe.Charge
+    | Stripe.PaymentIntent
+    | Stripe.Invoice
+    | Stripe.Checkout.Session
+    | Record<string, unknown>;
   };
 };
 
@@ -95,12 +96,13 @@ export async function POST(request: Request) {
     await prisma.syncLog.create({
       data: {
         source: "Stripe",
-        detail: `Webhook ${event.type} processed. ${normalized.length} entr${
-          normalized.length === 1 ? "y" : "ies"
-        } normalized.`,
+        detail: `Webhook ${event.type} processed. ${normalized.length} entr${normalized.length === 1 ? "y" : "ies"
+          } normalized.`,
         records: result.added.toString(),
       },
     });
+
+
 
     // Immediately revalidate transaction pages so the UI reflects new data without redeploy.
     revalidatePath("/transactions");

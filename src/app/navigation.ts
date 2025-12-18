@@ -8,6 +8,7 @@ import {
   Megaphone,
   ClipboardList,
   Bot,
+  Video, // Added Video icon
 } from "lucide-react";
 
 export const navGroups = [
@@ -15,6 +16,7 @@ export const navGroups = [
     label: "Command",
     items: [
       { name: "Dashboard", href: "/", icon: LayoutDashboard },
+      { name: "Content Studio", href: "/content", icon: Video }, // Added Content Studio link
       { name: "People / CRM", href: "/people", icon: Users },
       { name: "Ads Dashboard", href: "/ads", icon: Megaphone },
       { name: "Corporate Dashboard", href: "/corporate", icon: Building2 },
