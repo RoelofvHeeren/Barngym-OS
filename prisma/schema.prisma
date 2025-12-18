@@ -486,6 +486,7 @@ model VideoProject {
   platform        VideoPlatform        @default(INSTAGRAM_REEL)
   status          VideoProjectStatus   @default(IDEA)
   priority        VideoProjectPriority @default(MEDIUM)
+  tags            String[]             @default([])
   
   // Script & Brief Data
   scriptContent   String?              @db.Text // Rich text or markdown

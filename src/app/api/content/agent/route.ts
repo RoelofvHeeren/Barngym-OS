@@ -9,15 +9,20 @@ const openai = new OpenAI({
 
 export async function POST(req: NextRequest) {
     try {
-        const { prompt, templateId } = await req.json();
+        const { messages, templateId } = await req.json();
 
-        if (!prompt) {
-            return NextResponse.json({ ok: false, message: "Prompt is required" }, { status: 400 });
+        if (!messages || !Array.isArray(messages) || messages.length === 0) {
+            return NextResponse.json({ ok: false, message: "Messages array is required" }, { status: 400 });
         }
 
         const systemPrompt = `
     You are an expert Content Producer for Barn Gym. 
     Your goal is to help users create video content ideas and scripts for Instagram Reels, TikToks, and YouTube Shorts.
+    
+    You are in a conversation with the user to refine the idea.
+    
+    If the user request is just an initial idea, generate a full plan.
+    If the user is asking for a revision ("make it shorter", "change the hook"), modify the previous plan accordingly.
     
     You must output valid JSON with the following structure:
     {
@@ -43,7 +48,7 @@ export async function POST(req: NextRequest) {
         const completion = await openai.chat.completions.create({
             messages: [
                 { role: "system", content: systemPrompt },
-                { role: "user", content: `Create a video project plan for: "${prompt}"` }
+                ...messages
             ],
             model: "gpt-4o", // Or gpt-3.5-turbo if cost concern, but 4o is better for creative
             response_format: { type: "json_object" },

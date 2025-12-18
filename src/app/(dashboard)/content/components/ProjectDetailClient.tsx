@@ -109,7 +109,22 @@ export default function ProjectDetailClient({ project: initialProject }: Project
                     {/* Brief Mini Panel */}
                     <div className="rounded-2xl border border-emerald-900/10 bg-white p-4 shadow-sm">
                         <h3 className="font-semibold text-sm mb-3">Project Details</h3>
-                        <div className="space-y-3 text-sm">
+                        <div className="space-y-4 text-sm">
+                            {/* Tags */}
+                            <div>
+                                <p className="text-xs text-muted mb-2">Tags</p>
+                                <div className="flex flex-wrap gap-1.5">
+                                    {(project.tags || []).map((tag) => (
+                                        <span key={tag} className="rounded-md bg-gray-100 px-2 py-1 text-xs font-medium text-gray-700">
+                                            {tag}
+                                        </span>
+                                    ))}
+                                    <button className="rounded-md border border-dashed border-gray-300 px-2 py-1 text-xs text-muted hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700">
+                                        + Add
+                                    </button>
+                                </div>
+                            </div>
+
                             <div>
                                 <p className="text-xs text-muted">Priority</p>
                                 <p className="font-medium">{project.priority}</p>

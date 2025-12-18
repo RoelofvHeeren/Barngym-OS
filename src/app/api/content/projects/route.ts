@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
-        const { title, goal, platform, status } = body;
+        const { title, goal, platform, status, tags, scriptContent, editingBrief } = body;
 
         if (!title) {
             return NextResponse.json({ ok: false, message: "Title is required" }, { status: 400 });
@@ -44,6 +44,9 @@ export async function POST(req: NextRequest) {
                 goal,
                 platform: platform || "INSTAGRAM_REEL",
                 status: status || "IDEA",
+                tags: tags || [],
+                scriptContent,
+                editingBrief
             },
         });
 
