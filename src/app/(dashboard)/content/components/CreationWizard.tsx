@@ -27,6 +27,7 @@ export default function CreationWizard({ onClose }: CreationWizardProps) {
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState("");
     const [loading, setLoading] = useState(false);
+    const [duration, setDuration] = useState("30s");
 
     // The latest state of the project being built
     const [currentProject, setCurrentProject] = useState<GeneratedProject | null>(null);
@@ -56,7 +57,7 @@ export default function CreationWizard({ onClose }: CreationWizardProps) {
 
             const res = await fetch("/api/content/agent", {
                 method: "POST",
-                body: JSON.stringify({ messages: apiMessages }),
+                body: JSON.stringify({ messages: apiMessages, duration }),
             });
             const json = await res.json();
 
@@ -64,11 +65,10 @@ export default function CreationWizard({ onClose }: CreationWizardProps) {
                 const generated = json.data;
                 setCurrentProject(generated);
 
-                // Add agent response (we show a summary or the thought process? 
-                // For now, let's just say "I've updated the draft" or similar if it's not the first one.
-                // Or we can generate a conversational response separate from the JSON?
-                // For simplicity V1: The agent returns JSON. We interpret that as "Here is the plan".
-                setMessages(prev => [...prev, { role: "assistant", content: "I've generated a plan based on your request. Check the preview on the right." }]);
+                // Add agent response
+                setMessages(prev => [...prev, { role: "assistant", content: "I've updated the plan based on your request. Check the preview on the right." }]);
+            } else {
+                setMessages(prev => [...prev, { role: "assistant", content: "Sorry, I encountered an issue: " + json.message }]);
             }
         } catch (e) {
             console.error(e);
@@ -80,6 +80,13 @@ export default function CreationWizard({ onClose }: CreationWizardProps) {
 
     const handleCreate = async () => {
         if (!currentProject) return;
+
+        // Validation
+        if (!currentProject.title || !currentProject.platform) {
+            alert("Project must have a Title and Platform.");
+            return;
+        }
+
         try {
             const res = await fetch("/api/content/projects", {
                 method: "POST",
@@ -97,9 +104,12 @@ export default function CreationWizard({ onClose }: CreationWizardProps) {
             if (json.ok) {
                 onClose();
                 router.push(`/content/${json.data.id}`);
+            } else {
+                alert("Failed to create project: " + json.message);
             }
         } catch (e) {
             console.error(e);
+            alert("An unexpected error occurred while creating.");
         }
     };
 
@@ -116,9 +126,21 @@ export default function CreationWizard({ onClose }: CreationWizardProps) {
 
                 {/* LEFT: Chat Interface */}
                 <div className="flex w-1/3 flex-col border-r bg-gray-50/50">
-                    <div className="border-b bg-white px-6 py-4">
-                        <h3 className="font-bold text-emerald-900">AI Assistant</h3>
-                        <p className="text-xs text-muted">Iterate on your idea here.</p>
+                    <div className="border-b bg-white px-6 py-4 flex justify-between items-center">
+                        <div>
+                            <h3 className="font-bold text-emerald-900">AI Assistant</h3>
+                            <p className="text-xs text-muted">Iterate on your idea here.</p>
+                        </div>
+                        <select
+                            value={duration}
+                            onChange={(e) => setDuration(e.target.value)}
+                            className="rounded-lg border border-gray-200 bg-gray-50 px-2 py-1 text-xs"
+                        >
+                            <option value="15s">15s</option>
+                            <option value="30s">30s</option>
+                            <option value="60s">60s</option>
+                            <option value="90s">90s</option>
+                        </select>
                     </div>
 
                     <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4">

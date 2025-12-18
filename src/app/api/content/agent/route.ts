@@ -9,18 +9,21 @@ const openai = new OpenAI({
 
 export async function POST(req: NextRequest) {
     try {
-        const { messages, templateId } = await req.json();
+        const { messages, templateId, duration } = await req.json();
 
         if (!messages || !Array.isArray(messages) || messages.length === 0) {
             return NextResponse.json({ ok: false, message: "Messages array is required" }, { status: 400 });
         }
+
+        const durationContext = duration ? `The estimated duration for this video is ${duration}. Ensure the script length fits this timing.` : "";
 
         const systemPrompt = `
     You are an expert Content Producer for Barn Gym. 
     Your goal is to help users create video content ideas and scripts for Instagram Reels, TikToks, and YouTube Shorts.
     
     You are in a conversation with the user to refine the idea.
-    
+    ${durationContext}
+
     If the user request is just an initial idea, generate a full plan.
     If the user is asking for a revision ("make it shorter", "change the hook"), modify the previous plan accordingly.
     
@@ -37,10 +40,15 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    The script should adhere to this structure:
-    1. Hook (3 seconds)
-    2. Value / Body
-    3. Call to Action
+    The script MUST adhere to this structure and MUST include timing estimates for EACH section:
+    **Hook (3s)**
+    [Script lines...]
+
+    **Value / Body (Xs)** - Calculate X based on remaining time
+    [Script lines...]
+
+    **Call to Action (Xs)**
+    [Script lines...]
     
     Use a tone that is professional yet approachable, fitting for a premium gym brand.
     `;
