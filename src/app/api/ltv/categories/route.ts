@@ -4,21 +4,7 @@ import { classifyProduct } from "@/utils/productClassifier";
 
 export const runtime = "nodejs";
 
-const isAdsLead = (lead: { source: string | null; tags: unknown }) => {
-  const src = (lead.source ?? "").toLowerCase();
-  if (src.includes("ads") || src.includes("facebook") || src.includes("instagram") || src.includes("meta") || src.includes("tiktok")) return true;
-  const tags = lead.tags;
-  if (!tags) return false;
-  if (Array.isArray(tags)) {
-    return tags.some((tag) => typeof tag === "string" && tag.toLowerCase().includes("ads"));
-  }
-  if (typeof tags === "object") {
-    return Object.values(tags as Record<string, unknown>).some(
-      (value) => typeof value === "string" && value.toLowerCase().includes("ads")
-    );
-  }
-  return false;
-};
+import { isAdsLead } from "@/utils/ltv";
 
 type CategoryKey = "pt" | "classes" | "online_coaching";
 

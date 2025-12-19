@@ -129,6 +129,7 @@ export async function POST(request: Request) {
       if (contactId) {
         await recalculateContactLtv(contactId);
       }
+      await recalculateLeadLtv(leadId);
 
       // Update lead status to Client
       await prisma.lead.update({
@@ -285,6 +286,7 @@ export async function POST(request: Request) {
       if (contactId) {
         await recalculateContactLtv(contactId);
       }
+      await recalculateLeadLtv(newLead.id);
 
       const emailLower = email?.toLowerCase();
       if (emailLower) {

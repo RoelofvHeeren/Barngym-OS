@@ -40,6 +40,11 @@ const isAdsLeadFilter = {
     { tags: { array_contains: "ads" } },
     { tags: { path: ["ghlTags"], array_contains: "ads" } },
     { source: { contains: "ads", mode: "insensitive" as const } },
+    { source: { contains: "facebook", mode: "insensitive" as const } },
+    { source: { contains: "instagram", mode: "insensitive" as const } },
+    { source: { contains: "meta", mode: "insensitive" as const } },
+    { source: { contains: "tiktok", mode: "insensitive" as const } },
+    { source: { equals: "ghl_ads", mode: "insensitive" as const } },
   ],
 };
 
