@@ -11,13 +11,12 @@ type Overview = {
   spendCents: number;
   leadsCount: number;
   conversionsCount: number;
-  revenueFromAdsCents: number;
-  avgLtvAdsCents: number;
+  totalAdsLtvCents: number;
+  totalAdsClients: number;
+  avgLtvCents: number;
   cplCents: number;
   cpaCents: number;
-  roas: number;
-  acquisitionRoas: number;
-  acquisitionRevenueCents: number;
+  cohortRoas: number;
 };
 
 type LeadRow = {
@@ -30,8 +29,6 @@ type LeadRow = {
   createdAt: string;
   firstPaymentAt: string | null;
   ltvCents: number;
-  ltvAdsCents: number;
-  periodRevenueCents: number;
   productCategories: string[];
   tracking: {
     utm_source: string | null;
@@ -228,10 +225,10 @@ function AdsDashboardContent() {
         lead.fullName.toLowerCase().includes(term) ||
         (lead.email ?? "").toLowerCase().includes(term)
     );
-    // Sort clients by period revenue (highest first), leads by newest
+    // Sort clients by LTV (highest first), leads by newest
     return filtered.sort((a, b) => {
       if (leadStatusFilter === "client") {
-        return (b.periodRevenueCents ?? 0) - (a.periodRevenueCents ?? 0);
+        return (b.ltvCents ?? 0) - (a.ltvCents ?? 0);
       }
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
@@ -357,11 +354,11 @@ function AdsDashboardContent() {
             sub: "from ads in this period",
           },
           { label: "Conversions", value: overview?.conversionsCount ?? "—" },
-          { label: "Revenue from ads", value: formatCurrency(overview?.revenueFromAdsCents ?? 0) },
-          { label: "Ad Client ROAS", value: `${overview?.roas?.toFixed(2) ?? "0.00"} x` },
-          { label: "Acquisition ROAS", value: `${overview?.acquisitionRoas?.toFixed(2) ?? "0.00"} x` },
-          { label: "Acquisition Revenue", value: formatCurrency(overview?.acquisitionRevenueCents ?? 0) },
-          { label: "Avg LTV (Ads Clients)", value: formatCurrency(overview?.avgLtvAdsCents ?? 0) },
+          { label: "Total LTV (All Clients)", value: formatCurrency(overview?.totalAdsLtvCents ?? 0) },
+          { label: "Cohort ROAS", value: `${overview?.cohortRoas?.toFixed(2) ?? "0.00"} x`, sub: "lifetime LTV / spend" },
+          { label: "Avg LTV", value: formatCurrency(overview?.avgLtvCents ?? 0) },
+          { label: "CPL", value: formatCurrency(overview?.cplCents ?? 0) },
+          { label: "CPA", value: formatCurrency(overview?.cpaCents ?? 0) },
         ].map((card) => (
           <div key={card.label} className="glass-panel">
             <p className="text-xs uppercase tracking-[0.2em] text-muted">{card.label}</p>
@@ -418,9 +415,7 @@ function AdsDashboardContent() {
                 <th className="pb-3 pr-4 font-medium pl-2">Name & Contact</th>
                 {leadStatusFilter === "client" ? (
                   <>
-                    <th className="pb-3 pr-4 font-medium">Period Rev</th>
-                    <th className="pb-3 pr-4 font-medium">Ads LTV</th>
-                    <th className="pb-3 pr-4 font-medium">Total LTV</th>
+                    <th className="pb-3 pr-4 font-medium">LTV</th>
                     <th className="pb-3 pr-4 font-medium">First Payment</th>
                     <th className="pb-3 pr-4 font-medium">Categories</th>
                   </>
@@ -474,12 +469,6 @@ function AdsDashboardContent() {
                     {leadStatusFilter === "client" ? (
                       <>
                         <td className="pr-4 font-mono font-bold text-emerald-800">
-                          {formatCurrency(lead.periodRevenueCents)}
-                        </td>
-                        <td className="pr-4 font-mono font-medium text-emerald-600/80">
-                          {formatCurrency(lead.ltvAdsCents)}
-                        </td>
-                        <td className="pr-4 font-mono text-muted text-xs">
                           {formatCurrency(lead.ltvCents)}
                         </td>
                         <td className="pr-4 text-muted">{formatDate(lead.firstPaymentAt)}</td>

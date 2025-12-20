@@ -98,19 +98,7 @@ export async function GET(request: Request) {
       where: whereCondition,
     });
 
-    // 2. Revenue (Cash Flow): Sum of all payments in this period from ads leads
-    const revenueAgg = await prisma.payment.aggregate({
-      _sum: { amountCents: true },
-      where: {
-        timestamp: dateFilter,
-        lead: isAdsLeadFilter as any,
-      }
-    });
-    const revenueFromAdsCents = revenueAgg._sum.amountCents ?? 0;
-
-    // 3. Conversions (Acquisitions): Count of leads whose FIRST payment was in this period.
-    // Optimization: Fetch leads who made a payment *in this period* (candidates), 
-    // then verify if that was their *first* payment.
+    // 2. Conversions (Acquisitions): Count of leads whose FIRST payment was in this period.
     const activeAdsClients = await prisma.lead.findMany({
       where: {
         ...isAdsLeadFilter,
@@ -121,7 +109,6 @@ export async function GET(request: Request) {
       },
       select: {
         id: true,
-        ltvAdsCents: true,
         payments: {
           select: { timestamp: true },
           orderBy: { timestamp: "asc" },
@@ -147,47 +134,29 @@ export async function GET(request: Request) {
       }
     }
 
-    // 3b. Acquisition Revenue (Filtered by Date)
-    // We need to calculate revenue specifically from the clients acquired in this period.
-    let acquisitionRevenueCents = 0;
-
-    if (conversionsCount > 0) {
-      // Re-identify new clients (acquired in period)
-      const newClientIds = new Set<string>();
-      for (const client of activeAdsClients) {
-        if (!client.payments.length) continue;
-        const firstPaymentDate = client.payments[0].timestamp;
-        const isAcquiredInPeriod = start ? (firstPaymentDate >= start && firstPaymentDate <= end) : (firstPaymentDate <= end);
-        if (isAcquiredInPeriod) {
-          newClientIds.add(client.id);
-        }
-      }
-
-      if (newClientIds.size > 0) {
-        const acqRevenueAgg = await prisma.payment.aggregate({
-          _sum: { amountCents: true },
-          where: {
-            leadId: { in: Array.from(newClientIds) },
-            timestamp: dateFilter
-          }
-        });
-        acquisitionRevenueCents = acqRevenueAgg._sum.amountCents ?? 0;
-      }
-    }
-
     // 3a. Avg LTV for ads clients (All Time)
-    // Calculated independently of the selected date range to provide a stable baseline.
-    const adsClientsAgg = await prisma.lead.aggregate({
-      _sum: { ltvAdsCents: true },
-      _count: { id: true },
+    // Calculate from Payments table directly (same as /api/ltv/categories)
+    // This ensures consistency between dashboards.
+    const adsClientsForLtv = await prisma.lead.findMany({
       where: {
         ...isAdsLeadFilter,
         isClient: true
+      },
+      select: {
+        id: true,
+        payments: { select: { amountCents: true } }
       }
     });
 
-    const totalAdsLtv = adsClientsAgg._sum.ltvAdsCents || 0;
-    const totalAdsClients = adsClientsAgg._count.id || 0;
+    let totalAdsLtv = 0;
+    let totalAdsClients = 0;
+    for (const client of adsClientsForLtv) {
+      const clientLtv = client.payments.reduce((sum, p) => sum + (p.amountCents || 0), 0);
+      if (clientLtv > 0) {
+        totalAdsLtv += clientLtv;
+        totalAdsClients++;
+      }
+    }
     const avgLtvAdsCents = totalAdsClients > 0 ? Math.round(totalAdsLtv / totalAdsClients) : 0;
     // 4. Spend: Real data OR Default Budget
     // Exclude "Historical Manual Import" from specific ranges (like 7d, 30d) because it's a lump sum spanning a year.
@@ -263,8 +232,17 @@ export async function GET(request: Request) {
 
     const cplCents = leadsCount ? Math.round(spendCents / leadsCount) : 0;
     const cpaCents = conversionsCount ? Math.round(spendCents / conversionsCount) : 0;
-    const roas = spendCents > 0 ? revenueFromAdsCents / spendCents : 0;
-    const acquisitionRoas = spendCents > 0 ? acquisitionRevenueCents / spendCents : 0;
+
+    // Cohort-based ROAS: Total LTV of all ads clients / Total all-time spend
+    // This is more meaningful than period-based revenue calculations
+    const allTimeSpendAgg = await prisma.adsSpend.aggregate({
+      _sum: { amountCents: true }
+    });
+    const allTimeMetaSpendAgg = await prisma.metaDailyInsight.aggregate({
+      _sum: { spend: true }
+    });
+    const allTimeSpendCents = (allTimeSpendAgg._sum.amountCents ?? 0) + Math.round((allTimeMetaSpendAgg._sum.spend ?? 0) * 100);
+    const cohortRoas = allTimeSpendCents > 0 ? totalAdsLtv / allTimeSpendCents : 0;
 
     return NextResponse.json({
       ok: true,
@@ -273,13 +251,14 @@ export async function GET(request: Request) {
         spendCents,
         leadsCount,
         conversionsCount,
-        revenueFromAdsCents,
-        acquisitionRevenueCents,
-        avgLtvAdsCents,
+        // Total LTV across all ads clients (not period-based)
+        totalAdsLtvCents: totalAdsLtv,
+        totalAdsClients,
+        avgLtvCents: avgLtvAdsCents,
         cplCents,
         cpaCents,
-        roas: Number(roas.toFixed(2)),
-        acquisitionRoas: Number(acquisitionRoas.toFixed(2)),
+        // Cohort ROAS: lifetime LTV / lifetime spend (meaningful metric)
+        cohortRoas: Number(cohortRoas.toFixed(2)),
       },
     });
   } catch (error) {

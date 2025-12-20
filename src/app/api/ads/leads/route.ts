@@ -158,7 +158,9 @@ export async function GET(request: Request) {
       }),
     ]);
 
-    const paymentsMap = new Map<string, { first: Date; categories: Set<string>; periodRevenue: number }>();
+    // Build payment aggregations per lead
+    // Compute LTV directly from payments (source of truth) instead of stored fields
+    const paymentsMap = new Map<string, { first: Date; categories: Set<string>; totalLtvCents: number }>();
     payments.forEach((p) => {
       if (!p.leadId) return;
       const existing = paymentsMap.get(p.leadId);
@@ -167,17 +169,10 @@ export async function GET(request: Request) {
       const categories = existing?.categories ?? new Set<string>();
       if (p.productType) categories.add(p.productType);
 
-      let periodRevenue = existing?.periodRevenue ?? 0;
-      // Check if payment falls in selected range
-      const inRange = start
-        ? (p.timestamp >= start && p.timestamp <= end)
-        : (p.timestamp <= end);
+      // Sum ALL payments for LTV (not period-based)
+      const totalLtvCents = (existing?.totalLtvCents ?? 0) + (p.amountCents ?? 0);
 
-      if (inRange) {
-        periodRevenue += p.amountCents;
-      }
-
-      paymentsMap.set(p.leadId, { first, categories, periodRevenue });
+      paymentsMap.set(p.leadId, { first, categories, totalLtvCents });
     });
 
     const trackingMap = new Map<string, typeof tracking>();
@@ -224,9 +219,9 @@ export async function GET(request: Request) {
         submissionDate: lead.submissionDate,
         originalCreatedAt: lead.createdAt,
         firstPaymentAt,
-        ltvCents: lead.ltvAllCents ?? 0,
-        ltvAdsCents: lead.ltvAdsCents ?? 0,
-        periodRevenueCents: paymentInfo?.periodRevenue ?? 0,
+        // Use LTV computed directly from payments (source of truth)
+        // This ensures dashboard matches client profile exactly
+        ltvCents: paymentInfo?.totalLtvCents ?? 0,
         productCategories: Array.from(paymentInfo?.categories ?? []),
         tracking: {
           utm_source: trackingEntry?.utmSource ?? null,
