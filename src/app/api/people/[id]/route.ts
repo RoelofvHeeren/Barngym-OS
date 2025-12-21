@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { calculateLtvFromTransactions, isAdsClient } from "@/utils/calculateLTV";
 
 export const runtime = "nodejs";
 
@@ -45,11 +46,13 @@ export async function GET(
                 ['completed', 'paid', 'succeeded', 'success'].includes(t.status?.toLowerCase())
             );
 
-            const lifetimeSpend = lead.ltvAllCents || successfulTransactions.reduce((sum: number, t: any) =>
-                sum + (t.amountMinor || 0), 0
-            );
+            // Calculate LTV from transactions (single source of truth)
+            const lifetimeSpend = calculateLtvFromTransactions(transactions);
 
-            const adsLifetimeSpend = lead.ltvAdsCents || 0;
+            // Calculate Ads LTV (only if this is an ads client)
+            const adsLifetimeSpend = isAdsClient({ tags: lead.tags as string[] | null, source: lead.source })
+                ? lifetimeSpend
+                : 0;
 
             const profileData = {
                 name: lead.fullName || lead.email || 'Unknown',
@@ -130,12 +133,12 @@ export async function GET(
             t.status === 'succeeded' || t.status === 'paid' || t.status === 'completed'
         );
 
-        const contactLtv = contact.ltvAllCents || successfulTransactions.reduce((sum: number, t: any) =>
-            sum + (t.amountMinor || 0), 0
-        );
+        // Calculate LTV from transactions (single source of truth)
+        const contactLtvFromTransactions = calculateLtvFromTransactions(transactions);
 
-        // Use the maximum of Contact LTV or Linked Lead LTV
-        const lifetimeSpend = Math.max(contactLtv, linkedLead?.ltvAllCents || 0);
+        // If there's a linked lead with transactions, include those too
+        // Note: linkedLead doesn't have transactions loaded, so we only use contact transactions
+        const lifetimeSpend = contactLtvFromTransactions;
 
         const profileData = {
             name: contact.fullName || 'Unknown',
