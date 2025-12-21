@@ -20,12 +20,6 @@ export async function GET(
             where: { id },
             include: {
                 transactions: {
-                    where: {
-                        status: {
-                            in: ['completed', 'paid', 'PAID', 'succeeded', 'success', 'succeeded'],
-                            mode: 'insensitive'
-                        }
-                    },
                     orderBy: { occurredAt: 'desc' },
                     take: 50,
                 },
