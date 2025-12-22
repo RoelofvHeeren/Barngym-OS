@@ -186,8 +186,48 @@ export async function GET(request: Request) {
     const leadEmails = leads.map((l) => l.email).filter(Boolean) as string[];
     const contacts = await prisma.contact.findMany({
       where: { email: { in: leadEmails } },
-      select: { id: true, email: true },
+      select: {
+        id: true,
+        email: true,
+        transactions: {
+          select: { occurredAt: true, amountMinor: true, status: true, productType: true }
+        }
+      },
     });
+
+    // Add Contact transactions to the paymentsMap to get complete LTV
+    contacts.forEach((contact) => {
+      if (!contact.email) return;
+      // Find the lead associated with this contact
+      const lead = leads.find(l => l.email?.toLowerCase() === contact.email?.toLowerCase());
+      if (!lead) return;
+
+      const existing = paymentsMap.get(lead.id);
+      let totalLtvCents = existing?.totalLtvCents ?? 0;
+      const categories = existing?.categories ?? new Set<string>();
+      let first = existing?.first;
+
+      // Add successful contact transactions
+      contact.transactions.forEach((tx) => {
+        const status = tx.status?.toLowerCase();
+        if (status && ['completed', 'paid', 'succeeded', 'success', 'settled'].includes(status)) {
+          totalLtvCents += (tx.amountMinor || 0);
+          if (tx.productType) categories.add(tx.productType);
+          if (!first || tx.occurredAt < first) {
+            first = tx.occurredAt;
+          }
+        }
+      });
+
+      if (totalLtvCents > 0) {
+        paymentsMap.set(lead.id, {
+          first: first ?? new Date(),
+          categories,
+          totalLtvCents
+        });
+      }
+    });
+
     const contactMap = new Map<string, string>();
     contacts.forEach((c) => {
       if (c.email) contactMap.set(c.email.toLowerCase(), c.id);
