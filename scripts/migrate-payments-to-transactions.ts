@@ -1,5 +1,5 @@
-import { prisma } from './src/lib/prisma';
-import { calculateLtvFromTransactions } from './src/utils/calculateLTV';
+import { prisma } from '../src/lib/prisma';
+import { calculateLtvFromTransactions } from '../src/utils/calculateLTV';
 
 /**
  * Migration Script: Consolidate Lead.payments into Contact.transactions
