@@ -141,39 +141,16 @@ export async function GET(request: Request) {
 
     const leadIds = leads.map((lead) => lead.id);
 
-    const [payments, tracking] = await Promise.all([
-      prisma.payment.findMany({
-        where: {
-          leadId: { in: leadIds },
-        },
-        select: { leadId: true, timestamp: true, productType: true, amountCents: true },
-        orderBy: { timestamp: "asc" },
-      }),
-      prisma.leadTracking.findMany({
-        where: {
-          leadId: { in: leadIds },
-          ...(campaignFilter ? { campaignId: campaignFilter } : {}),
-        },
-        orderBy: { createdAt: "asc" },
-      }),
-    ]);
-
-    // Build payment aggregations per lead
-    // Compute LTV directly from payments (source of truth) instead of stored fields
-    const paymentsMap = new Map<string, { first: Date; categories: Set<string>; totalLtvCents: number }>();
-    payments.forEach((p) => {
-      if (!p.leadId) return;
-      const existing = paymentsMap.get(p.leadId);
-
-      const first = existing?.first ?? p.timestamp; // already sorted asc
-      const categories = existing?.categories ?? new Set<string>();
-      if (p.productType) categories.add(p.productType);
-
-      // Sum ALL payments for LTV (not period-based)
-      const totalLtvCents = (existing?.totalLtvCents ?? 0) + (p.amountCents ?? 0);
-
-      paymentsMap.set(p.leadId, { first, categories, totalLtvCents });
+    const tracking = await prisma.leadTracking.findMany({
+      where: {
+        leadId: { in: leadIds },
+        ...(campaignFilter ? { campaignId: campaignFilter } : {}),
+      },
+      orderBy: { createdAt: "asc" },
     });
+
+    // paymentsMap will be populated from Contact transactions below
+    const paymentsMap = new Map<string, { first: Date; categories: Set<string>; totalLtvCents: number }>();
 
     const trackingMap = new Map<string, typeof tracking>();
     tracking.forEach((t) => {
@@ -195,19 +172,22 @@ export async function GET(request: Request) {
       },
     });
 
-    // Add Contact transactions to the paymentsMap to get complete LTV
+    // Map to store LTV and payment info derived from Contact transactions
+    const ltvInfoMap = new Map<string, { first: Date; categories: Set<string>; totalLtvCents: number }>();
+
+    // Use ONLY Contact transactions as single source of truth (no Lead payments)
+    // This prevents double-counting and matches the profile API behavior
     contacts.forEach((contact) => {
       if (!contact.email) return;
       // Find the lead associated with this contact
       const lead = leads.find(l => l.email?.toLowerCase() === contact.email?.toLowerCase());
       if (!lead) return;
 
-      const existing = paymentsMap.get(lead.id);
-      let totalLtvCents = existing?.totalLtvCents ?? 0;
-      const categories = existing?.categories ?? new Set<string>();
-      let first = existing?.first;
+      let totalLtvCents = 0;
+      const categories = new Set<string>();
+      let first: Date | undefined;
 
-      // Add successful contact transactions
+      // Calculate LTV from Contact transactions ONLY
       contact.transactions.forEach((tx) => {
         const status = tx.status?.toLowerCase();
         if (status && ['completed', 'paid', 'succeeded', 'success', 'settled'].includes(status)) {
