@@ -47,8 +47,6 @@ export async function POST(request: NextRequest) {
                         productType: true,
                     }
                 },
-                // Fetch linked lead mainly for reporting/reference
-                email: true,
             }
         });
 
