@@ -199,54 +199,7 @@ export async function GET(request: Request) {
     const metaSpendCents = Math.round((metaSpendAgg._sum.spend ?? 0) * 100);
     let spendCents = manualSpendCents + metaSpendCents;
 
-    // Default Budget Logic if no real data
-    if (spendCents === 0) {
-      const MONTHLY_BUDGET_CENTS = 750 * 100;
-      const DAILY_BUDGET_CENTS = Math.round(MONTHLY_BUDGET_CENTS / 30);
-
-      switch (rangeParam as RangeKey) {
-        case "today":
-          spendCents = DAILY_BUDGET_CENTS;
-          break;
-        case "7d":
-          spendCents = DAILY_BUDGET_CENTS * 7;
-          break;
-        case "30d":
-          spendCents = MONTHLY_BUDGET_CENTS;
-          break;
-        case "month": {
-          const now = new Date();
-          const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-          const currentDay = now.getDate();
-          // Prorate: (CurrentDay / DaysInMonth) * MonthlyBudget? 
-          // Or just CurrentDay * DailyBudget?
-          // User said: "increase by 25 bucks... if it's the 10th... should show 250".
-          // So CurrentDay * DAILY_BUDGET_CENTS.
-          // But cap at Monthly Budget if end of month?
-          spendCents = Math.min(currentDay * DAILY_BUDGET_CENTS, MONTHLY_BUDGET_CENTS);
-          break;
-        }
-        case "all":
-          // Estimate duration based on first ever ad lead
-          const firstLead = await prisma.lead.findFirst({
-            where: isAdsLeadFilter,
-            orderBy: { createdAt: "asc" },
-            select: { createdAt: true },
-          });
-
-          if (firstLead) {
-            const now = new Date();
-            const start = firstLead.createdAt;
-            const diffTime = Math.abs(now.getTime() - start.getTime());
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-            // Prorate based on days to be more precise than just months
-            spendCents = Math.round(diffDays * DAILY_BUDGET_CENTS);
-          } else {
-            spendCents = 0;
-          }
-          break;
-      }
-    }
+    // If no real data, spendCents remains 0. We no longer use a fallback budget.
 
     const cplCents = leadsCount ? Math.round(spendCents / leadsCount) : 0;
     const cpaCents = conversionsCount ? Math.round(spendCents / conversionsCount) : 0;
