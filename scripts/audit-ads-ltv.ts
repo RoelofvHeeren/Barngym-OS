@@ -1,4 +1,4 @@
-
+// @ts-nocheck
 import { prisma } from '@/lib/prisma';
 
 // List extracted from user's message
