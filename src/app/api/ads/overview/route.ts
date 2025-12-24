@@ -6,6 +6,12 @@ export const dynamic = "force-dynamic";
 
 type RangeKey = "today" | "7d" | "30d" | "month" | "all";
 
+// --- Configuration ---
+// Per business rules: Between 25 Sept 2024 and 24 Dec 2025, Meta API is the single source of truth.
+// We must strictly exclude CSV imports for this period to avoid double counting.
+const META_SOURCE_START = new Date("2024-09-25T00:00:00.000Z");
+const META_SOURCE_END = new Date("2025-12-24T23:59:59.999Z");
+
 const parseRange = (range?: string): { start: Date | null; end: Date } => {
   const now = new Date();
   const end = now;
@@ -80,7 +86,6 @@ export async function GET(request: Request) {
     const dateFilter = start ? { gte: start, lte: end } : { lte: end };
 
     // Filter by submissionDate OR createdAt
-    // Filter by submissionDate OR createdAt
     const whereCondition = {
       AND: [
         isAdsLeadFilter,
@@ -136,7 +141,6 @@ export async function GET(request: Request) {
 
     // 3a. Avg LTV for ads clients (All Time)
     // Use Contact.ltvAllCents as source of truth (same as /api/ads/leads)
-    // This ensures consistency between dashboard overview and the leads list.
     const adsClientsLeads = await prisma.lead.findMany({
       where: {
         ...isAdsLeadFilter,
@@ -170,28 +174,14 @@ export async function GET(request: Request) {
       }
     }
 
-    // fallback for clients count if we missed some via email match (unlikely but safe)
-    // actually, we should probably stick to the count of leads for "Total Clients" 
-    // but for LTV average, we only count those with LTV.
-    // Let's use the contact count for consistency with the LTV sum.
-
     const avgLtvAdsCents = totalAdsClients > 0 ? Math.round(totalAdsLtv / totalAdsClients) : 0;
-    // 4. Spend: Real data OR Default Budget
-    // Exclude "Historical Manual Import" from specific ranges (like 7d, 30d) because it's a lump sum spanning a year.
-    // It should only show up in "All Time" (where start is null).
-    const isHistoricalIncluded = !start;
 
-    // 4. Spend: Hybrid Logic (Meta > Manual > CSV)
-    // Strategy: 
-    // - Always count "Real Manual" (user entered via UI).
-    // - For Programmatic Source: Prefer Live Meta data. If missing (0), use CSV Import.
+    // 4. Spend: Hybrid Logic (Meta > Manual > CSV) using Precedence Rules
 
     // Define shared filter
     const spendWhere = start ? { periodStart: { lte: end }, periodEnd: { gte: start } } : {};
 
-    // A. Real Manual Spend (Exclude CSV & Historical Fallback)
-    // "Historical Manual Import" is a lump sum covering 2020-2025. 
-    // Since we now have live Meta data (2024+) and CSV Fallback (2024+), we must exclude this legacy lump sum to prevent double counting.
+    // A. Real Manual Spend (Strict Rule: Exclude "Historical Manual Import" and "CSV_FALLBACK" completely from Manual)
     const nonManualSources = ["Historical Manual Import"];
 
     const realManualAgg = await prisma.adsSpend.aggregate({
@@ -206,34 +196,63 @@ export async function GET(request: Request) {
     });
     const realManualSpendCents = realManualAgg._sum.amountCents ?? 0;
 
-    // B. CSV Fallback Spend
+    // B. CSV Fallback Spend (Precedence Rule: Exclude records within [Sept 25 2024, Dec 24 2025])
     const csvAgg = await prisma.adsSpend.aggregate({
       _sum: { amountCents: true },
       where: {
         AND: [
           spendWhere,
-          { source: { startsWith: "CSV_FALLBACK" } }
+          { source: { startsWith: "CSV_FALLBACK" } },
+          {
+            // The record is REJECTED if it fully falls within the Meta Window, or overlaps significantly?
+            // "Avoid using CSV-uploaded ad data for spend within this date range"
+            // Let's exclude if periodStart >= META_START && periodEnd <= META_END?
+            // Or if ANY overlap? 
+            // Most rigorous: If the CSV record provides data for the Meta Window, exclude it.
+            // CSV usually comes in "chunks" (e.g. Month).
+            // Safer to use NOT(Overlap).
+            // Logic: Exclude if (RecordStart <= MetaEnd) AND (RecordEnd >= MetaStart).
+            // Wait, we want to exclude CSV *only* for the days covered by Meta.
+            // But CSV records are aggregated.
+            // If we have a CSV row for "Nov 2024", and Meta covers Nov 2024, we drop the CSV row.
+            // YES.
+            NOT: {
+              AND: [
+                { periodStart: { lte: META_SOURCE_END } },
+                { periodEnd: { gte: META_SOURCE_START } }
+              ]
+            }
+          }
         ]
       }
     });
     const csvSpendCents = csvAgg._sum.amountCents ?? 0;
 
-    // C. Meta Live Spend
+    // C. Meta Live Spend (The source of truth for the Window)
     const metaSpendAgg = await prisma.metaDailyInsight.aggregate({
       _sum: { spend: true },
       where: start ? { date: { gte: start, lte: end } } : {},
     });
     const metaSpendCents = Math.round((metaSpendAgg._sum.spend ?? 0) * 100);
 
-    // D. Final Period Spend
-    const programmaticSpend = metaSpendCents > 0 ? metaSpendCents : csvSpendCents;
+    // D. Final Period Spend = Manual + Meta + (Filtered CSV)
+    // Note: CSV is already filtered to NOT overlap with Meta Window.
+    // So we can safely sum them?
+    // What if we are outside the window? 
+    // Outside window: CSV is included (if filters match). Meta is included (if exists).
+    // Original Logic was "Meta > CSV" (if Meta > 0, use Meta).
+    // New Logic: "Meta Only in Window". "CSV Only outside?".
+    // Actually, simply summing them is fine because:
+    // 1. Inside Window: CSV is 0 (filtered out). Meta is X. Sum = X. Correct.
+    // 2. Outside Window: CSV is Y. Meta is 0 (presumably not synced). Sum = Y. Correct.
+    // 3. Overlap at boundary? The NOT(Overlap) filter handles coarse collisions.
+    const programmaticSpend = metaSpendCents + csvSpendCents;
     const spendCents = realManualSpendCents + programmaticSpend;
 
     const cplCents = leadsCount ? Math.round(spendCents / leadsCount) : 0;
     const cpaCents = conversionsCount ? Math.round(spendCents / conversionsCount) : 0;
 
     // 5. Cohort-based ROAS: Total LTV / All-Time Spend
-    // Apply same hybrid logic for All-Time
 
     // All-time Manual (Strict)
     const allTimeManualAgg = await prisma.adsSpend.aggregate({
@@ -247,10 +266,22 @@ export async function GET(request: Request) {
     });
     const allTimeManual = allTimeManualAgg._sum.amountCents ?? 0;
 
-    // All-time CSV
+    // All-time CSV (Strictly Exclude Window)
     const allTimeCsvAgg = await prisma.adsSpend.aggregate({
       _sum: { amountCents: true },
-      where: { source: { startsWith: 'CSV_FALLBACK' } }
+      where: {
+        AND: [
+          { source: { startsWith: 'CSV_FALLBACK' } },
+          {
+            NOT: {
+              AND: [
+                { periodStart: { lte: META_SOURCE_END } },
+                { periodEnd: { gte: META_SOURCE_START } }
+              ]
+            }
+          }
+        ]
+      }
     });
     const allTimeCsv = allTimeCsvAgg._sum.amountCents ?? 0;
 
@@ -260,7 +291,7 @@ export async function GET(request: Request) {
     });
     const allTimeMeta = Math.round((allTimeMetaAgg._sum.spend ?? 0) * 100);
 
-    const allTimeProgrammatic = allTimeMeta > 0 ? allTimeMeta : allTimeCsv;
+    const allTimeProgrammatic = allTimeMeta + allTimeCsv;
     const allTimeSpendCents = allTimeManual + allTimeProgrammatic;
 
     const cohortRoas = allTimeSpendCents > 0 ? totalAdsLtv / allTimeSpendCents : 0;

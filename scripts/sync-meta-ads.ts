@@ -43,12 +43,8 @@ async function sync() {
         // 2. Sync Insights (Daily Spend) in Chunks
         console.log("Fetching Daily Insights (Chunked)...");
 
-        // Start from Aug 1 2024 (matching CSV start) or earlier
-        // Let's go back 18 months to be safe for "Lifetime" if needed, but CSV starts Aug 2024.
-        // User wants "Lifetime spend". If campaign started 2 years ago, we might miss data if we only go back to Aug 2024.
-        // However, fetching 2 years of DAILY data might take a while.
-        // Let's start with Jan 1 2024 for now, assuming most relevant campaigns are recent.
-        let cursor = new Date("2024-01-01");
+        // Start from Sept 25 2024 as per "Meta Source of Truth" requirement
+        let cursor = new Date("2024-09-25");
         const now = new Date();
 
         let validCount = 0;
