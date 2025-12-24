@@ -181,38 +181,78 @@ export async function GET(request: Request) {
     // It should only show up in "All Time" (where start is null).
     const isHistoricalIncluded = !start;
 
-    const adsSpendAgg = await prisma.adsSpend.aggregate({
+    // 4. Spend: Hybrid Logic (Meta > Manual > CSV)
+    // Strategy: 
+    // - Always count "Real Manual" (user entered via UI).
+    // - For Programmatic Source: Prefer Live Meta data. If missing (0), use CSV Import.
+
+    // Define shared filter
+    const spendWhere = start ? { periodStart: { lte: end }, periodEnd: { gte: start } } : {};
+
+    // A. Real Manual Spend (Exclude CSV)
+    const realManualAgg = await prisma.adsSpend.aggregate({
       _sum: { amountCents: true },
       where: {
         AND: [
-          start ? { periodStart: { lte: end }, periodEnd: { gte: start } } : {},
-          isHistoricalIncluded ? {} : { source: { not: "Historical Manual Import" } }
+          spendWhere,
+          { source: { not: { startsWith: "CSV_FALLBACK" } } }
         ]
       }
     });
+    const realManualSpendCents = realManualAgg._sum.amountCents ?? 0;
+
+    // B. CSV Fallback Spend
+    const csvAgg = await prisma.adsSpend.aggregate({
+      _sum: { amountCents: true },
+      where: {
+        AND: [
+          spendWhere,
+          { source: { startsWith: "CSV_FALLBACK" } }
+        ]
+      }
+    });
+    const csvSpendCents = csvAgg._sum.amountCents ?? 0;
+
+    // C. Meta Live Spend
     const metaSpendAgg = await prisma.metaDailyInsight.aggregate({
       _sum: { spend: true },
-      where: start ? { date: { gte: start, lte: end } } : {}, // Approx filter
+      where: start ? { date: { gte: start, lte: end } } : {},
     });
-
-    const manualSpendCents = adsSpendAgg._sum.amountCents ?? 0;
     const metaSpendCents = Math.round((metaSpendAgg._sum.spend ?? 0) * 100);
-    let spendCents = manualSpendCents + metaSpendCents;
 
-    // If no real data, spendCents remains 0. We no longer use a fallback budget.
+    // D. Final Period Spend
+    const programmaticSpend = metaSpendCents > 0 ? metaSpendCents : csvSpendCents;
+    const spendCents = realManualSpendCents + programmaticSpend;
 
     const cplCents = leadsCount ? Math.round(spendCents / leadsCount) : 0;
     const cpaCents = conversionsCount ? Math.round(spendCents / conversionsCount) : 0;
 
-    // Cohort-based ROAS: Total LTV of all ads clients / Total all-time spend
-    // This is more meaningful than period-based revenue calculations
-    const allTimeSpendAgg = await prisma.adsSpend.aggregate({
-      _sum: { amountCents: true }
+    // 5. Cohort-based ROAS: Total LTV / All-Time Spend
+    // Apply same hybrid logic for All-Time
+
+    // All-time Manual (Non-CSV)
+    const allTimeManualAgg = await prisma.adsSpend.aggregate({
+      _sum: { amountCents: true },
+      where: { source: { not: { startsWith: 'CSV_FALLBACK' } } }
     });
-    const allTimeMetaSpendAgg = await prisma.metaDailyInsight.aggregate({
+    const allTimeManual = allTimeManualAgg._sum.amountCents ?? 0;
+
+    // All-time CSV
+    const allTimeCsvAgg = await prisma.adsSpend.aggregate({
+      _sum: { amountCents: true },
+      where: { source: { startsWith: 'CSV_FALLBACK' } }
+    });
+    const allTimeCsv = allTimeCsvAgg._sum.amountCents ?? 0;
+
+    // All-time Meta
+    const allTimeMetaAgg = await prisma.metaDailyInsight.aggregate({
       _sum: { spend: true }
     });
-    const allTimeSpendCents = (allTimeSpendAgg._sum.amountCents ?? 0) + Math.round((allTimeMetaSpendAgg._sum.spend ?? 0) * 100);
+    const allTimeMeta = Math.round((allTimeMetaAgg._sum.spend ?? 0) * 100);
+
+    const allTimeProgrammatic = allTimeMeta > 0 ? allTimeMeta : allTimeCsv;
+    const allTimeSpendCents = allTimeManual + allTimeProgrammatic;
+
     const cohortRoas = allTimeSpendCents > 0 ? totalAdsLtv / allTimeSpendCents : 0;
 
     return NextResponse.json({
