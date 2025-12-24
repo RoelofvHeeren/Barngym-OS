@@ -166,6 +166,7 @@ export async function GET(request: Request) {
       select: {
         id: true,
         email: true,
+        ltvAllCents: true,
         transactions: {
           select: { occurredAt: true, amountMinor: true, status: true, productType: true }
         }
