@@ -29,6 +29,13 @@ function safeString(value: unknown): string | undefined {
   return trimmed.length ? trimmed : undefined;
 }
 
+export const REVENUE_STATUSES = ["Completed", "Paid", "PAID", "succeeded", "SETTLED", "success", "COMPLETED"];
+
+export function isRevenueTransaction(status: string | null | undefined): boolean {
+  if (!status) return false;
+  return REVENUE_STATUSES.some(s => s.toLowerCase() === status.toLowerCase());
+}
+
 export async function upsertTransactions(records: NormalizedTransaction[]) {
   if (!records.length) {
     return { added: 0, total: await prisma.transaction.count() };

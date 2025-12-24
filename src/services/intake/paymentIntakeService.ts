@@ -166,5 +166,17 @@ export async function ingestGlofoxPayment(rawPayload: any) {
     ghlContactId: payment.ghlContactId ?? payment.contactId ?? null,
   };
 
+  /*
+    Status Check: Only ingest actual revenue (Completed/Paid).
+    We use the same logic as Transactions to ensure consistency.
+  */
+  const statusValue = (payment.payment_status ?? payment.status ?? "").toString();
+  const REVENUE_STATUSES = ["Completed", "Paid", "PAID", "succeeded", "SETTLED", "success", "COMPLETED"];
+  const isRevenue = REVENUE_STATUSES.some(s => s.toLowerCase() === statusValue.toLowerCase());
+
+  if (!isRevenue) {
+    return null;
+  }
+
   return ingestPayment(normalized);
 }

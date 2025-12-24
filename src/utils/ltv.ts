@@ -49,7 +49,7 @@ export async function recalculateLeadLtv(leadId: string) {
         // 1. Calculate All LTV
         // We base it on the Payments table which is the source of truth for revenue.
         const ltvAllCents = lead.payments.reduce(
-            (sum, p) => sum + (p.amountCents ?? 0),
+            (sum: number, p: any) => sum + (p.amountCents ?? 0), // p is Payment but we can use any if explicit or import Payment
             0
         );
 
@@ -127,7 +127,10 @@ export async function recalculateContactLtv(contactId: string) {
         const aggregate = await prisma.transaction.aggregate({
             where: {
                 contactId,
-                status: { in: ["Completed", "succeeded", "SETTLED", "paid", "success"] },
+                status: {
+                    in: ["Completed", "Paid", "PAID", "succeeded", "SETTLED", "success", "COMPLETED"],
+                    mode: "insensitive"
+                },
             },
             _sum: {
                 amountMinor: true,

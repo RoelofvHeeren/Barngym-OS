@@ -40,6 +40,7 @@ async function aggregateRevenue(targetYear: number) {
     where: {
       amountMinor: { gt: 0 },
       occurredAt: { gte: yearStart, lte: yearEnd },
+      status: { in: ["Completed", "Paid", "PAID", "succeeded", "SETTLED", "success", "COMPLETED"] }
     },
     select: { amountMinor: true, provider: true, productType: true, occurredAt: true },
   });

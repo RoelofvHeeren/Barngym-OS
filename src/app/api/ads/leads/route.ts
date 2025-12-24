@@ -175,23 +175,20 @@ export async function GET(request: Request) {
     // Map to store LTV and payment info derived from Contact transactions
     const ltvInfoMap = new Map<string, { first: Date; categories: Set<string>; totalLtvCents: number }>();
 
-    // Use ONLY Contact transactions as single source of truth (no Lead payments)
-    // This prevents double-counting and matches the profile API behavior
+    // Use Contact transactions and stored LTV as single source of truth
     contacts.forEach((contact) => {
       if (!contact.email) return;
       // Find the lead associated with this contact
       const lead = leads.find(l => l.email?.toLowerCase() === contact.email?.toLowerCase());
       if (!lead) return;
 
-      let totalLtvCents = 0;
       const categories = new Set<string>();
       let first: Date | undefined;
 
-      // Calculate LTV from Contact transactions ONLY
+      // Extract metadata from transactions for display (categories, first payment date)
       contact.transactions.forEach((tx) => {
         const status = tx.status?.toLowerCase();
         if (status && ['completed', 'paid', 'succeeded', 'success', 'settled'].includes(status)) {
-          totalLtvCents += (tx.amountMinor || 0);
           if (tx.productType) categories.add(tx.productType);
           if (!first || tx.occurredAt < first) {
             first = tx.occurredAt;
@@ -199,11 +196,13 @@ export async function GET(request: Request) {
         }
       });
 
-      if (totalLtvCents > 0) {
+      // Use the stored LTV value (which is now guaranteed correct by our backfill script)
+      // This is much faster and ensures consistency with other parts of the app
+      if (contact.ltvAllCents > 0) {
         paymentsMap.set(lead.id, {
           first: first ?? new Date(),
           categories,
-          totalLtvCents
+          totalLtvCents: contact.ltvAllCents
         });
       }
     });

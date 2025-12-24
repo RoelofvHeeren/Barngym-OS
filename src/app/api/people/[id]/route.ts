@@ -127,12 +127,9 @@ export async function GET(
             t.status === 'succeeded' || t.status === 'paid' || t.status === 'completed'
         );
 
-        // Calculate LTV from transactions (single source of truth)
-        const contactLtvFromTransactions = calculateLtvFromTransactions(transactions);
-
-        // If there's a linked lead with transactions, include those too
-        // Note: linkedLead doesn't have transactions loaded, so we only use contact transactions
-        const lifetimeSpend = contactLtvFromTransactions;
+        // Use stored LTV as primary source of truth (faster and consistent)
+        // Fallback to calculation only if needed (though backfill ensures integrity)
+        const lifetimeSpend = contact.ltvAllCents ?? calculateLtvFromTransactions(transactions);
 
         const profileData = {
             name: contact.fullName || 'Unknown',

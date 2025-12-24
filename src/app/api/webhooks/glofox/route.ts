@@ -136,6 +136,43 @@ async function handleMemberEvent(eventType: string, payload: Record<string, unkn
     create: data,
   });
 
+  // Upsert Lead (for Transaction Mapping & CRM)
+  // We try to match existing Lead by email/GlofoxID
+  const existingLead = await prisma.lead.findFirst({
+    where: {
+      OR: [
+        { glofoxMemberId: data.memberId },
+        data.email ? { email: data.email } : undefined,
+      ].filter(Boolean) as any
+    }
+  });
+
+  if (existingLead) {
+    await prisma.lead.update({
+      where: { id: existingLead.id },
+      data: {
+        firstName: data.firstName,
+        lastName: data.lastName,
+        email: data.email,
+        phone: data.phone,
+        glofoxMemberId: data.memberId,
+        // Update tags or other fields if desired
+      }
+    });
+  } else {
+    await prisma.lead.create({
+      data: {
+        firstName: data.firstName,
+        lastName: data.lastName,
+        email: data.email,
+        phone: data.phone,
+        glofoxMemberId: data.memberId,
+        source: "Glofox Webhook",
+        stage: "New",
+      }
+    });
+  }
+
   // Sync to GHL
   // Store mapping in GlofoxGhlLink if needed, but for now just push to GHL
   await syncToGHL("contacts/upsert", {

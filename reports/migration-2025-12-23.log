@@ -1,0 +1,86 @@
+[2025-12-23T13:10:05.904Z] 
+⚠️  WARNING: Running in LIVE mode. Data will be modified!
+
+[2025-12-23T13:10:05.904Z] Press Ctrl+C to cancel, or wait 5 seconds to continue...
+
+[2025-12-23T13:10:10.905Z] 
+======================================================================
+[2025-12-23T13:10:10.906Z] Resilient Payment Migration (LIVE)
+[2025-12-23T13:10:10.906Z] ======================================================================
+[2025-12-23T13:10:10.906Z] 
+🚀 Starting new migration...
+[2025-12-23T13:10:10.906Z] Attempting database connection (attempt 1/10)...
+[2025-12-23T13:10:15.942Z] Connection failed: Can't reach database server at `caboose.proxy.rlwy.net:16552`
+
+Please make sure your database server is running at `caboose.proxy.rlwy.net:16552`.
+[2025-12-23T13:10:15.942Z] Retrying in 2s...
+[2025-12-23T13:10:17.944Z] Attempting database connection (attempt 2/10)...
+[2025-12-23T13:10:24.263Z] ✓ Database connected successfully
+[2025-12-23T13:10:24.263Z] 
+Fetching payments...
+[2025-12-23T13:10:31.084Z] Found 1167 total payments
+[2025-12-23T13:10:31.084Z] Processing from index 0...
+
+[2025-12-23T13:11:51.371Z] Checkpoint: 50/1167 (4%)
+[2025-12-23T13:12:25.328Z] Connection error processing payment cmiwy18lv008suqpktrruulbo, retrying...
+[2025-12-23T13:12:27.330Z] Attempting database connection (attempt 1/10)...
+[2025-12-23T13:12:28.062Z] ✓ Database connected successfully
+[2025-12-23T13:13:27.491Z] Checkpoint: 100/1167 (9%)
+[2025-12-23T13:14:22.014Z] Checkpoint: 150/1167 (13%)
+[2025-12-23T13:15:28.287Z] Connection error processing payment cmiwyd9ij012zuqpkw35fp9oz, retrying...
+[2025-12-23T13:15:30.288Z] Attempting database connection (attempt 1/10)...
+[2025-12-23T13:15:35.292Z] Connection failed: 
+Invalid `prisma.$queryRaw()` invocation:
+
+
+Can't reach database server at `caboose.proxy.rlwy.net:16552`
+
+Please make sure your database server is running at `caboose.proxy.rlwy.net:16552`.
+[2025-12-23T13:15:35.292Z] Retrying in 2s...
+[2025-12-23T13:15:37.294Z] Attempting database connection (attempt 2/10)...
+[2025-12-23T13:15:42.298Z] Connection failed: 
+Invalid `prisma.$queryRaw()` invocation:
+
+
+Can't reach database server at `caboose.proxy.rlwy.net:16552`
+
+Please make sure your database server is running at `caboose.proxy.rlwy.net:16552`.
+[2025-12-23T13:15:42.298Z] Retrying in 4s...
+[2025-12-23T13:15:46.299Z] Attempting database connection (attempt 3/10)...
+[2025-12-23T13:15:50.720Z] ✓ Database connected successfully
+[2025-12-23T13:15:57.124Z] Checkpoint: 200/1167 (17%)
+[2025-12-23T13:16:52.838Z] Checkpoint: 250/1167 (21%)
+[2025-12-23T13:17:50.937Z] Checkpoint: 300/1167 (26%)
+[2025-12-23T13:18:44.390Z] Checkpoint: 350/1167 (30%)
+[2025-12-23T13:19:27.969Z] Checkpoint: 400/1167 (34%)
+[2025-12-23T13:20:12.931Z] Checkpoint: 450/1167 (39%)
+[2025-12-23T13:21:08.621Z] Checkpoint: 500/1167 (43%)
+[2025-12-23T13:22:17.252Z] Checkpoint: 550/1167 (47%)
+[2025-12-23T13:23:36.236Z] Checkpoint: 600/1167 (51%)
+[2025-12-23T13:24:38.003Z] Checkpoint: 650/1167 (56%)
+[2025-12-23T13:25:47.950Z] Checkpoint: 700/1167 (60%)
+[2025-12-23T13:26:51.493Z] Checkpoint: 750/1167 (64%)
+[2025-12-23T13:28:17.469Z] Checkpoint: 800/1167 (69%)
+[2025-12-23T13:30:06.844Z] Checkpoint: 850/1167 (73%)
+[2025-12-23T13:31:06.852Z] Checkpoint: 900/1167 (77%)
+[2025-12-23T16:57:43.116Z] Connection error processing payment cmiwzk7r503zjuqpkplw98uz3, retrying...
+[2025-12-23T16:57:45.121Z] Attempting database connection (attempt 1/10)...
+[2025-12-23T16:57:49.135Z] ✓ Database connected successfully
+[2025-12-23T16:58:08.687Z] Checkpoint: 950/1167 (81%)
+[2025-12-23T16:59:19.663Z] Checkpoint: 1000/1167 (86%)
+[2025-12-23T16:59:54.776Z] Checkpoint: 1050/1167 (90%)
+[2025-12-23T17:00:35.285Z] Checkpoint: 1100/1167 (94%)
+[2025-12-23T17:01:15.284Z] Checkpoint: 1150/1167 (99%)
+[2025-12-23T17:01:25.498Z] 
+======================================================================
+[2025-12-23T17:01:25.499Z] Total Payments:          1167
+[2025-12-23T17:01:25.499Z] ======================================================================
+[2025-12-23T17:01:25.499Z] Migration Complete!
+[2025-12-23T17:01:25.499Z] Contacts Created:        0
+[2025-12-23T17:01:25.499Z] Transactions Created:    183
+[2025-12-23T17:01:25.499Z] Processed:               1167
+[2025-12-23T17:01:25.499Z] Leads Linked:            183
+[2025-12-23T17:01:25.499Z] ======================================================================
+
+[2025-12-23T17:01:25.499Z] Errors:                  0
+[2025-12-23T17:01:25.499Z] Transactions Skipped:    984

@@ -1,0 +1,14 @@
+{
+  "lastProcessedPaymentIndex": 1166,
+  "lastProcessedPaymentId": "cmj0vrfni0027uqyq3224kuh1",
+  "totalPayments": 1167,
+  "processedCount": 1167,
+  "contactsCreated": 0,
+  "transactionsCreated": 183,
+  "transactionsSkipped": 984,
+  "leadsLinked": 183,
+  "errors": [],
+  "startedAt": "2025-12-23T13:10:10.906Z",
+  "lastCheckpoint": "2025-12-23T17:01:25.497Z",
+  "completed": true
+}
