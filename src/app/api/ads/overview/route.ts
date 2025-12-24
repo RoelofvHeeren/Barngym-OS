@@ -189,13 +189,18 @@ export async function GET(request: Request) {
     // Define shared filter
     const spendWhere = start ? { periodStart: { lte: end }, periodEnd: { gte: start } } : {};
 
-    // A. Real Manual Spend (Exclude CSV)
+    // A. Real Manual Spend (Exclude CSV & Historical Fallback)
+    // "Historical Manual Import" is a lump sum covering 2020-2025. 
+    // Since we now have live Meta data (2024+) and CSV Fallback (2024+), we must exclude this legacy lump sum to prevent double counting.
+    const nonManualSources = ["Historical Manual Import"];
+
     const realManualAgg = await prisma.adsSpend.aggregate({
       _sum: { amountCents: true },
       where: {
         AND: [
           spendWhere,
-          { source: { not: { startsWith: "CSV_FALLBACK" } } }
+          { source: { not: { startsWith: "CSV_FALLBACK" } } },
+          { source: { notIn: nonManualSources } }
         ]
       }
     });
@@ -230,10 +235,15 @@ export async function GET(request: Request) {
     // 5. Cohort-based ROAS: Total LTV / All-Time Spend
     // Apply same hybrid logic for All-Time
 
-    // All-time Manual (Non-CSV)
+    // All-time Manual (Strict)
     const allTimeManualAgg = await prisma.adsSpend.aggregate({
       _sum: { amountCents: true },
-      where: { source: { not: { startsWith: 'CSV_FALLBACK' } } }
+      where: {
+        AND: [
+          { source: { not: { startsWith: "CSV_FALLBACK" } } },
+          { source: { notIn: nonManualSources } }
+        ]
+      }
     });
     const allTimeManual = allTimeManualAgg._sum.amountCents ?? 0;
 
