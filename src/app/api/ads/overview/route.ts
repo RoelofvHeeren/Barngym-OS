@@ -140,7 +140,8 @@ export async function GET(request: Request) {
     const adsClientsLeads = await prisma.lead.findMany({
       where: {
         ...isAdsLeadFilter,
-        isClient: true
+        isClient: true,
+        payments: { some: {} } // Ensure they are strictly "acquired" (have purchase history)
       },
       select: {
         email: true
