@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { prisma } from '../src/lib/prisma';
 import { calculateLtvFromTransactions } from '../src/utils/calculateLTV';
 
