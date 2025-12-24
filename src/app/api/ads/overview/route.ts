@@ -135,28 +135,45 @@ export async function GET(request: Request) {
     }
 
     // 3a. Avg LTV for ads clients (All Time)
-    // Calculate from Payments table directly (same as /api/ltv/categories)
-    // This ensures consistency between dashboards.
-    const adsClientsForLtv = await prisma.lead.findMany({
+    // Use Contact.ltvAllCents as source of truth (same as /api/ads/leads)
+    // This ensures consistency between dashboard overview and the leads list.
+    const adsClientsLeads = await prisma.lead.findMany({
       where: {
         ...isAdsLeadFilter,
         isClient: true
       },
       select: {
-        id: true,
-        payments: { select: { amountCents: true } }
+        email: true
+      }
+    });
+
+    const leadEmails = adsClientsLeads.map(l => l.email).filter(Boolean) as string[];
+
+    // Fetch corresponding contacts to get the canonical LTV
+    const adsContacts = await prisma.contact.findMany({
+      where: {
+        email: { in: leadEmails }
+      },
+      select: {
+        ltvAllCents: true
       }
     });
 
     let totalAdsLtv = 0;
     let totalAdsClients = 0;
-    for (const client of adsClientsForLtv) {
-      const clientLtv = client.payments.reduce((sum, p) => sum + (p.amountCents || 0), 0);
-      if (clientLtv > 0) {
-        totalAdsLtv += clientLtv;
+
+    for (const contact of adsContacts) {
+      if (contact.ltvAllCents > 0) {
+        totalAdsLtv += contact.ltvAllCents;
         totalAdsClients++;
       }
     }
+
+    // fallback for clients count if we missed some via email match (unlikely but safe)
+    // actually, we should probably stick to the count of leads for "Total Clients" 
+    // but for LTV average, we only count those with LTV.
+    // Let's use the contact count for consistency with the LTV sum.
+
     const avgLtvAdsCents = totalAdsClients > 0 ? Math.round(totalAdsLtv / totalAdsClients) : 0;
     // 4. Spend: Real data OR Default Budget
     // Exclude "Historical Manual Import" from specific ranges (like 7d, 30d) because it's a lump sum spanning a year.
